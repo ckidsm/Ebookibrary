@@ -838,8 +838,17 @@
             if (!book) return;
             const slug = slugify(book.title);
             const analyzed = _analyzedMap.get(slug);
-            const origLink = (book.meta_json && tryParseJson(book.meta_json)?.link)
-                          || (book.kyobo_id ? `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.title)}` : '');
+            // 외부 원본 링크 우선순위: 1) meta_json.link 2) kyobo_id 식별 URL 3) title 검색
+            let origLink = '';
+            const meta = book.meta_json ? tryParseJson(book.meta_json) : null;
+            if (meta?.link) {
+                origLink = meta.link;
+            } else if (book.kyobo_id) {
+                // ebook 상품 페이지 직링 (e-Library 도서함과는 다름)
+                origLink = `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.kyobo_id)}`;
+            } else if (book.title) {
+                origLink = `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.title)}`;
+            }
 
             const cover = book.cover_url
                 ? `<img class="bmodal-cover" src="${escapeAttr(book.cover_url)}" alt="" onerror="this.outerHTML='<div class=&quot;bmodal-cover-ph&quot;>📕</div>'">`
@@ -847,7 +856,7 @@
 
             const statusHtml = analyzed
                 ? `<span class="bmodal-status is-analyzed">✓ 분석 완료 · ${analyzed.pages}페이지</span>`
-                : `<span class="bmodal-status is-none">⏳ 미분석</span>`;
+                : `<span class="bmodal-status is-none" title="아래 [📊 분석 시작] 으로 분석하면 [📖 보기]가 활성화됩니다">⏳ 미분석 · [📖 보기] 비활성</span>`;
 
             document.getElementById('bmodal-body').innerHTML = `
                 ${cover}
