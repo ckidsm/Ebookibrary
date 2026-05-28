@@ -552,6 +552,12 @@
             color: #6ee7b7;
         }
         .bbtn.is-go:hover { background: rgba(16,185,129,0.3); }
+        .bbtn.is-ebook {
+            background: rgba(165,180,252,0.15);
+            border-color: #a5b4fc;
+            color: #c7d2fe;
+        }
+        .bbtn.is-ebook:hover { background: rgba(165,180,252,0.25); }
         .bbtn[disabled] {
             opacity: 0.45;
             cursor: not-allowed;
@@ -834,21 +840,29 @@
         }
 
         // ── 도서 분석 모달 ──
+        function ebookViewerUrl(book) {
+            // 1) Userscript 가 카드 anchor 에서 추출한 link (가장 정확)
+            const meta = book.meta_json ? tryParseJson(book.meta_json) : null;
+            if (meta?.link) return meta.link;
+            // 2) kyobo_id 가 E + 숫자(8자리+) 형식이면 ebook 상품 페이지 직링
+            if (book.kyobo_id && /^E\d{6,}$/i.test(book.kyobo_id)) {
+                return `https://ebook-product.kyobobook.co.kr/dig/epd/ebook/${book.kyobo_id}`;
+            }
+            return '';
+        }
+        function searchUrl(book) {
+            const q = book.title || book.kyobo_id || '';
+            return q ? `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(q)}` : '';
+        }
+
         function openBookModal(book) {
             if (!book) return;
             const slug = slugify(book.title);
             const analyzed = _analyzedMap.get(slug);
-            // 외부 원본 링크 우선순위: 1) meta_json.link 2) kyobo_id 식별 URL 3) title 검색
-            let origLink = '';
-            const meta = book.meta_json ? tryParseJson(book.meta_json) : null;
-            if (meta?.link) {
-                origLink = meta.link;
-            } else if (book.kyobo_id) {
-                // ebook 상품 페이지 직링 (e-Library 도서함과는 다름)
-                origLink = `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.kyobo_id)}`;
-            } else if (book.title) {
-                origLink = `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.title)}`;
-            }
+
+            const summaryUrl = analyzed ? analyzed.url : '';
+            const ebookUrl = ebookViewerUrl(book);
+            const sUrl = searchUrl(book);
 
             const cover = book.cover_url
                 ? `<img class="bmodal-cover" src="${escapeAttr(book.cover_url)}" alt="" onerror="this.outerHTML='<div class=&quot;bmodal-cover-ph&quot;>📕</div>'">`
@@ -856,7 +870,7 @@
 
             const statusHtml = analyzed
                 ? `<span class="bmodal-status is-analyzed">✓ 분석 완료 · ${analyzed.pages}페이지</span>`
-                : `<span class="bmodal-status is-none" title="아래 [📊 분석 시작] 으로 분석하면 [📖 보기]가 활성화됩니다">⏳ 미분석 · [📖 보기] 비활성</span>`;
+                : `<span class="bmodal-status is-none" title="아래 [📊 분석 시작] 후 활성화됩니다">⏳ 미분석</span>`;
 
             document.getElementById('bmodal-body').innerHTML = `
                 ${cover}
@@ -871,15 +885,22 @@
                 <div id="bmodal-extra"></div>
             `;
 
-            const goUrl = analyzed ? analyzed.url : null;
+            // 푸터 — 4버튼 (분석 시작 + 분석 페이지 + e-book + 검색)
             document.getElementById('bmodal-foot').innerHTML = `
                 <button class="bbtn is-primary" id="bb-analyze">${analyzed ? '📊 다시 분석' : '📊 분석 시작'}</button>
-                ${goUrl
-                    ? `<a class="bbtn is-go" href="${escapeAttr(goUrl)}" target="_blank" rel="noopener noreferrer">📖 보기</a>`
-                    : `<button class="bbtn" disabled title="분석 완료 후 활성화">📖 보기</button>`
+
+                ${summaryUrl
+                    ? `<a class="bbtn is-go" href="${escapeAttr(summaryUrl)}" target="_blank" rel="noopener noreferrer">📊 분석 페이지</a>`
+                    : `<button class="bbtn" disabled title="분석 완료 후 활성화 (slug 폴더에 summary/index.html 생성 시)">📊 분석 페이지</button>`
                 }
-                ${origLink
-                    ? `<a class="bbtn" href="${escapeAttr(origLink)}" target="_blank" rel="noopener noreferrer">↗ 원본</a>`
+
+                ${ebookUrl
+                    ? `<a class="bbtn is-ebook" href="${escapeAttr(ebookUrl)}" target="_blank" rel="noopener noreferrer">📖 e-book 보기</a>`
+                    : `<button class="bbtn" disabled title="meta link 또는 kyobo_id (E... 형식) 없어 직링 불가">📖 e-book 보기</button>`
+                }
+
+                ${sUrl
+                    ? `<a class="bbtn" href="${escapeAttr(sUrl)}" target="_blank" rel="noopener noreferrer">↗ 검색</a>`
                     : ''
                 }
             `;
