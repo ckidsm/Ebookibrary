@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Kyobo e-Library → NAS Sync
 // @namespace    https://192.168.10.205/
-// @version      0.3.0
-// @description  교보 e-Library 페이지에서 내 도서 목록을 NAS Kyobo Bridge(9000)로 동기화
+// @version      0.4.0
+// @description  교보 e-Library 페이지에서 내 도서 목록을 NAS Kyobo Bridge(9000)로 동기화 (자동 스크롤 + author 진단)
 // @author       YUNDEOKSOO
 // @match        https://elibrary.kyobobook.co.kr/*
 // @match        https://ebook.kyobobook.co.kr/dig/*
@@ -22,7 +22,7 @@
     const DEFAULTS = { backend: 'http://192.168.10.205:9000' };
     const backendUrl = () => GM_getValue('backendUrl', DEFAULTS.backend);
 
-    // ── UI: 우측 하단 floating 패널 ────────────────────────
+    // ── UI ──────────────────────────────────────────────
     function injectPanel() {
         if (document.getElementById('nvk-panel')) return;
         const panel = document.createElement('div');
@@ -39,15 +39,15 @@
         ].join(';');
         panel.innerHTML = `
             <div style="font-weight:700;color:#22d3ee;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
-                <span>📚 NAS Sync <span style="opacity:0.6;font-weight:400;font-family:monospace;font-size:11px;">v0.3.0</span></span>
+                <span>📚 NAS Sync <span style="opacity:0.6;font-weight:400;font-family:monospace;font-size:11px;">v0.4.0</span></span>
                 <span id="nvk-close" style="cursor:pointer;opacity:0.5;font-size:16px;">×</span>
             </div>
             <div id="nvk-status" style="color:#8b96a8;font-size:12px;margin-bottom:10px;line-height:1.5;">
                 백엔드: <code id="nvk-backend" style="color:#22d3ee;">${backendUrl()}</code>
             </div>
             <div style="display:flex;gap:6px;margin-bottom:8px;">
-                <button id="nvk-preview" style="flex:1;padding:7px 10px;background:#1c2230;border:1px solid #2f3a4d;border-radius:6px;color:#e6ecf2;cursor:pointer;font-size:12px;">미리보기 (F12)</button>
-                <button id="nvk-sync" style="flex:1;padding:7px 10px;background:rgba(34,211,238,0.18);border:1px solid #22d3ee;border-radius:6px;color:#22d3ee;cursor:pointer;font-size:12px;font-weight:600;">동기화</button>
+                <button id="nvk-preview" style="flex:1;padding:7px 10px;background:#1c2230;border:1px solid #2f3a4d;border-radius:6px;color:#e6ecf2;cursor:pointer;font-size:12px;">미리보기 (현재)</button>
+                <button id="nvk-sync"    style="flex:1;padding:7px 10px;background:rgba(34,211,238,0.18);border:1px solid #22d3ee;border-radius:6px;color:#22d3ee;cursor:pointer;font-size:12px;font-weight:600;">동기화 (전체)</button>
             </div>
             <details style="font-size:11px;color:#8b96a8;">
                 <summary style="cursor:pointer;">설정·진단</summary>
@@ -55,8 +55,8 @@
                     <input id="nvk-url" type="text" value="${backendUrl()}"
                         style="width:100%;padding:5px;background:#161b24;color:#e6ecf2;border:1px solid #2f3a4d;border-radius:4px;font-family:monospace;font-size:11px;box-sizing:border-box;" />
                     <div style="display:flex;gap:4px;margin-top:5px;">
-                        <button id="nvk-save"  style="flex:1;padding:4px 8px;background:#1c2230;border:1px solid #2f3a4d;border-radius:4px;color:#e6ecf2;cursor:pointer;font-size:11px;">URL 저장</button>
-                        <button id="nvk-diag"  style="flex:1;padding:4px 8px;background:#1c2230;border:1px solid #2f3a4d;border-radius:4px;color:#e6ecf2;cursor:pointer;font-size:11px;">진단 dump</button>
+                        <button id="nvk-save" style="flex:1;padding:4px 8px;background:#1c2230;border:1px solid #2f3a4d;border-radius:4px;color:#e6ecf2;cursor:pointer;font-size:11px;">URL 저장</button>
+                        <button id="nvk-diag" style="flex:1;padding:4px 8px;background:#1c2230;border:1px solid #2f3a4d;border-radius:4px;color:#e6ecf2;cursor:pointer;font-size:11px;">진단 dump</button>
                     </div>
                 </div>
             </details>
@@ -64,8 +64,8 @@
         document.body.appendChild(panel);
 
         document.getElementById('nvk-close').onclick = () => panel.remove();
-        document.getElementById('nvk-preview').onclick = () => doExtract(true);
-        document.getElementById('nvk-sync').onclick = () => doExtract(false);
+        document.getElementById('nvk-preview').onclick = () => doExtract({ preview: true, scroll: false });
+        document.getElementById('nvk-sync').onclick = () => doExtract({ preview: false, scroll: true });
         document.getElementById('nvk-save').onclick = () => {
             const v = document.getElementById('nvk-url').value.trim();
             if (v) {
@@ -77,6 +77,11 @@
         document.getElementById('nvk-diag').onclick = () => {
             console.log('[NVK] === FULL DIAGNOSTIC DUMP ===');
             console.log('[NVK] diagnose():', diagnose());
+            const { books, selector } = extractBooks();
+            if (selector && books.length > 0) {
+                const sample = document.querySelector(selector);
+                console.log('[NVK] sample card outerHTML (첫 카드):\n', sample?.outerHTML);
+            }
             setStatus('진단 dump 콘솔 출력 — F12 → Console 확인', '#8b96a8');
         };
     }
@@ -88,12 +93,38 @@
         if (color) el.style.color = color;
     }
 
+    // ── 자동 스크롤 (무한 스크롤 페이지 대응) ─────────────
+    // 페이지 끝까지 스크롤하여 모든 카드를 lazy-load 시킨다.
+    // 높이 변화가 없으면 종료, 최대 60회 (= 48초 max @ 800ms)
+    async function autoScroll(opts = {}) {
+        const maxRounds = opts.maxRounds || 60;
+        const delay = opts.delay || 800;
+        const initialY = window.scrollY;
+        let prevHeight = document.body.scrollHeight;
+        let stillCount = 0;
+        for (let i = 0; i < maxRounds; i++) {
+            window.scrollTo(0, document.body.scrollHeight);
+            setStatus(`자동 스크롤 ${i + 1}/${maxRounds} · 높이 ${prevHeight}px`, '#8b96a8');
+            await new Promise(r => setTimeout(r, delay));
+            const h = document.body.scrollHeight;
+            if (h === prevHeight) {
+                stillCount++;
+                if (stillCount >= 3) break;  // 3회 연속 변화 없으면 종료
+            } else {
+                stillCount = 0;
+                prevHeight = h;
+            }
+        }
+        // 추출 정확도를 위해 위로 살짝 올림 (sticky elements 가리는 거 회피)
+        window.scrollTo(0, initialY);
+        await new Promise(r => setTimeout(r, 300));
+    }
+
     // ── 풍부한 진단 dump ──────────────────────────────────
     function diagnose() {
         const url = location.href;
         const title = document.title;
 
-        // 모든 element 의 class 빈도 (반복 5+ 만)
         const classCounts = new Map();
         document.querySelectorAll('[class]').forEach(el => {
             const c = (el.className && el.className.toString()) || '';
@@ -106,7 +137,6 @@
             .slice(0, 20)
             .map(([cls, n]) => `${String(n).padStart(3)}× ${cls.slice(0, 100)}`);
 
-        // 도서 관련 키워드 element 후보
         const bookLike = Array.from(
             document.querySelectorAll('[class*="book"], [class*="Book"], [class*="library"], [class*="prod"], [class*="item"]')
         ).slice(0, 30).map(el => ({
@@ -116,7 +146,6 @@
             text: (el.textContent || '').trim().slice(0, 80),
         }));
 
-        // ul/ol > li 패턴 — 자식 li 5개 이상
         const lists = Array.from(document.querySelectorAll('ul, ol'))
             .filter(ul => ul.children.length >= 5)
             .slice(0, 10)
@@ -131,8 +160,7 @@
         return { url, title, repeated, bookLike, lists };
     }
 
-    // ── 핵심: 도서 카드 추출 ──────────────────────────────
-    // v0.3.0 — 셀렉터 후보 확장
+    // ── 도서 카드 추출 ────────────────────────────────────
     const EXTRACT_RULES = {
         cardSelectors: [
             // v0.2 — 일반 패턴
@@ -148,7 +176,6 @@
             'ul[class*="book"] > li', 'ul[class*="list"] > li',
             'div[class*="book"] > div', 'div[class*="library"] > div',
             '[class*="elibrary"] li', '[class*="elibrary"] [class*="item"]',
-            // 데이터 속성 패턴 강화
             '[data-sno]', '[data-isbn]', '[data-prdno]', '[data-cartid]',
         ],
         title: (card) => {
@@ -157,15 +184,19 @@
             );
             return cand?.textContent?.trim();
         },
+        // v0.4 — 한국 도서 사이트 패턴 추가 (.aut, .gd_name, .writer 등)
         author: (card) => {
             const cand = card.querySelector(
-                '.author, .book-author, [class*="author"], [class*="Author"], [class*="writer"]'
+                '.author, .book-author, .gd_name, .writer, .writer_name, .aut, '
+                + '[class*="author"], [class*="Author"], [class*="writer"], '
+                + '[data-author]'
             );
-            return cand?.textContent?.trim();
+            return cand?.textContent?.trim().replace(/\s+/g, ' ');
         },
         publisher: (card) => {
             const cand = card.querySelector(
-                '.publisher, [class*="publisher"], [class*="Publisher"], [class*="company"]'
+                '.publisher, .pub, [class*="publisher"], [class*="Publisher"], '
+                + '[class*="company"], [class*="brand"]'
             );
             return cand?.textContent?.trim();
         },
@@ -191,7 +222,6 @@
             if (n > 0) triedResults.push(`${n}× ${s}`);
             if (n > bestCount) { bestCount = n; bestSelector = s; }
         }
-
         if (!bestSelector) {
             return { books: [], selector: null, tried: triedResults };
         }
@@ -216,7 +246,12 @@
         return { books, selector: bestSelector, tried: triedResults };
     }
 
-    function doExtract(previewOnly) {
+    // ── 메인: 추출 + (선택)전송 ──────────────────────────
+    async function doExtract({ preview = false, scroll = false } = {}) {
+        if (scroll) {
+            try { await autoScroll(); } catch (e) { console.warn('[NVK] autoScroll error:', e); }
+        }
+
         const { books, selector, tried } = extractBooks();
 
         if (books.length === 0) {
@@ -229,15 +264,21 @@
             console.log('[NVK] === 추출 실패 진단 ===');
             console.log('[NVK] tried selectors (>0):', tried);
             console.log('[NVK] diagnose():', diag);
-            console.log('[NVK] 위 정보를 캡처/복사해서 개발자에게 전달하면 셀렉터 보정 가능');
             return;
         }
 
+        // 첫 카드 outerHTML 콘솔에 출력 (author/publisher 셀렉터 진단용)
+        const sampleCard = document.querySelector(selector);
+        const sampleHtml = sampleCard?.outerHTML?.slice(0, 4000);
         console.log(`[NVK] 추출 ${books.length}건 (selector="${selector}", tried=${tried.length}):`, books);
-        if (previewOnly) {
+        console.log('[NVK] === 첫 카드 outerHTML (author/publisher 셀렉터 진단용) ===\n', sampleHtml);
+
+        if (preview) {
+            const sample = books[0];
+            const authorStatus = sample.author ? `author="${sample.author}"` : '<span style="color:#f59e0b">author 못 잡음</span>';
             setStatus(
                 `미리보기 <b style="color:#22d3ee;">${books.length}건</b> · selector=<code>${selector}</code><br>` +
-                `<small style="color:#8b96a8;">F12 → Console 에서 추출 결과 확인</small>`,
+                `<small>첫 책: <b>${escHtml(sample.title)}</b> · ${authorStatus}</small>`,
                 '#8b96a8'
             );
             return;
@@ -268,10 +309,14 @@
                 setStatus('✗ 네트워크 오류 — 백엔드에 도달 못함', '#ef4444');
                 console.error('[NVK] sync error:', err);
             },
-            ontimeout() {
-                setStatus('✗ 타임아웃 — 백엔드 응답 없음', '#ef4444');
-            },
+            ontimeout() { setStatus('✗ 타임아웃 — 백엔드 응답 없음', '#ef4444'); },
         });
+    }
+
+    function escHtml(s) {
+        return String(s || '').replace(/[&<>"']/g, c => (
+            {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+        ));
     }
 
     // ── init ──────────────────────────────────────────────
