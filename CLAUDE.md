@@ -342,6 +342,56 @@ DSM의 docker가 PATH 밖이라 `/usr/local/bin/docker` 절대경로 사용
 
 ---
 
+## Phase C — 도서 분석 파이프라인 (캡처 → OCR → AI 요약 → HTML)
+
+### 결정 사항
+- **언어**: Python (macOS 자동화·OCR·AI 모두 Python 자산 풍부)
+- **기존 자산**: `/Users/deoksooyun/Library/CloudStorage/OneDrive-개인/SRC/python/kyobo_screenshot/`
+  - `kyobo_app_screenshot.py` (817줄) — macOS 교보eBook.app 자동 캡처
+  - `kyobo_screenshot.py` (264줄) — Playwright 웹뷰어 캡처
+  - `kyobo_capture.sh` — 대화형 CLI 메뉴 (앱 실행·캡처 모드 선택)
+  - `verify_ocr.py` / `merge_batches.py` / `generate_html.py` — 이미 books/CLI_완전활용/summary/ 에 복사돼 있음
+  - `CLAUDE.md` — 요약 JSON 스키마·HTML 패턴 (1800px 썸네일·사이드바 트리·페이지 카드)
+- **아키텍처**: 8080 정적 UI + 9000 FastAPI 백엔드 + Mac 로컬 worker (polling)
+- **동작 시작점**: 웹 (도서 카드 클릭 → 분석 시작)
+
+### 단계
+- **C-1** ✅ 메인 우상단 톱니바퀴 + 설정 모달 + `/api/settings` 백엔드 (DONE)
+- **C-2** ⏳ `KyoboLibrary/book-capture/` Python 패키지 신설, 기존 자산 이식·통합 CLI
+- **C-3** ⏳ AI 요약 모듈 (Claude/OpenAI), 백엔드 `/api/jobs` 큐, poll_worker.py
+- **C-4** ⏳ 메인 도서 카드에 분석 상태 + [분석 시작]/[보기] 버튼
+
+### 2026-05-28: Phase C-1 — 톱니바퀴 + 설정 모달
+
+**추가**
+- `kyobo-bridge/app/db.py` — `settings` 테이블 + `get_setting`/`set_setting`/`get_all_settings`/`set_all_settings`
+- `kyobo-bridge/app/main.py` — `GET /api/settings` (기본값 머지 + api_key 마스킹 응답) / `PUT /api/settings` (부분 업데이트 + api_key 빈 값은 기존 유지)
+- `index.html` — 헤더 우상단 ⚙ 버튼, 다크 톤 설정 모달 (캡처/OCR/AI/출력 4그룹, 17개 필드), 백엔드 API 호출 + 저장 status
+
+**설정 4그룹**
+1. **캡처** — 영역 x/y/w/h, 페이지 넘김 대기, 최대 페이지 수, 넘김 키, 첫 페이지 로딩 대기, 중복 해시 중단
+2. **OCR** — 언어(`kor+eng` 등), 썸네일 사용 여부
+3. **AI** — 공급자(claude/openai/none), 모델, API 키(마스킹), 출력 언어, temperature
+4. **출력** — 책 폴더(Mac 로컬), 썸네일 최대 px
+
+**보안 메모**
+- `api_key`는 SQLite에 평문 저장(향후 암호화 검토). GET 응답에는 빈 문자열 + `api_key_masked: "sk-...1234"` 형식.
+- PUT 시 `api_key=""` 면 기존 값 유지 (사용자가 마스킹 상태에서 안 건드린 경우).
+
+**검증**
+- GET `/api/settings` 기본값 정상
+- PUT `/api/settings` 부분 업데이트 정상 (`updated_keys: N`)
+- region 저장·복원 OK
+- api_key 마스킹 OK, 평문 응답 안 함
+
+**다음 (C-2)**
+- `KyoboLibrary/book-capture/` 폴더 신설
+- 기존 `kyobo_app_screenshot.py`·`verify_ocr.py`·`generate_html.py` 이식 + venv 정리
+- 통합 CLI: `python -m bookcapture run --slug <도서명>`
+- C-1 설정값 자동 로드 (`/api/settings` 호출)
+
+---
+
 ### 2026-05-28: Phase B-2.1 — Tampermonkey + Userscript 설치 가이드 페이지
 
 **추가**

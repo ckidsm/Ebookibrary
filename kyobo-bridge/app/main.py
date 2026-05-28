@@ -15,7 +15,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from . import __version__
-from .db import clear_books, count_books, init_db, list_books, upsert_books
+from .db import (
+    clear_books, count_books, init_db, list_books, upsert_books,
+    get_all_settings, set_all_settings,
+)
 
 log = logging.getLogger("kyobo-bridge")
 logging.basicConfig(level=logging.INFO)
@@ -119,6 +122,77 @@ def sync_kyobo_library(payload: SyncRequest) -> dict:
 class LoginRequest(BaseModel):
     kyobo_id: str
     kyobo_pw: str
+
+
+# ── Phase C-1: 설정 (캡처·OCR·AI 등) ────────────────────────
+DEFAULT_SETTINGS = {
+    "capture": {
+        # macOS screencapture 좌표 (책 본문 영역) — 0,0,0,0 이면 사용자 미설정
+        "region": {"x": 0, "y": 0, "w": 0, "h": 0},
+        "delay_sec": 1.5,             # 페이지 넘김 후 대기
+        "max_pages": 400,             # 안전 한도
+        "next_key": "right",          # AppleScript 키 이름 (right, space, page_down 등)
+        "first_page_wait": 3.0,       # 최초 도서 로딩 대기
+        "skip_duplicate_hash": True,  # 같은 PNG 해시 N회 연속 시 중단
+    },
+    "ocr": {
+        "lang": "kor+eng",
+        "use_thumbs": True,           # 1800px 리사이즈본 사용 (Claude 호환)
+    },
+    "ai": {
+        "provider": "claude",         # claude | openai | none
+        "model": "claude-sonnet-4-5", # 사용자 설정 가능
+        "api_key": "",                # 사용자가 직접 입력 (UI 마스킹)
+        "language": "ko",
+        "temperature": 0.3,
+    },
+    "output": {
+        # NAS 측 절대경로 (compose 마운트는 /mnt/data 식으로 추가 가능)
+        # 기본은 컨테이너 외부에서 rsync 받을 디렉토리 (Mac 로컬 도구가 사용)
+        "books_dir": "./books",
+        "thumb_max_px": 1800,
+    },
+}
+
+
+@app.get("/api/settings")
+def get_settings_endpoint() -> dict:
+    saved = get_all_settings()
+    # 기본값 + 저장값 머지 (얕은 머지, top-level 키 단위)
+    merged = {**DEFAULT_SETTINGS}
+    for k, v in saved.items():
+        if k in merged and isinstance(merged[k], dict) and isinstance(v, dict):
+            merged[k] = {**merged[k], **v}
+        else:
+            merged[k] = v
+    # api_key 는 응답에서 마스킹 (저장은 그대로)
+    if isinstance(merged.get("ai"), dict) and merged["ai"].get("api_key"):
+        key = merged["ai"]["api_key"]
+        merged["ai"]["api_key_masked"] = (
+            key[:7] + "..." + key[-4:] if len(key) > 12 else "***"
+        )
+        merged["ai"]["api_key"] = ""  # 평문은 응답에 안 내보냄
+    return {"settings": merged}
+
+
+class SettingsUpdate(BaseModel):
+    capture: dict | None = None
+    ocr: dict | None = None
+    ai: dict | None = None
+    output: dict | None = None
+    model_config = {"extra": "allow"}
+
+
+@app.put("/api/settings")
+def put_settings(payload: SettingsUpdate) -> dict:
+    items = {k: v for k, v in payload.model_dump().items() if v is not None}
+    # ai.api_key 가 빈 문자열로 오면 기존 값 유지 (마스킹 응답 후 사용자가 안 건드린 경우)
+    if "ai" in items and items["ai"].get("api_key") == "":
+        prev = get_all_settings().get("ai") or {}
+        if prev.get("api_key"):
+            items["ai"]["api_key"] = prev["api_key"]
+    n = set_all_settings(items)
+    return {"ok": True, "updated_keys": n}
 
 
 @app.post(

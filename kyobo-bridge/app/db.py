@@ -51,8 +51,50 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_books_title  ON books(title);
             CREATE INDEX IF NOT EXISTS idx_books_synced ON books(synced_at);
+
+            -- Phase C-1: 키-값 설정 저장
+            CREATE TABLE IF NOT EXISTS settings (
+                key         TEXT PRIMARY KEY,
+                value_json  TEXT,
+                updated_at  TEXT DEFAULT (datetime('now'))
+            );
             """
         )
+
+
+# ── Phase C-1: settings 키-값 CRUD ──────────────────────
+import json as _json
+
+def get_setting(key: str, default=None):
+    with cursor() as cur:
+        row = cur.execute("SELECT value_json FROM settings WHERE key = ?", (key,)).fetchone()
+        if not row: return default
+        try: return _json.loads(row["value_json"])
+        except Exception: return default
+
+def set_setting(key: str, value) -> None:
+    with cursor() as cur:
+        cur.execute(
+            "INSERT INTO settings(key, value_json) VALUES(?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=datetime('now')",
+            (key, _json.dumps(value, ensure_ascii=False)),
+        )
+
+def get_all_settings() -> dict:
+    with cursor() as cur:
+        rows = cur.execute("SELECT key, value_json FROM settings").fetchall()
+        out = {}
+        for r in rows:
+            try: out[r["key"]] = _json.loads(r["value_json"])
+            except Exception: out[r["key"]] = None
+        return out
+
+def set_all_settings(items: dict) -> int:
+    n = 0
+    for k, v in items.items():
+        set_setting(k, v)
+        n += 1
+    return n
 
 
 def list_books() -> list[dict]:

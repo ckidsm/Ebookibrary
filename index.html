@@ -27,6 +27,7 @@
             text-align: center;
             color: white;
             margin-bottom: 3rem;
+            position: relative;
         }
 
         h1 {
@@ -39,6 +40,126 @@
             font-size: 1.1rem;
             opacity: 0.9;
         }
+
+        /* ── Phase C-1: 우상단 톱니바퀴 ── */
+        .gear-btn {
+            position: absolute;
+            top: 0; right: 0;
+            width: 44px; height: 44px;
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            border-radius: 50%;
+            font-size: 22px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: transform 0.4s ease, background 0.2s ease;
+        }
+        .gear-btn:hover { background: rgba(255,255,255,0.28); transform: rotate(60deg); }
+
+        /* 설정 모달 */
+        .smodal-backdrop {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 900;
+            display: none;
+        }
+        .smodal-backdrop.open { display: block; }
+        .smodal {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(820px, 94vw);
+            max-height: 86vh;
+            background: #11151c;
+            color: #e6ecf2;
+            border: 1px solid #2f3a4d;
+            border-radius: 12px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+            z-index: 901;
+            display: none;
+            grid-template-rows: auto 1fr auto;
+            overflow: hidden;
+            font-size: 13px;
+        }
+        .smodal.open { display: grid; }
+        .smodal-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 18px;
+            background: #161b24;
+            border-bottom: 1px solid #2f3a4d;
+        }
+        .smodal-head h2 { font-size: 1.05rem; margin: 0; color: #22d3ee; font-weight: 600; }
+        .smodal-close {
+            cursor: pointer; opacity: 0.6; font-size: 20px;
+            background: transparent; border: 0; color: white;
+        }
+        .smodal-body { overflow: auto; padding: 16px 20px; }
+        .smodal-foot {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 18px;
+            background: #161b24;
+            border-top: 1px solid #2f3a4d;
+        }
+        .smodal-foot .save-status { flex: 1; color: #8b96a8; font-size: 12px; font-family: monospace; }
+
+        .sgroup { margin-bottom: 18px; }
+        .sgroup h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #8b96a8;
+            margin: 0 0 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #242c3a;
+        }
+        .sgrid {
+            display: grid;
+            grid-template-columns: 180px 1fr;
+            gap: 8px 14px;
+            align-items: center;
+        }
+        .sgrid label { color: #b8c2d0; font-size: 12px; }
+        .sgrid input[type=text],
+        .sgrid input[type=number],
+        .sgrid input[type=password],
+        .sgrid select {
+            width: 100%;
+            padding: 6px 10px;
+            background: #0a0c10;
+            color: #e6ecf2;
+            border: 1px solid #2f3a4d;
+            border-radius: 5px;
+            font-family: 'IBM Plex Mono', ui-monospace, monospace;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+        .sgrid input:focus, .sgrid select:focus { outline: 1px solid #22d3ee; }
+
+        .region-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+        .region-grid label { font-size: 10px; color: #8b96a8; text-align: center; }
+
+        .sbtn {
+            background: #1c2230;
+            border: 1px solid #2f3a4d;
+            color: #e6ecf2;
+            padding: 7px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .sbtn:hover { border-color: #22d3ee; color: #22d3ee; }
+        .sbtn-primary {
+            background: rgba(34,211,238,0.18);
+            border-color: #22d3ee;
+            color: #22d3ee;
+            font-weight: 600;
+        }
+        .sbtn-primary:hover { background: rgba(34,211,238,0.28); }
 
         .books-grid {
             display: grid;
@@ -313,7 +434,25 @@
         <header>
             <h1>📚 교보 전자책 라이브러리</h1>
             <p class="subtitle">수백 권의 도서를 언제 어디서나</p>
+            <button class="gear-btn" id="open-settings" title="설정">⚙</button>
         </header>
+
+        <!-- 설정 모달 -->
+        <div class="smodal-backdrop" id="smodal-bd"></div>
+        <div class="smodal" id="smodal">
+            <div class="smodal-head">
+                <h2>⚙ 분석 파이프라인 설정</h2>
+                <button class="smodal-close" id="smodal-close">×</button>
+            </div>
+            <div class="smodal-body" id="smodal-body">
+                <p style="opacity:0.7;">불러오는 중...</p>
+            </div>
+            <div class="smodal-foot">
+                <span class="save-status" id="save-status"></span>
+                <button class="sbtn" id="smodal-cancel">취소</button>
+                <button class="sbtn sbtn-primary" id="smodal-save">저장</button>
+            </div>
+        </div>
 
         <div class="section-label">교보 e-서비스</div>
         <section class="quick-grid">
@@ -481,11 +620,179 @@
         }
         function escapeAttr(s) { return escapeHtml(s); }
 
-        // 페이지 로드 시 실행
+        // ── Phase C-1: 설정 모달 ──
+        let _settings = null;
+
+        async function openSettings() {
+            document.getElementById('smodal-bd').classList.add('open');
+            document.getElementById('smodal').classList.add('open');
+            try {
+                const r = await fetch(`${BRIDGE_URL}/api/settings`);
+                const j = await r.json();
+                _settings = j.settings;
+                renderSettings(_settings);
+            } catch (e) {
+                document.getElementById('smodal-body').innerHTML =
+                    `<div style="color:#ef4444;">설정 불러오기 실패: ${escapeHtml(String(e))}</div>`;
+            }
+        }
+        function closeSettings() {
+            document.getElementById('smodal-bd').classList.remove('open');
+            document.getElementById('smodal').classList.remove('open');
+            document.getElementById('save-status').textContent = '';
+        }
+
+        function renderSettings(s) {
+            const c = s.capture || {};
+            const r = c.region || {};
+            const o = s.ocr || {};
+            const a = s.ai || {};
+            const out = s.output || {};
+            const apiKeyMasked = a.api_key_masked || '';
+            const apiKeyPlaceholder = apiKeyMasked ? `현재 저장됨: ${apiKeyMasked} (변경하려면 새 키 입력)` : '예: sk-ant-... 또는 sk-...';
+
+            document.getElementById('smodal-body').innerHTML = `
+                <div class="sgroup">
+                    <h3>① 캡처 (macOS screencapture)</h3>
+                    <div class="sgrid">
+                        <label>캡처 영역 (x,y,w,h)</label>
+                        <div class="region-grid">
+                            <input type="number" id="cap-x" value="${r.x ?? 0}">
+                            <input type="number" id="cap-y" value="${r.y ?? 0}">
+                            <input type="number" id="cap-w" value="${r.w ?? 0}">
+                            <input type="number" id="cap-h" value="${r.h ?? 0}">
+                            <label>x</label><label>y</label><label>w</label><label>h</label>
+                        </div>
+                        <label>페이지 넘김 대기 (초)</label>
+                        <input type="number" id="cap-delay" step="0.1" value="${c.delay_sec ?? 1.5}">
+                        <label>최대 페이지 수</label>
+                        <input type="number" id="cap-maxp" value="${c.max_pages ?? 400}">
+                        <label>페이지 넘김 키</label>
+                        <select id="cap-key">
+                            ${['right','left','space','page_down','page_up'].map(k => `<option ${c.next_key===k?'selected':''} value="${k}">${k}</option>`).join('')}
+                        </select>
+                        <label>첫 페이지 로딩 대기 (초)</label>
+                        <input type="number" id="cap-firstwait" step="0.1" value="${c.first_page_wait ?? 3.0}">
+                        <label>중복 해시 중단</label>
+                        <select id="cap-dup">
+                            <option value="true" ${c.skip_duplicate_hash!==false?'selected':''}>예 (같은 화면 N회면 종료)</option>
+                            <option value="false" ${c.skip_duplicate_hash===false?'selected':''}>아니오</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="sgroup">
+                    <h3>② OCR (tesseract)</h3>
+                    <div class="sgrid">
+                        <label>언어</label>
+                        <select id="ocr-lang">
+                            ${['kor+eng','kor','eng','jpn+eng'].map(k => `<option ${o.lang===k?'selected':''} value="${k}">${k}</option>`).join('')}
+                        </select>
+                        <label>썸네일(1800px) 사용</label>
+                        <select id="ocr-thumbs">
+                            <option value="true" ${o.use_thumbs!==false?'selected':''}>예 (권장 — Claude 호환)</option>
+                            <option value="false" ${o.use_thumbs===false?'selected':''}>아니오 (원본 사용)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="sgroup">
+                    <h3>③ AI 요약</h3>
+                    <div class="sgrid">
+                        <label>공급자</label>
+                        <select id="ai-provider">
+                            ${['claude','openai','none'].map(k => `<option ${a.provider===k?'selected':''} value="${k}">${k}</option>`).join('')}
+                        </select>
+                        <label>모델</label>
+                        <input type="text" id="ai-model" value="${escapeAttr(a.model || 'claude-sonnet-4-5')}">
+                        <label>API 키</label>
+                        <input type="password" id="ai-key" placeholder="${escapeAttr(apiKeyPlaceholder)}">
+                        <label>출력 언어</label>
+                        <input type="text" id="ai-lang" value="${escapeAttr(a.language || 'ko')}">
+                        <label>Temperature</label>
+                        <input type="number" id="ai-temp" step="0.1" min="0" max="2" value="${a.temperature ?? 0.3}">
+                    </div>
+                </div>
+
+                <div class="sgroup">
+                    <h3>④ 출력</h3>
+                    <div class="sgrid">
+                        <label>책 폴더 (Mac 로컬)</label>
+                        <input type="text" id="out-dir" value="${escapeAttr(out.books_dir || './books')}">
+                        <label>썸네일 최대 px</label>
+                        <input type="number" id="out-thumbpx" value="${out.thumb_max_px ?? 1800}">
+                    </div>
+                </div>
+            `;
+        }
+
+        async function saveSettings() {
+            const payload = {
+                capture: {
+                    region: {
+                        x: +document.getElementById('cap-x').value || 0,
+                        y: +document.getElementById('cap-y').value || 0,
+                        w: +document.getElementById('cap-w').value || 0,
+                        h: +document.getElementById('cap-h').value || 0,
+                    },
+                    delay_sec: parseFloat(document.getElementById('cap-delay').value) || 1.5,
+                    max_pages: +document.getElementById('cap-maxp').value || 400,
+                    next_key: document.getElementById('cap-key').value,
+                    first_page_wait: parseFloat(document.getElementById('cap-firstwait').value) || 3.0,
+                    skip_duplicate_hash: document.getElementById('cap-dup').value === 'true',
+                },
+                ocr: {
+                    lang: document.getElementById('ocr-lang').value,
+                    use_thumbs: document.getElementById('ocr-thumbs').value === 'true',
+                },
+                ai: {
+                    provider: document.getElementById('ai-provider').value,
+                    model: document.getElementById('ai-model').value.trim(),
+                    api_key: document.getElementById('ai-key').value,  // 빈 문자열이면 백엔드가 기존 유지
+                    language: document.getElementById('ai-lang').value.trim() || 'ko',
+                    temperature: parseFloat(document.getElementById('ai-temp').value) || 0.3,
+                },
+                output: {
+                    books_dir: document.getElementById('out-dir').value.trim(),
+                    thumb_max_px: +document.getElementById('out-thumbpx').value || 1800,
+                },
+            };
+            const st = document.getElementById('save-status');
+            st.textContent = '저장 중...';
+            try {
+                const r = await fetch(`${BRIDGE_URL}/api/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const j = await r.json();
+                if (r.ok && j.ok) {
+                    st.textContent = `✓ 저장됨 (${j.updated_keys}개 그룹)`;
+                    st.style.color = '#10b981';
+                    setTimeout(closeSettings, 800);
+                } else {
+                    st.textContent = `✗ ${JSON.stringify(j).slice(0,200)}`;
+                    st.style.color = '#ef4444';
+                }
+            } catch (e) {
+                st.textContent = `✗ ${String(e)}`;
+                st.style.color = '#ef4444';
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             renderBooks();
             pingBackend();
             loadKyoboBooks();
+
+            document.getElementById('open-settings').onclick = openSettings;
+            document.getElementById('smodal-close').onclick = closeSettings;
+            document.getElementById('smodal-cancel').onclick = closeSettings;
+            document.getElementById('smodal-bd').onclick = closeSettings;
+            document.getElementById('smodal-save').onclick = saveSettings;
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeSettings();
+            });
         });
     </script>
 </body>
