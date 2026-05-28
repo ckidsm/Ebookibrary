@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Kyobo e-Library → NAS Sync
 // @namespace    https://192.168.10.205/
-// @version      0.4.0
-// @description  교보 e-Library 페이지에서 내 도서 목록을 NAS Kyobo Bridge(9000)로 동기화 (자동 스크롤 + author 진단)
+// @version      0.5.0
+// @description  교보 e-Library 페이지에서 내 도서 목록을 NAS Kyobo Bridge(9000)로 동기화 (스크롤 컨테이너 자동 감지)
 // @author       YUNDEOKSOO
 // @match        https://elibrary.kyobobook.co.kr/*
 // @match        https://ebook.kyobobook.co.kr/dig/*
@@ -39,7 +39,7 @@
         ].join(';');
         panel.innerHTML = `
             <div style="font-weight:700;color:#22d3ee;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
-                <span>📚 NAS Sync <span style="opacity:0.6;font-weight:400;font-family:monospace;font-size:11px;">v0.4.0</span></span>
+                <span>📚 NAS Sync <span style="opacity:0.6;font-weight:400;font-family:monospace;font-size:11px;">v0.5.0</span></span>
                 <span id="nvk-close" style="cursor:pointer;opacity:0.5;font-size:16px;">×</span>
             </div>
             <div id="nvk-status" style="color:#8b96a8;font-size:12px;margin-bottom:10px;line-height:1.5;">
@@ -94,29 +94,94 @@
     }
 
     // ── 자동 스크롤 (무한 스크롤 페이지 대응) ─────────────
-    // 페이지 끝까지 스크롤하여 모든 카드를 lazy-load 시킨다.
-    // 높이 변화가 없으면 종료, 최대 60회 (= 48초 max @ 800ms)
+    // v0.5: window 스크롤이 안 먹히는 SPA(별도 스크롤 컨테이너) 대응.
+    //   1단계: 모든 후보 컨테이너 자동 감지
+    //   2단계: 각 컨테이너에 스크롤 + 카드 수 변화로 검증
+    //   3단계: 카드 증가하는 컨테이너 발견 시 그것만 계속 스크롤
+    function findScrollCandidates() {
+        const set = new Set([window, document.documentElement, document.body]);
+        document.querySelectorAll('*').forEach(el => {
+            const delta = el.scrollHeight - el.clientHeight;
+            if (delta < 100) return;
+            const style = getComputedStyle(el);
+            if (style.overflowY === 'auto' || style.overflowY === 'scroll' || style.overflow === 'auto' || style.overflow === 'scroll') {
+                set.add(el);
+            }
+        });
+        return Array.from(set);
+    }
+
+    function scrollToBottom(target) {
+        if (target === window) {
+            window.scrollTo(0, document.documentElement.scrollHeight);
+        } else if (target === document.documentElement || target === document.body) {
+            window.scrollTo(0, document.documentElement.scrollHeight);
+        } else {
+            target.scrollTop = target.scrollHeight;
+        }
+    }
+
+    function describeTarget(t) {
+        if (t === window) return 'window';
+        if (t === document.documentElement) return '<html>';
+        if (t === document.body) return '<body>';
+        const cls = (t.className && t.className.toString().slice(0, 50)) || '';
+        return `<${t.tagName.toLowerCase()}${cls ? '.' + cls.split(' ')[0] : ''}>`;
+    }
+
+    function countCards() {
+        let best = 0;
+        for (const s of EXTRACT_RULES.cardSelectors) {
+            const n = document.querySelectorAll(s).length;
+            if (n > best) best = n;
+        }
+        return best;
+    }
+
     async function autoScroll(opts = {}) {
-        const maxRounds = opts.maxRounds || 60;
-        const delay = opts.delay || 800;
-        const initialY = window.scrollY;
-        let prevHeight = document.body.scrollHeight;
+        const maxRounds = opts.maxRounds || 80;
+        const delay = opts.delay || 700;
+
+        const candidates = findScrollCandidates();
+        const baseCount = countCards();
+        console.log(`[NVK] autoScroll start · 초기 카드 ${baseCount}개 · 스크롤 후보 ${candidates.length}개`,
+            candidates.map(describeTarget));
+
+        // 각 후보를 1회씩 시도 → 카드 수 변화가 가장 큰 컨테이너 선택
+        let bestTarget = window;
+        let bestDelta = 0;
+        for (const t of candidates) {
+            const before = countCards();
+            scrollToBottom(t);
+            await new Promise(r => setTimeout(r, 500));
+            const after = countCards();
+            const delta = after - before;
+            console.log(`[NVK]   probe ${describeTarget(t)} → ${before}→${after} (Δ${delta})`);
+            if (delta > bestDelta) { bestDelta = delta; bestTarget = t; }
+        }
+        console.log(`[NVK] 선택된 스크롤 컨테이너: ${describeTarget(bestTarget)} (probe Δ${bestDelta})`);
+
+        // 선택된 컨테이너로 본격 스크롤 (카드 수 변화 기준)
+        let lastCount = countCards();
         let stillCount = 0;
         for (let i = 0; i < maxRounds; i++) {
-            window.scrollTo(0, document.body.scrollHeight);
-            setStatus(`자동 스크롤 ${i + 1}/${maxRounds} · 높이 ${prevHeight}px`, '#8b96a8');
+            scrollToBottom(bestTarget);
+            setStatus(`자동 스크롤 ${i + 1}/${maxRounds} · 카드 ${lastCount}개 · ${describeTarget(bestTarget)}`, '#8b96a8');
             await new Promise(r => setTimeout(r, delay));
-            const h = document.body.scrollHeight;
-            if (h === prevHeight) {
+            const c = countCards();
+            if (c === lastCount) {
                 stillCount++;
-                if (stillCount >= 3) break;  // 3회 연속 변화 없으면 종료
+                if (stillCount >= 4) break;  // 4회 연속 변화 없으면 종료
             } else {
                 stillCount = 0;
-                prevHeight = h;
+                lastCount = c;
             }
         }
-        // 추출 정확도를 위해 위로 살짝 올림 (sticky elements 가리는 거 회피)
-        window.scrollTo(0, initialY);
+        console.log(`[NVK] autoScroll done · 최종 카드 ${lastCount}개`);
+
+        // 추출 위치 복귀 (상단)
+        if (bestTarget === window) window.scrollTo(0, 0);
+        else bestTarget.scrollTop = 0;
         await new Promise(r => setTimeout(r, 300));
     }
 
@@ -157,7 +222,19 @@
                 sampleText: ul.children[0]?.textContent?.trim().slice(0, 100),
             }));
 
-        return { url, title, repeated, bookLike, lists };
+        // v0.5 — 스크롤 컨테이너 후보
+        const scrollCandidates = findScrollCandidates().map(t => {
+            if (t === window) return { target: 'window', scrollHeight: document.documentElement.scrollHeight, clientHeight: window.innerHeight };
+            return {
+                target: describeTarget(t),
+                cls: (t.className && t.className.toString().slice(0, 80)) || '',
+                scrollHeight: t.scrollHeight,
+                clientHeight: t.clientHeight,
+                delta: t.scrollHeight - t.clientHeight,
+            };
+        });
+
+        return { url, title, repeated, bookLike, lists, scrollCandidates };
     }
 
     // ── 도서 카드 추출 ────────────────────────────────────
