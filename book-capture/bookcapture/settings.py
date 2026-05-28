@@ -86,7 +86,7 @@ def load(bridge_url: str | None = None) -> Settings:
     except Exception as e:
         print(f"[settings] 백엔드 로드 실패 ({url}): {e} — 기본값 사용")
 
-    # 2) 환경변수 우선
+    # 2) 키 조회 우선순위: 환경변수 → 백엔드 LAN secret endpoint → (마스킹된 응답값)
     env_key = None
     if s.ai.provider == "claude":
         env_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -94,6 +94,17 @@ def load(bridge_url: str | None = None) -> Settings:
         env_key = os.environ.get("OPENAI_API_KEY")
     if env_key:
         s.ai.api_key = env_key
+    elif not s.ai.api_key:
+        # 환경변수도 없고 1)단계 응답은 마스킹뿐 → LAN secret 으로 평문 시도
+        secret_url = (bridge_url or DEFAULT_BRIDGE_URL).rstrip("/") + "/api/secrets/ai"
+        try:
+            req = urllib.request.Request(secret_url, headers={"Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if data.get("api_key"):
+                    s.ai.api_key = data["api_key"]
+        except Exception as e:
+            print(f"[settings] secret 로드 실패 ({secret_url}): {e}")
 
     return s
 

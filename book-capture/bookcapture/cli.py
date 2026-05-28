@@ -23,6 +23,7 @@ from . import __version__
 from . import settings as cfg
 from . import ocr as ocr_mod
 from . import build_html
+from . import summarize as summarize_mod
 
 
 def cmd_settings(args) -> int:
@@ -77,12 +78,52 @@ def cmd_build(args) -> int:
     return 0
 
 
+def cmd_summarize(args) -> int:
+    """OCR 결과 → batch JSON (Claude/OpenAI API)."""
+    s = cfg.load(bridge_url=args.bridge)
+    book_dir = _resolve_book_dir(args)
+    if not book_dir.exists():
+        print(f"✗ 폴더 없음: {book_dir}", file=sys.stderr); return 2
+
+    ocr_dir = book_dir / "summary" / "ocr_text"
+    if not ocr_dir.exists():
+        print(f"✗ OCR 결과 없음: {ocr_dir} — 먼저 `ocr` 서브커맨드 실행", file=sys.stderr); return 2
+
+    # ocr_text/page_NNN.txt → {num: path}
+    import re
+    files: dict[int, "Path"] = {}
+    for p in sorted(ocr_dir.glob("page_*.txt")):
+        m = re.search(r"page_(\d+)\.txt$", p.name)
+        if m:
+            files[int(m.group(1))] = p
+    if not files:
+        print(f"✗ {ocr_dir} 에 page_*.txt 없음", file=sys.stderr); return 2
+
+    page_range = None
+    if args.pages:
+        try:
+            lo, hi = args.pages.split("-")
+            page_range = (int(lo), int(hi))
+        except Exception:
+            print(f"✗ --pages 형식: 127-155 (받은 값: {args.pages})", file=sys.stderr); return 2
+
+    out_path = book_dir / "summary" / (args.out or f"batch_{min(files):03d}.json")
+    print(f"[summarize] 시작 · {len(files)} 페이지 · model={s.ai.model}")
+    res = summarize_mod.summarize_pages(files, cfg=s.ai, out_path=out_path, page_range=page_range)
+    print(f"\n결과: {res['pages_done']}건 성공, {len(res['errors'])}건 실패, "
+          f"입력 {res['in_tok']} / 출력 {res['out_tok']} 토큰, ${res['cost_usd']:.3f}")
+    return 0 if not res["errors"] else 1
+
+
 def cmd_run(args) -> int:
-    """capture → ocr → build 일괄 실행 (대화형)."""
+    """capture → ocr → (summarize) → build 일괄 실행 (대화형)."""
     rc = cmd_capture(args)
     if rc != 0: return rc
     rc = cmd_ocr(args)
     if rc != 0: return rc
+    if not getattr(args, "no_summarize", False):
+        rc = cmd_summarize(args)
+        if rc != 0: print(f"[run] summarize 일부 실패 (계속 진행)")
     rc = cmd_build(args)
     return rc
 
@@ -109,11 +150,21 @@ def build_parser() -> argparse.ArgumentParser:
     pb.add_argument("--book-dir")
     pb.set_defaults(func=cmd_build)
 
-    pr = sub.add_parser("run", help="capture → ocr → build 일괄")
+    ps = sub.add_parser("summarize", help="OCR 결과 → batch JSON (Claude API)")
+    ps.add_argument("--slug")
+    ps.add_argument("--book-dir")
+    ps.add_argument("--pages", help="페이지 범위 (예: 127-155)")
+    ps.add_argument("--out", help="출력 파일명 (기본: batch_<첫페이지>.json)")
+    ps.set_defaults(func=cmd_summarize)
+
+    pr = sub.add_parser("run", help="capture → ocr → summarize → build 일괄")
     pr.add_argument("--slug")
     pr.add_argument("--book-dir")
     pr.add_argument("--mode", choices=["1", "2", "3"], default="3")
     pr.add_argument("--refresh", action="store_true")
+    pr.add_argument("--no-summarize", action="store_true", help="AI 요약 단계 스킵 (비용 0)")
+    pr.add_argument("--pages")
+    pr.add_argument("--out")
     pr.set_defaults(func=cmd_run)
 
     return p

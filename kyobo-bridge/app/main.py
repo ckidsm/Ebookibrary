@@ -17,8 +17,24 @@ from pydantic import BaseModel, Field
 from . import __version__
 from .db import (
     clear_books, count_books, init_db, list_books, upsert_books,
-    get_all_settings, set_all_settings,
+    get_all_settings, get_setting, set_all_settings,
 )
+
+import ipaddress
+from fastapi import Request
+
+
+def _is_lan(client_ip: str) -> bool:
+    """LAN 내부(또는 docker bridge) IP 만 허용. 외부 노출 차단."""
+    try:
+        ip = ipaddress.ip_address(client_ip)
+        return (
+            ip.is_loopback
+            or ip.is_private          # 10/8, 172.16/12, 192.168/16
+            or ip.is_link_local
+        )
+    except Exception:
+        return False
 
 log = logging.getLogger("kyobo-bridge")
 logging.basicConfig(level=logging.INFO)
@@ -193,6 +209,26 @@ def put_settings(payload: SettingsUpdate) -> dict:
             items["ai"]["api_key"] = prev["api_key"]
     n = set_all_settings(items)
     return {"ok": True, "updated_keys": n}
+
+
+# ── Phase C-3: LAN 전용 시크릿 (book-capture worker 용) ──────
+@app.get("/api/secrets/ai")
+def get_ai_secret(request: Request) -> dict:
+    """평문 API 키 반환 — LAN 내부 IP 만 허용. 외부에서 호출 시 403."""
+    client = request.client.host if request.client else ""
+    if not _is_lan(client):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"LAN 전용 endpoint (요청 IP: {client})",
+        )
+    ai = get_setting("ai", {}) or {}
+    return {
+        "provider": ai.get("provider", "claude"),
+        "model": ai.get("model", "claude-sonnet-4-5"),
+        "api_key": ai.get("api_key", ""),
+        "language": ai.get("language", "ko"),
+        "temperature": ai.get("temperature", 0.3),
+    }
 
 
 @app.post(

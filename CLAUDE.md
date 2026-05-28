@@ -441,6 +441,42 @@ python -m bookcapture run --slug "그림으로 이해하는 알고리즘"
 
 ---
 
+### 2026-05-29: Phase C-3 (Part 1) — AI 요약 모듈 동작 검증
+
+**한 일**
+- `kyobo-bridge/app/main.py` — `/api/secrets/ai` 추가 (LAN-only IP 화이트리스트: loopback·private·link-local). book-capture가 평문 API 키를 안전하게 받는 endpoint
+- `kyobo-bridge/app/main.py` — CORS `allow_methods` 에 PUT/OPTIONS 추가 (C-1 핫픽스, 별도 커밋)
+- `book-capture/bookcapture/settings.py` — 키 조회 우선순위 추가: 환경변수(ANTHROPIC_API_KEY) → 백엔드 `/api/secrets/ai` → 마스킹 응답
+- `book-capture/bookcapture/summarize.py` (신규) — 핵심 모듈
+  - `summarize_page()` — OCR 1페이지 → batch JSON 1페이지 (Anthropic Messages API, urllib만)
+  - `summarize_pages()` — 다수 페이지 일괄 + 진행률 + 비용 누적
+  - SYSTEM_PROMPT — 한국어 학습 도서 요약 전문가
+  - 재시도(429/5xx, exponential backoff 3회)
+  - JSON 추출(`_extract_json`) — 코드펜스/잡담 제거
+  - 비용 계산(`_PRICES`) — Sonnet/Haiku/Opus 토큰 단가 내장
+- `book-capture/bookcapture/cli.py` — `summarize` 서브커맨드 (`--slug`, `--pages 127-155`, `--out`), `run` 흐름에 summarize 단계 통합(+ `--no-summarize` 스킵 옵션)
+
+**검증 (실제 API 호출)**
+- ping: `claude-sonnet-4-5`, `Reply: PONG`, in/out 14/6 토큰, $0.0001
+- 1페이지 요약 (`books/CLI_완전활용/summary/ocr_text/page_127.txt`):
+  - 결과: topics 3개 / terms 5개 / summary 4문장 (`<br>` 줄바꿈) / points 4개 (`<strong>·<code>` 활용)
+  - 토큰: in 839 / out 590, 비용 **$0.011** (≈ 15원)
+  - 품질: 기존 사용자 수동 작성본과 동등 수준
+
+**책 한 권 비용 추정** (280페이지 기준)
+| 모델 | 한 권 비용 | $20 으로 |
+|---|---|---|
+| Claude Sonnet 4.5 | **$3.18** (≈ 4,400원) | ~6권 |
+| Claude Haiku 4.5  | $1.06 (≈ 1,500원) | ~19권 |
+
+**다음 (C-3 Part 2)**
+- `merge.py` — `merge_batches.py` 이식 (batch_*.json → pages_data.json + chapters_data.json)
+- `build_html.py` 본격 — `generate_html.py` 패턴 (사이드바·챕터 카드·scroll spy)
+- 백엔드 `/api/jobs` 큐 + `worker.py` polling (선택, CLI 직접 호출로도 충분)
+- C-4: 도서 카드에 [분석 시작]/[보기]/[원본] 버튼 + 분석 상태 배지
+
+---
+
 ### 2026-05-28: Phase B-2.1 — Tampermonkey + Userscript 설치 가이드 페이지
 
 **추가**
