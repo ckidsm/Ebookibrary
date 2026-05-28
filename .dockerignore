@@ -18,6 +18,10 @@
 # 설계·기획 문서 (NAS에 안 보냄)
 /docs/
 
+# 백엔드는 별도 컨테이너로 빌드·배포 — 정적 rsync에는 안 보냄
+/kyobo-bridge/
+/docker-compose.yml
+
 # 빌드 도구·캐시 (모든 books/ 하위에서)
 **/ocr_text/
 **/verification_report.json

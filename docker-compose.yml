@@ -1,0 +1,37 @@
+# Kyobo Library Stack — 두 서비스
+#   library-web   : 정적 라이브러리 (nginx, 8080)
+#   kyobo-bridge  : FastAPI 백엔드 (9000) — 교보 연동 담당
+#
+# deploy.sh 가 이 파일을 /volume1/docker/kyobo-stack/ 로 scp 후
+# `docker-compose up -d` 로 두 서비스 일괄 기동.
+
+services:
+  library-web:
+    image: nginx:latest
+    container_name: kyobo-library-web
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - /volume1/docker/web-apps/kyobo-library:/usr/share/nginx/html:ro
+    environment:
+      TZ: Asia/Seoul
+
+  kyobo-bridge:
+    image: kyobo-bridge:latest
+    container_name: kyobo-bridge
+    restart: unless-stopped
+    ports:
+      - "9000:8000"
+    volumes:
+      - /volume1/docker/web-apps/kyobo-bridge/data:/data
+    environment:
+      TZ: Asia/Seoul
+      KYOBO_BRIDGE_DB: /data/library.db
+    # 헬스체크는 이미지 안에도 있지만 compose에도 명시 (재시작 트리거)
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

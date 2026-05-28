@@ -265,3 +265,41 @@ DSM의 docker가 PATH 밖이라 `/usr/local/bin/docker` 절대경로 사용
 - FastAPI 백엔드 스캐폴드 — `/health`, `/api/library/books`, SQLite 저장
 - 9000 포트 매핑, NAS 마운트 추가
 - 그 후 Phase B-2: 백엔드 프록시 — 교보 로그인 폼 대행 + 세션 보관 + e-Library API 호출
+
+---
+
+### 2026-05-28: Phase B-1 — 9000 포트 FastAPI 백엔드·compose 통합
+
+**추가된 폴더·파일**
+- `kyobo-bridge/` — FastAPI 백엔드
+  - `Dockerfile` (python:3.12-slim + httpx + curl, HEALTHCHECK 내장)
+  - `requirements.txt` (fastapi 0.115.5, uvicorn[standard] 0.34.0, httpx 0.27.2)
+  - `app/__init__.py` (__version__ = 0.1.0)
+  - `app/main.py` (FastAPI, lifespan, CORS, /health, /api/library/books, B-2 placeholders)
+  - `app/db.py` (SQLite WAL 모드, books 테이블)
+  - `README.md`
+- `docker-compose.yml` (루트) — `library-web` + `kyobo-bridge` 두 service
+- `deploy.sh` 전면 재작성 — 정적 rsync + buildx amd64 + save+scp+load + compose up + 두 포트 헬스체크. `--static` / `--backend` / `--dry` / `--logs` 옵션
+- `.dockerignore` 보강 — `/kyobo-bridge/`, `/docker-compose.yml` 추가 (정적 rsync에 안 따라가도록)
+
+**기존 인프라 인계**
+- DSM Container Manager로 떠 있던 `kyobo-library-web` 컨테이너를 **compose 통제로 자동 인계**
+  (`deploy.sh` 의 stop/rm + compose up 흐름). 다운타임 ~5초.
+- NAS compose 위치: `/volume1/docker/kyobo-stack/docker-compose.yml`
+- 새 NAS 볼륨: `/volume1/docker/web-apps/kyobo-bridge/data` (SQLite WAL)
+
+**검증**
+- ✅ `kyobo-bridge:latest` 이미지 67MB (buildx amd64)
+- ✅ 두 컨테이너 모두 `com.docker.compose.project=kyobo-stack` 라벨로 통제
+- ✅ `GET /health` → `{"status":"ok","service":"kyobo-bridge","version":"0.1.0","books":0}`
+- ✅ `GET /api/library/books` → `{"books":[],"version":"0.1.0"}`
+- ✅ Phase B-2 placeholders: `POST /api/auth/kyobo/login` `POST /api/library/sync` → **501**
+- ✅ 기존 `http://192.168.10.205:8080/` 정상 (compose 인계 후에도)
+
+**다음 (Phase B-2, 다음 메시지)**
+- `httpx.AsyncClient(cookies=...)` 로 교보 로그인 폼 대행
+- 사용자 세션 보관 (서버 메모리 또는 SQLite, 보안 모드 결정 필요)
+- `POST /api/auth/kyobo/login {id, pw}` → JSESSIONID 받아 저장
+- `POST /api/library/sync` → 저장된 세션으로 e-Library 도서 메타 페이지 가져와 파싱·SQLite 적재
+- `GET /api/library/books` 가 sync된 책 반환
+- 메인 페이지에 도서함 뷰 추가 (정적 라이브러리 + sync된 e-Library 둘 다 표시)
