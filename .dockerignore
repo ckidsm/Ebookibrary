@@ -15,6 +15,9 @@
 # 옛 가이드·구버전 스크립트 (보존만, NAS에 안 보냄)
 /_archive/
 
+# 설계·기획 문서 (NAS에 안 보냄)
+/docs/
+
 # 빌드 도구·캐시 (모든 books/ 하위에서)
 **/ocr_text/
 **/verification_report.json

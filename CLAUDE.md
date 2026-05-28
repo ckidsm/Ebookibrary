@@ -223,7 +223,45 @@ DSM의 docker가 PATH 밖이라 `/usr/local/bin/docker` 절대경로 사용
 - `.dockerignore` (rsync exclude 겸용)
 - `deploy.sh` (rsync + restart + 헬스체크)
 
-**다음 (Phase B 첫 메시지)**
-- 첫 NAS 실배포로 placeholder → 실 데이터 교체
-- 사용자와 9000 포트 구조·교보 연동 의도 정렬 후 구현
-- 로컬 git init + 초기 커밋 (Phase A 산출물 기준)
+**Phase A 마무리 (같은 날 진행)**
+- 로컬 `git init -b main` + 초기 커밋 (26개 파일, 규칙 형식, Co-Authored-By 트레일러 없음)
+- **첫 실배포 성공** — `./deploy.sh` → http://192.168.10.205:8080/ HTTP 200, 본문에 "CLI 완전활용" 확인. placeholder 한 줄 → 867KB 실 콘텐츠로 교체됨.
+
+**핫픽스 #1 (배포 권한)**
+- rsync `-a` 가 로컬 권한(`700`)을 그대로 NAS로 전송 → nginx 워커가 못 읽어 HTTP 403.
+- `deploy.sh` 의 rsync 라인에 `--chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r` 추가하여 NAS 측 권한을 디렉토리 `755`·파일 `644` 로 통일.
+
+**다음 (Phase B)**
+- 9000 포트 추가 서비스 구조 (별도 컨테이너 권장 — 이유는 Phase B 설계서)
+- 교보 e-Library 연동 (현실적 옵션 비교)
+- README.md 갱신, opt-in 검색·다크 모드 등 To-Do 처리
+
+---
+
+### 2026-05-28: Phase B-0 — 메인에 교보 외부 링크 카드 추가
+
+**사용자 결정 사항 (Phase B 전체)**
+- "같은 도커 내" 해석: **별도 컨테이너** (같은 `docker-compose.yml`의 두 service) ✅
+- 별도 교보 크롤링 파이썬 보유 여부: **없음** → 백엔드는 0부터 새로 작성
+- Phase B-2 데이터 수집 방식: **백엔드 프록시(옵션 C)** 채택 (Userscript 보조 가능)
+- Tampermonkey 확장 설치 거부감: 없음
+
+**한 일**
+- `index.html` 에 글래스 카드 2개 추가 — `🔑 교보문고 로그인`, `📖 내 e-Library`
+  - 새 탭(`target="_blank" rel="noopener noreferrer"`)으로 외부 URL 열기
+  - 보라 그라데이션 배경 위 반투명 흰 카드(`backdrop-filter: blur(8px)`) — 기존 톤과 일관
+- `.section-label` 추가하여 "교보 e-서비스" / "내 도서 라이브러리" 두 구역 시각 구분
+- 모바일 반응형(`@media max-width: 768px`)에서 quick-grid 1열로 collapse
+
+**핫픽스**
+- `docs/PHASE_B_PROPOSAL.md` 가 `.dockerignore` 누락으로 NAS에 따라감 → `/docs/` 룰 추가, NAS의 docs/ 폴더 수동 삭제
+
+**검증**
+- 배포: `./deploy.sh` HTTP 200
+- 본문에 `href="https://ebook.kyobobook.co.kr/dig/pnd/welcome"` / `href="https://elibrary.kyobobook.co.kr/dig/elb/elibrary"` 정상 출력
+
+**다음 (Phase B-1, 다음 메시지에서)**
+- `docker-compose.yml` 새로 작성 (두 service: `library-web`(기존 nginx) + `kyobo-bridge`(신규 FastAPI))
+- FastAPI 백엔드 스캐폴드 — `/health`, `/api/library/books`, SQLite 저장
+- 9000 포트 매핑, NAS 마운트 추가
+- 그 후 Phase B-2: 백엔드 프록시 — 교보 로그인 폼 대행 + 세션 보관 + e-Library API 호출

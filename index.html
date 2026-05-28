@@ -131,8 +131,72 @@
             border-top: 1px solid rgba(255,255,255,0.2);
         }
 
+        /* ── Phase B-0: 교보 e-서비스 빠른 진입 카드 ── */
+        .section-label {
+            color: white;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            opacity: 0.75;
+            margin-bottom: 0.9rem;
+            padding-left: 0.25rem;
+        }
+
+        .quick-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .quick-card {
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 12px;
+            padding: 1.5rem 1.75rem;
+            text-decoration: none;
+            color: white;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: transform 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+            display: block;
+        }
+
+        .quick-card:hover {
+            background: rgba(255, 255, 255, 0.22);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-3px);
+        }
+
+        .quick-icon {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .quick-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+        }
+
+        .quick-title .ext {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            margin-left: 0.3rem;
+            font-weight: 500;
+        }
+
+        .quick-card:hover .ext { opacity: 1; }
+
+        .quick-desc {
+            font-size: 0.88rem;
+            line-height: 1.55;
+            opacity: 0.9;
+        }
+
         @media (max-width: 768px) {
-            .books-grid {
+            .books-grid,
+            .quick-grid {
                 grid-template-columns: 1fr;
             }
 
@@ -149,6 +213,29 @@
             <p class="subtitle">수백 권의 도서를 언제 어디서나</p>
         </header>
 
+        <div class="section-label">교보 e-서비스</div>
+        <section class="quick-grid">
+            <a href="https://ebook.kyobobook.co.kr/dig/pnd/welcome"
+               target="_blank" rel="noopener noreferrer" class="quick-card">
+                <div class="quick-icon">🔑</div>
+                <div class="quick-title">교보문고 로그인 <span class="ext">새 탭 ↗</span></div>
+                <div class="quick-desc">
+                    내 교보문고 계정으로 로그인하면 구매·대여 중인 도서와 e-Library에
+                    접근할 수 있습니다.
+                </div>
+            </a>
+            <a href="https://elibrary.kyobobook.co.kr/dig/elb/elibrary"
+               target="_blank" rel="noopener noreferrer" class="quick-card">
+                <div class="quick-icon">📖</div>
+                <div class="quick-title">내 e-Library <span class="ext">새 탭 ↗</span></div>
+                <div class="quick-desc">
+                    교보 전자도서관에서 빌린·구독 중인 도서 목록.
+                    (로그인이 안 되어 있으면 로그인 페이지로 이동합니다.)
+                </div>
+            </a>
+        </section>
+
+        <div class="section-label">내 도서 라이브러리</div>
         <div id="books-container" class="books-grid">
             <div class="loading">도서 목록을 불러오는 중...</div>
         </div>

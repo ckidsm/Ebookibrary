@@ -44,7 +44,10 @@ command -v rsync >/dev/null || die "rsync가 PATH에 없음"
 
 # 1. rsync 동기화
 step "rsync 동기화 → $NAS_HOST:$NAS_PATH"
+# --chmod: 로컬 파일이 700이어도 NAS에서는 디렉토리 755·파일 644로 통일
+# (nginx 워커가 read 가능해야 함, 안 그러면 HTTP 403)
 rsync -avz $DRY --delete \
+    --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
     --exclude-from=.dockerignore \
     -e "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15" \
     ./ "$NAS_HOST:$NAS_PATH/"
