@@ -266,24 +266,33 @@
     <div class="card">
         <div class="step-head">
             <span class="step-num">2</span>
-            <span class="step-title">개발자 모드 켜기 (한 번만)</span>
+            <span class="step-title">개발자 모드 켜기 + 설치 확인</span>
         </div>
         <div class="step-body">
             <p>Tampermonkey가 외부 URL의 Userscript를 설치하려면 Chrome의 개발자 모드가 필요합니다.</p>
             <ol>
                 <li>주소창에 <code>chrome://extensions/</code> 입력 → Enter</li>
-                <li>우상단 <strong>[개발자 모드]</strong> 토글 켜기</li>
+                <li>우상단 <strong>[개발자 모드]</strong> 토글 켜기 (켜져 있으면 좌상단에
+                    <code>[압축해제된 확장 프로그램 로드]</code> 같은 버튼들이 나타남)</li>
+                <li>설치된 확장 카드 목록에 <strong>Tampermonkey</strong> 가 보이고 우하단 토글이 켜진(파란색) 상태인지 확인</li>
             </ol>
             <div class="callout">
                 Edge는 <code>edge://extensions/</code>, 좌측 하단 [개발자 모드] 토글입니다.
             </div>
-            <div class="shot">
-                <div class="shot-placeholder">
-                    <div class="ph-icon">📷</div>
-                    <div>스크린샷 자리 — <code>install-img/02-dev-mode.png</code></div>
-                    <div style="margin-top:0.4rem;font-size:0.78rem;">chrome://extensions/ 화면 우상단 [개발자 모드] 토글</div>
-                </div>
-            </div>
+            <figure class="shot">
+                <img src="install-img/02-dev-mode.png" alt="chrome://extensions/ 화면 — 개발자 모드 켜진 상태, Tampermonkey 카드 활성화" loading="lazy" />
+                <figcaption class="shot-cap">▶ chrome://extensions/ · 좌상단 3개 버튼이 보이면 개발자 모드 ON · Tampermonkey 카드 우하단 토글 ON 확인</figcaption>
+            </figure>
+
+            <p style="margin-top:1.2rem;">
+                추가로 브라우저 우상단 <strong>Tampermonkey 검은 아이콘</strong>을 클릭하면 메뉴가 뜨고
+                "<strong>활성화됨</strong>" 상태로 표시되어야 합니다. 이 시점에는
+                "아무런 스크립트도 동작 중이지 않음"이 정상 — STEP 3 에서 우리 Userscript 가 추가됩니다.
+            </p>
+            <figure class="shot">
+                <img src="install-img/02b-tm-menu.png" alt="Tampermonkey 확장 아이콘 클릭 메뉴 — 활성화됨, 아무런 스크립트도 동작 중이지 않음" loading="lazy" style="max-width:340px;margin:0 auto;display:block;" />
+                <figcaption class="shot-cap">▶ Tampermonkey 아이콘 클릭 메뉴 — "활성화됨" 확인 (스크립트는 아직 없음 = 정상)</figcaption>
+            </figure>
         </div>
     </div>
 
@@ -291,20 +300,24 @@
     <div class="card">
         <div class="step-head">
             <span class="step-num">3</span>
-            <span class="step-title">Userscript 설치</span>
+            <span class="step-title">Userscript 설치 (가장 중요한 단계)</span>
         </div>
         <div class="step-body">
-            <p>아래 링크를 새 탭에서 열면 Tampermonkey가 자동으로 인식해 설치 페이지를 띄웁니다.</p>
-            <p style="margin: 0.6rem 0;">
+            <div class="callout is-info" style="font-size:0.95rem;">
+                ⚠ Tampermonkey 홈의 <strong>[Userscripts] 탭</strong>에서 검색하지 마세요 —
+                우리 스크립트는 NAS 직접 URL이라 아래 <strong>큰 시안 버튼</strong>으로 한 방에 설치됩니다.
+            </div>
+            <p style="margin: 1rem 0 0.4rem; text-align:center;">
                 <a href="userscript/sync-kyobo-library.user.js" target="_blank" rel="noopener noreferrer"
-                   style="display:inline-block;background:#22d3ee;color:#0a0c10;padding:0.5rem 1rem;border-radius:6px;font-weight:700;text-decoration:none;">
-                    📜 sync-kyobo-library.user.js 설치
+                   style="display:inline-block;background:#22d3ee;color:#0a0c10;padding:0.9rem 1.6rem;border-radius:8px;font-weight:800;text-decoration:none;font-size:1.05rem;border:2px solid #0a0c10;box-shadow:3px 3px 0 #0a0c10;">
+                    📜 sync-kyobo-library.user.js 바로 설치 →
                 </a>
             </p>
-            <ol>
-                <li>위 버튼 클릭 → Tampermonkey 설치 화면 자동 표시</li>
+            <ol style="margin-top:1.2rem;">
+                <li>위 시안 버튼 클릭 (새 탭) → Tampermonkey 설치 화면 자동 표시</li>
                 <li>좌상단 <strong>[설치]</strong> 버튼 클릭</li>
-                <li>설치 완료 후 탭 자동 닫힘</li>
+                <li>설치 완료 후 탭 자동 닫힘 또는 "Successfully installed" 표시</li>
+                <li>Tampermonkey 아이콘 다시 클릭 → "<strong>1개 동작 중</strong>" 표시로 바뀌면 OK</li>
             </ol>
             <div class="callout">
                 만약 권한 요청 페이지(<code>chrome-extension://...ask.html?aid=...</code>)가 뜨면
@@ -370,6 +383,15 @@
                 <li><strong>✗ 네트워크 오류</strong> — NAS Kyobo Bridge(9000) 컨테이너 다운.
                     <code>http://192.168.10.205:9000/health</code> 직접 호출해 응답 확인.</li>
                 <li><strong>로그인이 자꾸 풀림</strong> — 교보 세션 만료. 다시 로그인 후 [동기화] 재시도.</li>
+                <li><strong>Tampermonkey 홈 → [Userscripts] 탭으로 가서 우리 스크립트를 검색하지 마세요</strong> —
+                    이 탭은 GreasyFork·OpenUserJS 같은 외부 사이트 안내일 뿐이고, 우리 스크립트는
+                    NAS 서버 직접 URL로 설치합니다 (STEP 3 의 녹색 버튼). 아래 화면을 만났다면 그냥 닫고
+                    STEP 3 으로 돌아가세요.
+                    <figure class="shot" style="margin-top:0.6rem;">
+                        <img src="install-img/troubleshoot-tm-userscripts.png" alt="Tampermonkey 홈의 Userscripts 탭 — 외부 스크립트 사이트 안내" loading="lazy" />
+                        <figcaption class="shot-cap">⚠ 이 페이지는 우리와 무관 — STEP 3 의 [📜 ... 설치] 버튼으로 직접 설치하세요</figcaption>
+                    </figure>
+                </li>
             </ul>
         </div>
     </div>
