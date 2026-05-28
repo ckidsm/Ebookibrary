@@ -31,9 +31,13 @@
 **/verification_report.json
 **/verification_report.md
 **/batch_*.json
+**/pages_data.json
+**/chapters_data.json
 **/*.py
 **/__pycache__/
 **/thumbs/
+**/*.BAK
+**/*.bak
 
 # 시스템·임시
 .DS_Store

@@ -29,3 +29,5 @@ venv/
 # 로컬 임시
 /tmp/
 *.tmp
+*.BAK
+*.bak

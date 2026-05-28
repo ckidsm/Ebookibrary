@@ -477,6 +477,60 @@ python -m bookcapture run --slug "그림으로 이해하는 알고리즘"
 
 ---
 
+### 2026-05-29: Phase C-3 Part 2 — merge + 본격 HTML 빌드
+
+**추가/수정**
+- `book-capture/bookcapture/merge.py` (신규) — 기존 `merge_batches.py` 153줄을 함수로 이식
+  - `merge_batches(summary_dir)` — `batch_*.json` glob → `pages_data.json` 생성
+  - `_make_chapter_id()` — `chs-chapter-N` / `chs-part-N` 자동 부여
+  - `_build_chapters()` — section_id 와 chapter_intro 로 챕터/섹션 트리 자동 구성
+- `book-capture/bookcapture/build_html.py` 본격 (placeholder 대체) — 기존 `generate_html.py` 477줄의 핵심 로직 이식
+  - 좌측 사이드바 트리 (320px, 챕터-섹션-페이지)
+  - 페이지 카드 (좌: 이미지, 우: 주요주제/주요용어/강의요약/핵심내용)
+  - 이미지 모달 (클릭 확대, ESC 닫기)
+  - IntersectionObserver 기반 scroll spy (현재 페이지 사이드바 하이라이트)
+  - `chs-card` 챕터 종합 카드는 스킵 (chapters_data.json 의존 — 후속에서 자동 생성 검토)
+  - `build_index()` 하위 호환 유지 — `pages_data.json` 있으면 본격, 없으면 placeholder
+- `book-capture/bookcapture/cli.py`
+  - `merge` 서브커맨드 추가
+  - `run` 흐름: capture → ocr → (summarize) → **merge** → build
+- `.gitignore` / `.dockerignore` — `*.BAK`, `pages_data.json` 등 추가
+
+**검증 (실제 CLI_완전활용 데이터)**
+- `bookcapture merge --book-dir books/CLI_완전활용`
+  → 6 batch 머지, 185 페이지, 5 챕터 자동 분리 ([chs-chapter-4], [chs-chapter-5], [chs-part-3], [chs-part-4], [chs-part-5])
+- `bookcapture build --book-dir books/CLI_완전활용`
+  → 439KB index.html (기존 487KB와 거의 동등, chs-card 빼서 살짝 작음)
+  → 사이드바 5 챕터 + 페이지 카드 185개 정확
+- 기존 `index.html.BAK` 보존 (사용자 비교용)
+
+**Phase C 진행 상황**
+- ✅ C-1: 톱니바퀴 + 설정 모달 + `/api/settings`
+- ✅ C-2: book-capture 패키지 + 기존 캡처 스크립트 이식
+- ✅ C-3 Part 1: AI 요약(`summarize.py`) + `/api/secrets/ai`
+- ✅ C-3 Part 2: merge + build_html 본격
+- ⏳ C-3 Part 3 (선택): 백엔드 `/api/jobs` 큐 + `worker.py` polling — CLI 직접 호출로 충분하면 생략
+- ⏳ C-4: 메인 도서 카드 클릭 → [분석 시작]/[보기]/[원본] 모달 + 분석 상태 배지
+
+**Mac 사용자 풀 워크플로 (현재 기준)**
+```bash
+cd KyoboLibrary/book-capture
+source .venv/bin/activate            # (venv 없으면 한 번 생성)
+
+# 한 책 전체 자동
+python -m bookcapture run --slug "그림으로 이해하는 알고리즘" --mode 3
+# = 캡처 → OCR → AI 요약 → merge → build → summary/index.html
+
+# 또는 단계별
+python -m bookcapture capture --mode 3
+python -m bookcapture ocr      --slug "그림으로 이해하는 알고리즘"
+python -m bookcapture summarize --slug "그림으로 이해하는 알고리즘" --pages 1-50
+python -m bookcapture merge    --slug "그림으로 이해하는 알고리즘"
+python -m bookcapture build    --slug "그림으로 이해하는 알고리즘"
+```
+
+---
+
 ### 2026-05-28: Phase B-2.1 — Tampermonkey + Userscript 설치 가이드 페이지
 
 **추가**

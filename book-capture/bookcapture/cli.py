@@ -23,6 +23,7 @@ from . import __version__
 from . import settings as cfg
 from . import ocr as ocr_mod
 from . import build_html
+from . import merge as merge_mod
 from . import summarize as summarize_mod
 
 
@@ -68,6 +69,19 @@ def cmd_ocr(args) -> int:
         print(f"✗ 폴더 없음: {book_dir}", file=sys.stderr); return 2
     ocr_mod.ocr_book(book_dir, cfg=s.ocr, refresh=args.refresh)
     return 0
+
+
+def cmd_merge(args) -> int:
+    """batch_*.json 들 → pages_data.json + 챕터/섹션 트리."""
+    book_dir = _resolve_book_dir(args)
+    summary_dir = book_dir / "summary"
+    if not summary_dir.exists():
+        print(f"✗ summary 폴더 없음: {summary_dir}", file=sys.stderr); return 2
+    try:
+        merge_mod.merge_batches(summary_dir, fallback_title=args.slug or book_dir.name)
+        return 0
+    except Exception as e:
+        print(f"✗ merge 실패: {e}", file=sys.stderr); return 1
 
 
 def cmd_build(args) -> int:
@@ -116,7 +130,7 @@ def cmd_summarize(args) -> int:
 
 
 def cmd_run(args) -> int:
-    """capture → ocr → (summarize) → build 일괄 실행 (대화형)."""
+    """capture → ocr → (summarize) → merge → build 일괄 (대화형)."""
     rc = cmd_capture(args)
     if rc != 0: return rc
     rc = cmd_ocr(args)
@@ -124,6 +138,8 @@ def cmd_run(args) -> int:
     if not getattr(args, "no_summarize", False):
         rc = cmd_summarize(args)
         if rc != 0: print(f"[run] summarize 일부 실패 (계속 진행)")
+    rc = cmd_merge(args)
+    if rc != 0: print(f"[run] merge 실패 (batch JSON 없음 가능) — placeholder HTML 만 생성")
     rc = cmd_build(args)
     return rc
 
@@ -145,7 +161,12 @@ def build_parser() -> argparse.ArgumentParser:
     po.add_argument("--refresh", action="store_true")
     po.set_defaults(func=cmd_ocr)
 
-    pb = sub.add_parser("build", help="HTML 인덱스 빌드 (Phase C-2 placeholder)")
+    pm = sub.add_parser("merge", help="batch_*.json → pages_data.json (챕터/섹션 트리)")
+    pm.add_argument("--slug")
+    pm.add_argument("--book-dir")
+    pm.set_defaults(func=cmd_merge)
+
+    pb = sub.add_parser("build", help="HTML 빌드 (pages_data.json 있으면 본격, 없으면 placeholder)")
     pb.add_argument("--slug")
     pb.add_argument("--book-dir")
     pb.set_defaults(func=cmd_build)
