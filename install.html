@@ -339,6 +339,16 @@
                 <img src="install-img/04-ask-html-url.png" alt="설치 페이지 — 주소창에 chrome-extension://...ask.html URL 보이는 풀화면" loading="lazy" />
                 <figcaption class="shot-cap">▶ 주소창에 <code>chrome-extension://&lt;ID&gt;/ask.html?aid=&lt;UUID&gt;</code> 가 보이는 게 정상</figcaption>
             </figure>
+            <div class="callout">
+                <strong>이미 설치된 적이 있다면</strong> "유저 스크립트 재설치" 화면이 뜨고
+                "모든 스크립트 설정이 재설정될 것입니다!" 안내(우상단 <code>ⓘ</code> 정보 아이콘)가 표시됩니다.
+                위험한 경고가 아니라 <code>GM_setValue</code> 로 저장한 백엔드 URL 설정 등이
+                기본값으로 돌아간다는 뜻 — 첫 설치라면 그대로 [재설치] 클릭.
+            </div>
+            <figure class="shot">
+                <img src="install-img/03b-reinstall.png" alt="재설치 화면 — 우상단 정보 아이콘, 좌측 [재설치] 버튼" loading="lazy" />
+                <figcaption class="shot-cap">▶ 이미 설치되어 있을 때 — [재설치] 또는 [취소]</figcaption>
+            </figure>
         </div>
     </div>
 
@@ -359,13 +369,10 @@
             <div class="callout is-ok">
                 <strong>한 번 설치하면 끝</strong>입니다. 이후로는 도서함 페이지 방문 → [동기화] 클릭으로 최신화.
             </div>
-            <div class="shot">
-                <div class="shot-placeholder">
-                    <div class="ph-icon">📷</div>
-                    <div>스크린샷 자리 — <code>install-img/05-sync-panel.png</code></div>
-                    <div style="margin-top:0.4rem;font-size:0.78rem;">교보 e-Library 페이지 우측 하단 동기화 패널</div>
-                </div>
-            </div>
+            <figure class="shot">
+                <img src="install-img/05-sync-panel.png" alt="교보 e-Library — 우측 하단 NAS Sync 다크 패널 정상 등장" loading="lazy" />
+                <figcaption class="shot-cap">▶ elibrary.kyobobook.co.kr 페이지 우측 하단에 NAS Sync 패널 자동 등장</figcaption>
+            </figure>
         </div>
     </div>
 
@@ -379,9 +386,14 @@
             <ul>
                 <li><strong>다크 패널이 안 보임</strong> — 페이지 로드 완전히 끝나길 기다리고 새로고침.
                     Tampermonkey 우상단 아이콘 클릭해서 스크립트가 "활성화됨" 인지 확인.</li>
-                <li><strong>⚠ 카드 추출 실패</strong> 메시지 — 교보 페이지 DOM 구조 차이.
+                <li><strong>⚠ 카드 추출 실패</strong> 메시지 (아래 캡처처럼) — 교보 페이지 DOM 구조 차이.
                     <span class="keys"><kbd>F12</kbd></span> → Console 의 <code>[NVK] 진단용</code> 로그 캡처 후
-                    개발자에게 알려주면 셀렉터 보정 가능.</li>
+                    개발자에게 알려주면 셀렉터 보정 가능. v0.3.0 부터는 진단 dump 가 훨씬 풍부합니다.
+                    <figure class="shot" style="margin-top:0.6rem;max-width:520px;">
+                        <img src="install-img/05b-sync-extract-fail.png" alt="NAS Sync 패널 — 카드 추출 실패 안내" loading="lazy" />
+                        <figcaption class="shot-cap">⚠ 카드 추출 실패 — [미리보기 (F12)] 누르고 콘솔 dump 캡처 부탁</figcaption>
+                    </figure>
+                </li>
                 <li><strong>✗ 네트워크 오류</strong> — NAS Kyobo Bridge(9000) 컨테이너 다운.
                     <code>http://192.168.10.205:9000/health</code> 직접 호출해 응답 확인.</li>
                 <li><strong>로그인이 자꾸 풀림</strong> — 교보 세션 만료. 다시 로그인 후 [동기화] 재시도.</li>
