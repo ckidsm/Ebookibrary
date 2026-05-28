@@ -55,7 +55,7 @@ app.add_middleware(
         "https://mmbr.kyobobook.co.kr",
     ],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
