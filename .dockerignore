@@ -23,6 +23,9 @@
 /kyobo-bridge/
 /docker-compose.yml
 
+# Mac 로컬 자동화 도구 — NAS 미전송
+/book-capture/
+
 # 빌드 도구·캐시 (모든 books/ 하위에서)
 **/ocr_text/
 **/verification_report.json

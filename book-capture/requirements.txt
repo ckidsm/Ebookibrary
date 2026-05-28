@@ -1,0 +1,7 @@
+Pillow==11.0.0
+pytesseract==0.3.13
+# settings 모듈은 urllib(표준)만 사용 — 별도 HTTP 라이브러리 불필요
+# Phase C-3 추가 예정:
+# anthropic==0.40.0
+# openai==1.55.0
+# httpx==0.27.2     # AI SDK 가 내부에서 사용

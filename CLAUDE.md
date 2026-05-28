@@ -392,6 +392,55 @@ DSM의 docker가 PATH 밖이라 `/usr/local/bin/docker` 절대경로 사용
 
 ---
 
+### 2026-05-28: Phase C-2 — book-capture 패키지 + 기존 파이썬 이식
+
+**추가**
+- `book-capture/` 신규 폴더 (NAS 미전송, `.dockerignore` 처리)
+- `book-capture/bookcapture/` Python 패키지
+  - `__init__.py` `__main__.py` `cli.py` — `python -m bookcapture <sub>` 엔트리
+  - `settings.py` — `/api/settings` 로드(표준 `urllib`만 사용, 의존성 0). 환경변수 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` 우선
+  - `kyobo_app.py` — **기존 `kyobo_app_screenshot.py` 817줄 그대로 이식** (검증된 캡처 자산 보존)
+  - `ocr.py` — `verify_ocr.py` 패턴 단순화 (검증 아닌 OCR 캐시만), `make_thumbnails()` 1800px 리사이즈
+  - `build_html.py` — Phase C-2 placeholder 인덱스 (썸네일 그리드, OCR 유무 표시). C-3에서 사이드바·챕터 카드 본격
+- `requirements.txt` — Pillow, pytesseract (HTTP는 표준 라이브러리)
+- `README.md` — Mac venv 설정, tesseract 설치, macOS 권한, 5가지 서브커맨드 표
+- `.gitignore` — venv, books/, *.png, ocr_text/, thumbs/ 제외
+- `.dockerignore` 루트에 `/book-capture/` 추가 — NAS rsync 미전송
+
+**서브커맨드 5개**
+| 명령 | 동작 |
+|---|---|
+| `settings` | 현재 백엔드 설정 + AI 키 환경변수 점검 |
+| `capture --mode 1/2/3` | `kyobo_app.py` 인터랙티브 캡처 (전체/윈도우/연속) |
+| `ocr --slug X` | `<books_dir>/X/` *.png → `summary/ocr_text/page_NNN.txt` |
+| `build --slug X` | C-2 placeholder 인덱스 HTML |
+| `run --slug X --mode 3` | capture → ocr → build 일괄 |
+
+**검증**
+- `python3 -m bookcapture` help 정상
+- `python3 -m bookcapture settings` 백엔드 값 정확 반영 (`capture[100,50 1800×1100] delay=2.0s ...`)
+- httpx 없이 표준 라이브러리만으로 동작 — Mac 시스템 python3 즉시 사용 가능
+- venv 만들 때만 `pip install -r requirements.txt` (Pillow·pytesseract)
+
+**Mac 사용자 시작 흐름**
+```bash
+cd KyoboLibrary/book-capture
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+brew install tesseract tesseract-lang
+export ANTHROPIC_API_KEY="sk-ant-..."
+python -m bookcapture run --slug "그림으로 이해하는 알고리즘"
+```
+
+**다음 (C-3)**
+- `summarize.py` — Claude API(또는 OpenAI) 호출, OCR 텍스트 → `{ 주요주제, 주요용어, 강의요약, 핵심내용 }` batch JSON
+- `merge.py` — `merge_batches.py` 이식 (pages_data.json + chapters_data.json 자동 생성)
+- `build_html.py` 본격 — `generate_html.py` 패턴(사이드바 트리, 챕터 카드, scroll spy)
+- `worker.py` — 백엔드 `/api/jobs` 큐 polling
+- 백엔드: `/api/jobs` POST/GET, jobs 테이블 추가
+
+---
+
 ### 2026-05-28: Phase B-2.1 — Tampermonkey + Userscript 설치 가이드 페이지
 
 **추가**

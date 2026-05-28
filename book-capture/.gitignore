@@ -1,0 +1,19 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# 캡처 결과·OCR 캐시 (큰 PNG)
+books/
+*.png
+*.jpg
+*.jpeg
+**/thumbs/
+**/ocr_text/
+
+# 시스템
+.DS_Store
+.vscode/
+.idea/

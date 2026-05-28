@@ -1,0 +1,111 @@
+"""백엔드 /api/settings 에서 설정을 가져오고, 환경변수가 있으면 우선 적용.
+
+API 키 같은 민감 정보는 응답에서 마스킹되므로 환경변수로 따로 받는다:
+- ANTHROPIC_API_KEY
+- OPENAI_API_KEY
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import urllib.request
+from dataclasses import dataclass, field
+from typing import Any
+
+DEFAULT_BRIDGE_URL = os.environ.get(
+    "KYOBO_BRIDGE_URL",
+    "http://192.168.10.205:9000",
+)
+
+
+@dataclass
+class CaptureCfg:
+    region: dict = field(default_factory=lambda: {"x": 0, "y": 0, "w": 0, "h": 0})
+    delay_sec: float = 1.5
+    max_pages: int = 400
+    next_key: str = "right"
+    first_page_wait: float = 3.0
+    skip_duplicate_hash: bool = True
+
+
+@dataclass
+class OcrCfg:
+    lang: str = "kor+eng"
+    use_thumbs: bool = True
+
+
+@dataclass
+class AiCfg:
+    provider: str = "claude"
+    model: str = "claude-sonnet-4-5"
+    api_key: str = ""           # 환경변수에서 채워짐
+    language: str = "ko"
+    temperature: float = 0.3
+
+
+@dataclass
+class OutputCfg:
+    books_dir: str = "./books"
+    thumb_max_px: int = 1800
+
+
+@dataclass
+class Settings:
+    capture: CaptureCfg = field(default_factory=CaptureCfg)
+    ocr: OcrCfg = field(default_factory=OcrCfg)
+    ai: AiCfg = field(default_factory=AiCfg)
+    output: OutputCfg = field(default_factory=OutputCfg)
+
+
+def _merge_dc(dc: Any, src: dict) -> None:
+    if not isinstance(src, dict):
+        return
+    for k, v in src.items():
+        if hasattr(dc, k):
+            cur = getattr(dc, k)
+            if isinstance(cur, dict) and isinstance(v, dict):
+                cur.update(v)
+            else:
+                setattr(dc, k, v)
+
+
+def load(bridge_url: str | None = None) -> Settings:
+    s = Settings()
+
+    # 1) 백엔드에서 가져오기 (실패해도 기본값으로 진행) — urllib(표준 라이브러리)만 사용
+    url = (bridge_url or DEFAULT_BRIDGE_URL).rstrip("/") + "/api/settings"
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=5.0) as resp:
+            data = (json.loads(resp.read().decode("utf-8")) or {}).get("settings", {})
+            _merge_dc(s.capture, data.get("capture") or {})
+            _merge_dc(s.ocr, data.get("ocr") or {})
+            _merge_dc(s.ai, data.get("ai") or {})
+            _merge_dc(s.output, data.get("output") or {})
+    except Exception as e:
+        print(f"[settings] 백엔드 로드 실패 ({url}): {e} — 기본값 사용")
+
+    # 2) 환경변수 우선
+    env_key = None
+    if s.ai.provider == "claude":
+        env_key = os.environ.get("ANTHROPIC_API_KEY")
+    elif s.ai.provider == "openai":
+        env_key = os.environ.get("OPENAI_API_KEY")
+    if env_key:
+        s.ai.api_key = env_key
+
+    return s
+
+
+def explain(s: Settings) -> str:
+    """가독성 좋은 한 줄 요약 (로그용)."""
+    r = s.capture.region
+    key_mask = f"{s.ai.api_key[:7]}..." if s.ai.api_key else "(없음)"
+    return (
+        f"capture[{r['x']},{r['y']} {r['w']}×{r['h']}] "
+        f"delay={s.capture.delay_sec}s max={s.capture.max_pages} key={s.capture.next_key} | "
+        f"ocr[{s.ocr.lang}, thumbs={s.ocr.use_thumbs}] | "
+        f"ai[{s.ai.provider}/{s.ai.model}, key={key_mask}] | "
+        f"out={s.output.books_dir}"
+    )
