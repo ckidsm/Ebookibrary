@@ -172,6 +172,16 @@
             border-radius: 3px;
             font-size: 0.8rem;
         }
+        .shot-cap {
+            display: block;
+            padding: 0.55rem 0.9rem;
+            background: #f1f5f9;
+            color: #475569;
+            font-size: 0.84rem;
+            border-top: 1px solid #e2e8f0;
+            font-family: 'IBM Plex Mono', ui-monospace, monospace;
+        }
+        figure.shot { margin: 1rem 0 0; }
 
         .keys {
             display: inline-flex;
@@ -237,17 +247,18 @@
         <div class="step-body">
             <ol>
                 <li><a href="https://www.tampermonkey.net/" target="_blank" rel="noopener noreferrer">tampermonkey.net</a> 접속</li>
-                <li>본인 브라우저 아이콘(예: <strong>Chrome</strong>) 클릭 → Chrome Web Store 이동</li>
-                <li><strong>[Chrome에 추가]</strong> 버튼 → 권한 확인 팝업의 <strong>[확장 프로그램 추가]</strong> 클릭</li>
+                <li>상단 탭에서 본인 브라우저 선택 (사진은 <strong>Chrome</strong> 탭 활성 상태)</li>
+                <li>아래 <strong>DOWNLOAD</strong> 섹션의 녹색 <strong>[Get from Store]</strong> 버튼 클릭 → Chrome Web Store로 이동</li>
+                <li>Chrome Web Store에서 <strong>[Chrome에 추가]</strong> → 권한 확인 팝업의 <strong>[확장 프로그램 추가]</strong></li>
                 <li>브라우저 우상단 퍼즐 조각 아이콘에서 Tampermonkey 검은 아이콘 보이면 설치 완료</li>
             </ol>
-            <div class="shot">
-                <div class="shot-placeholder">
-                    <div class="ph-icon">📷</div>
-                    <div>스크린샷 자리 — <code>install-img/01-tampermonkey-net.png</code></div>
-                    <div style="margin-top:0.4rem;font-size:0.78rem;">tampermonkey.net 홈에서 브라우저 아이콘 클릭 화면</div>
-                </div>
+            <div class="callout">
+                <strong>BETA</strong> 카드는 최신 실험 버전. 일반 사용은 첫 번째 <strong>Tampermonkey</strong> 카드(Chrome 120+) 로 충분합니다.
             </div>
+            <figure class="shot">
+                <img src="install-img/01-tampermonkey-net.png" alt="tampermonkey.net 홈 화면 — Chrome 탭의 Get from Store 버튼" loading="lazy" />
+                <figcaption class="shot-cap">▶ tampermonkey.net · 본인 브라우저 탭 → 녹색 [Get from Store] 클릭</figcaption>
+            </figure>
         </div>
     </div>
 
