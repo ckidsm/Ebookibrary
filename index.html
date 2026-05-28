@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>교보 전자책 라이브러리</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .books-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .book-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .book-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .book-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .book-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+        }
+
+        .book-info {
+            color: #718096;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .book-description {
+            color: #4a5568;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-top: 1rem;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #edf2f7;
+            color: #667eea;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 1.2rem;
+            padding: 3rem;
+        }
+
+        .error {
+            background: #fed7d7;
+            color: #9b2c2c;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            opacity: 0.8;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255,255,255,0.2);
+        }
+
+        @media (max-width: 768px) {
+            .books-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 교보 전자책 라이브러리</h1>
+            <p class="subtitle">수백 권의 도서를 언제 어디서나</p>
+        </header>
+
+        <div id="books-container" class="books-grid">
+            <div class="loading">도서 목록을 불러오는 중...</div>
+        </div>
+
+        <footer>
+            <p>Powered by Kyobo eBook Screenshots</p>
+            <p style="font-size: 0.9rem; margin-top: 0.5rem;">© 2026 All rights reserved</p>
+        </footer>
+    </div>
+
+    <script>
+        // 도서 목록 데이터
+        const books = [
+            {
+                id: 'cli-complete',
+                title: 'CLI 완전활용',
+                slug: 'CLI_완전활용',
+                chapters: 8,
+                pages: 311,
+                description: 'Claude Code, Codex CLI, Gemini CLI 세 가지 AI 터미널 도구를 마스터하여 개발 생산성을 극대화하는 완전 가이드',
+                icon: '💻'
+            }
+            // 향후 여기에 더 많은 도서 추가
+        ];
+
+        // 도서 카드 렌더링
+        function renderBooks() {
+            const container = document.getElementById('books-container');
+
+            if (books.length === 0) {
+                container.innerHTML = '<div class="error">등록된 도서가 없습니다.</div>';
+                return;
+            }
+
+            container.innerHTML = books.map(book => `
+                <a href="books/${encodeURIComponent(book.slug)}/viewer.html" class="book-card">
+                    <div class="book-icon">${book.icon}</div>
+                    <div class="book-title">${book.title}</div>
+                    <div class="book-info">
+                        ${book.chapters}개 챕터 · ${book.pages}페이지
+                    </div>
+                    <div class="book-description">${book.description}</div>
+                    <span class="badge">바로 읽기 →</span>
+                </a>
+            `).join('');
+        }
+
+        // 페이지 로드 시 실행
+        document.addEventListener('DOMContentLoaded', () => {
+            renderBooks();
+        });
+
+        // 동적 도서 목록 로드 (향후 확장)
+        async function loadBooksFromServer() {
+            try {
+                const response = await fetch('api/books.json');
+                if (response.ok) {
+                    const serverBooks = await response.json();
+                    books.push(...serverBooks);
+                    renderBooks();
+                }
+            } catch (error) {
+                // 서버 데이터가 없으면 기본 목록 사용
+                console.log('Using default book list');
+            }
+        }
+
+        // loadBooksFromServer(); // 필요시 활성화
+    </script>
+</body>
+</html>

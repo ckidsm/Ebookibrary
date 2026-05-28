@@ -1,0 +1,652 @@
+{
+  "chapters": [
+    {
+      "id": "chs-chapter-4",
+      "title": "4장 Claude Code로 프로젝트 운영하기",
+      "range": "p.127 ~ p.143 (17페이지) · 3개 절",
+      "first_page": 127,
+      "overview": "Claude Code를 단순한 파일 편집기가 아닌 <strong>프로젝트 전체를 이해하고 맥락을 유지하는 'AI 개발 파트너'</strong>로 활용하는 방법을 다룬다. CLAUDE.md로 프로젝트 컨텍스트를 명문화하고, 계획 모드로 복잡한 작업을 안전하게 설계하며, 토큰·캐싱 전략으로 비용과 효율을 함께 관리하는 세 축을 학습한다.",
+      "sections": [
+        {
+          "title": "4.1 CLAUDE.md 파일 관리하기",
+          "points": [
+            "<strong>위치별 적용 범위</strong>: 전역(<code>~/.claude/CLAUDE.md</code>) → 프로젝트(<code>./CLAUDE.md</code>) → 모듈별 순으로 우선순위가 적용됨",
+            "<strong>일반 대화와의 차이</strong>: 매 세션마다 자동 로드되어 지속적 맥락 제공 — 시스템 프롬프트와 유사한 역할",
+            "<strong>/init 명령</strong>: 기존 프로젝트의 파일 구조·README를 분석해 CLAUDE.md 초안을 자동 생성",
+            "<strong>포함 항목</strong>: 프로젝트 목적, 기술 스택, 구조, 핵심 규칙·금지 사항, 개발 명령어/단축 사전",
+            "<strong>작성 원칙</strong>: 100줄 이내로 유지, 핵심 규칙 우선, 링크보다 직접 내용 포함, 파일 참조 최소화 (참조 시 토큰 비용 증가)",
+            "규칙은 35자 이하로 표현 시 토큰을 30~50% 줄일 수 있음",
+            "분량이 많아질 경우 <code>coding-style.md</code> 등으로 분리 가능"
+          ],
+          "tags": [
+            {"text": "CLAUDE.md", "core": true},
+            {"text": "프로젝트 메모리"},
+            {"text": "전역/프로젝트/모듈 스코프"},
+            {"text": "/init 명령"},
+            {"text": "시스템 프롬프트"},
+            {"text": "컨텍스트 윈도우"}
+          ]
+        },
+        {
+          "title": "4.2 계획 모드를 실제 작업 흐름에 적용하기",
+          "points": [
+            "<strong>계획 모드란</strong>: 코드를 수정하지 않고 분석·설계·리스크 파악만 수행하는 모드",
+            "<strong>사용 시점</strong>: 복잡한 리팩터링, 반복적 오류 수정, 새 기능 구현 시 전체 흐름 설계",
+            "<strong>구현 단계 전환</strong>: <em>Yes, and auto-accept edits</em> / <em>Yes, and manually approve edits</em> / <em>No, keep planning</em> 옵션 제공",
+            "<strong>기본값 설정</strong>: <code>.claude/settings.json</code>에 permissions 설정으로 계획 모드를 기본값으로 지정 가능",
+            "<strong>실전 활용 3가지 전략</strong>: ① 대규모 작업은 계획부터 요청 ② 계획을 반복 생성하며 점진적 개선 ③ <code>--permission-mode plan -p</code>로 설계안만 파일로 즉시 저장",
+            "<strong>설계안 비교</strong>: <code>diff redux.md zustand.md</code>처럼 두 설계안을 객관적으로 비교 가능 (요구 충족도/복잡도/유지보수성)"
+          ],
+          "tags": [
+            {"text": "계획 모드 (plan mode)", "core": true},
+            {"text": "--permission-mode plan"},
+            {"text": ".claude/settings.json"},
+            {"text": "설계안 비교"},
+            {"text": "diff"}
+          ]
+        },
+        {
+          "title": "4.3 컨텍스트 관리와 토큰 최적화하기",
+          "points": [
+            "<strong>토큰 기본</strong>: 영어 1단어 ≈ 1~1.5토큰, 한국어 1음절 ≈ 2~3토큰 — 한국어가 토큰 소비가 큼",
+            "<strong>입력/출력 토큰 구성</strong>: 입력(시스템 프롬프트, CLAUDE.md, 사용자 메시지, 도구 정의, MCP) / 출력(응답·코드 생성)",
+            "<strong>사용량 확인</strong>: <code>/context</code> 명령으로 구성 요소별 토큰 수 시각화",
+            "<strong>/compact vs /clear</strong>: <code>/compact</code>는 핵심만 유지(같은 작업 누적 시), <code>/clear</code>는 완전 초기화(작업 전환 시)",
+            "<strong>프롬프트 캐싱</strong>: 1차 캐시 생성 → 2차 캐시 히트 시 입력 토큰 가격 최대 90% 절감, 지연 시간 85% 절감",
+            "<strong>최적화 흐름 4단계</strong>: ① 큰 작업은 계획부터 ② <code>/context</code>로 사용량 점검 ③ 마크다운 저장 후 <code>/clear</code>로 초기화 ④ 프롬프트 캐싱 활용",
+            "<strong>멀티 터미널 전략</strong>: 백엔드/프론트엔드/문서화를 물리적으로 분리 → 컨텍스트 충돌 방지"
+          ],
+          "tags": [
+            {"text": "컨텍스트 윈도우", "core": true},
+            {"text": "프롬프트 캐싱", "core": true},
+            {"text": "/context"},
+            {"text": "/compact"},
+            {"text": "/clear"},
+            {"text": "캐시 히트"},
+            {"text": "200K 토큰"}
+          ]
+        }
+      ],
+      "tables": [
+        {
+          "title": "표 1. /compact vs /clear 비교",
+          "headers": ["구분", "/compact", "/clear"],
+          "rows": [
+            ["<strong>동작</strong>", "현재 대화를 핵심만 요약·압축", "모든 대화 이력 완전 삭제"],
+            ["<strong>맥락 유지</strong>", "유지 (토큰만 줄임)", "완전 초기화"],
+            ["<strong>사용 시점</strong>", "같은 작업 내 컨텍스트 누적 시<br>프론트→백엔드 전환, Git 커밋 후 정리", "완전히 새로운 작업으로 전환 시<br>기능 단위 개발 완료, 대규모 리팩터링 종료"],
+            ["<strong>옵션</strong>", "특정 주제로 초점 지정 가능", "옵션 없음"]
+          ],
+          "footer": "<strong>권장 트리거</strong>: <code>/context</code>로 확인 시 사용량 70% 이상"
+        },
+        {
+          "title": "표 2. Claude 모델 비용 비교 (4.3.3절)",
+          "headers": ["모델", "입력 가격", "출력 가격", "컨텍스트", "적합한 작업"],
+          "rows": [
+            ["<strong>Sonnet 4.5</strong>", "$3 / MTok", "$15 / MTok", "200K 토큰", "비용 효율적 일반 개발"],
+            ["<strong>Opus 4.5</strong>", "$15 / MTok", "$75 / MTok", "200K 토큰", "높은 품질의 복잡한 코드 생성"]
+          ],
+          "footer": "<strong>프롬프트 캐싱 적용 시</strong>: 캐시 히트된 입력 토큰은 기본 가격의 10%만 부과 → 비용 최대 90% / 지연 85% 절감"
+        }
+      ]
+    },
+    {
+      "id": "chs-chapter-5",
+      "title": "5장 Claude Code 고급 기능 활용하기",
+      "range": "p.144 ~ p.186 (43페이지) · 9개 절",
+      "first_page": 144,
+      "overview": "Claude Code를 단순한 AI 코드 어시스턴트가 아닌 <strong>'개발 자동화 플랫폼'</strong>으로 확장하는 방법을 다룬다. MCP 서버 연동, 서브에이전트, Hook, Output Style, 사용자 정의 명령어, 플러그인·스킬, IDE/커뮤니티 확장까지 — AI가 코드 작성을 넘어 워크플로 전체를 관리하고 실행하는 환경을 구축한다.",
+      "sections": [
+        {
+          "title": "5.1 MCP 이해하고 설정하기",
+          "points": [
+            "<strong>MCP(Model Context Protocol)</strong>: Anthropic이 개발한 오픈 프로토콜로, AI 모델과 외부 도구·시스템을 연결하는 표준",
+            "<strong>4가지 핵심 기능</strong>: 도구 실행, 리소스 읽기, 프롬프트 확장, 컨텍스트 확장",
+            "<strong>설치</strong>: <code>claude mcp add [이름] [실행 명령]</code>",
+            "<strong>스코프 3단계</strong>: Local(개인 세션), Project(<code>.mcp.json</code>, 팀 공유), User(<code>~/.claude/mcp.json</code>, 전역)",
+            "<strong>통신 방식</strong>: stdio(npx/uvx 로컬 실행) / HTTP(원격 서비스) / SSE(실시간 스트리밍)"
+          ]
+        },
+        {
+          "title": "5.2 주요 MCP 서버 설치하고 사용하기",
+          "points": [
+            "<strong>Playwright MCP</strong>: 웹 크롤링, 폼 입력, 스크린샷, E2E 테스트 자동화",
+            "<strong>GitHub MCP</strong>: 이슈 생성/조회, PR 생성·리뷰, 코드 검색, GitHub Actions 조회 — PAT(Personal Access Token) 필요",
+            "<strong>Supabase MCP</strong>: 회원가입 → 조직 → 프로젝트 생성 → Connect → MCP 탭에서 Server URL 복사 → <code>claude mcp add</code> → Authenticate",
+            "<strong>탐색</strong>: 공식 문서(modelcontextprotocol.io), Python/TypeScript SDK로 자체 제작 가능",
+            "<strong>트러블슈팅</strong>: Disconnected는 재시작, Browser not installed는 <code>npx playwright install chromium</code>"
+          ]
+        },
+        {
+          "title": "5.3 서브에이전트로 역할 분리하기",
+          "points": [
+            "<strong>서브에이전트</strong>: 특정 작업에 특화된 AI 전문가 — 부모와 별도의 200K 컨텍스트 할당",
+            "<code>/agents</code> 명령으로 관리 — Generate with Claude(자동 작성) 또는 Manual(YAML 직접 편집)",
+            "<strong>모델 선택</strong>: Sonnet(균형) / Opus(무거운 작업) / Haiku(경량) / Inherit(부모 상속)",
+            "<strong>저장 위치</strong>: <code>.claude/agents/{name}.md</code> — YAML front matter(name, description, model, tools, system prompt)",
+            "<strong>호출 방식</strong>: 자동 실행(description 기반 자동 선택) / 명시적 호출",
+            "<strong>비용 관리</strong>: 관련 작업 묶기, description을 명확히 작성해 불필요 호출 방지"
+          ]
+        },
+        {
+          "title": "5.4 Hook으로 작업 흐름 자동화하기",
+          "points": [
+            "<strong>Hook</strong>: Claude Code가 특정 시점에 자동 실행하는 사전 정의 명령",
+            "<strong>이벤트 종류</strong>: PreToolUse, PostToolUse, Stop, Notification, SubagentStop",
+            "<strong>설정 위치</strong>: <code>.claude/settings.json</code>(공유) / <code>.claude/settings.local.json</code>(개인·팀과 분리)",
+            "<strong>실전 예시</strong>: Slack Webhook + curl로 작업 완료 알림 전송",
+            "<strong>고급 패턴</strong>: matcher로 특정 도구만 트리거, watcher로 파일 변경 감지",
+            "<strong>보안 주의</strong>: Webhook URL/API 키는 공개 저장소 커밋 금지, 외부 Hook 설정은 실행 전 검토 필수",
+            "Hook 변경 후 <code>/hooks</code>로 검토해야 적용 — 악의적 수정으로부터 세션 보호"
+          ]
+        },
+        {
+          "title": "5.5 Output Style로 맞춤 설정하기",
+          "points": [
+            "<strong>Output Style</strong>: Claude Code의 출력 형식·스타일 제어 — 간결한 코드부터 학습용 상세 설명까지",
+            "<strong>기본 3종</strong>: Default(간결) / Explanatory(구조·해석 포함) / Learning(학습 도움, TODO·hint 제공)",
+            "<strong>전환</strong>: <code>/output-style</code> 명령",
+            "<strong>사용자 정의</strong>: <code>~/.claude/output-styles/{name}.md</code>(개인) 또는 <code>.claude/output-styles/{name}.md</code>(프로젝트)",
+            "YAML 프론트매터 + 마크다운 본문 구조 — name, description, keep-coding-instructions 등 설정"
+          ]
+        },
+        {
+          "title": "5.6 사용자 정의 명령어로 자동화 워크플로 구축하기",
+          "points": [
+            "<strong>구조</strong>: <code>.claude/commands/{name}.md</code>에 프롬프트 정의 → <code>/{name}</code>으로 실행",
+            "<strong>인수 활용</strong>: <code>$ARGUMENTS</code> 변수로 사용자 입력 동적 전달",
+            "<strong>고급 헤더</strong>: YAML 헤더에 description, model 지정 → 명령어별 모델 선택, 특화 도구 생성",
+            "<strong>그룹화</strong>: 폴더/하위폴더 구조로 관리 (<code>.claude/commands/review/security.md</code> 등)",
+            "<strong>커뮤니티 확장</strong>: Claude Command Suite, Awesome Claude Code 참고"
+          ]
+        },
+        {
+          "title": "5.7 플러그인과 스킬로 Claude Code 확장하기",
+          "points": [
+            "<strong>스킬</strong>: 특정 작업 시 Claude가 자동 참조하는 전문 지식 파일 (description의 키워드 기반 자동 호출)",
+            "<strong>플러그인</strong>: Claude Code 기능 자체를 확장하는 독립 패키지",
+            "<strong>저장 위치</strong>: <code>~/.claude/skills</code>(개인) / <code>.claude/skills</code>(프로젝트)",
+            "<strong>관리 명령</strong>: <code>/plugin marketplace add</code>, <code>/plugin install</code>, <code>/plugin enable|disable|uninstall</code>",
+            "<strong>팀 공유</strong>: <code>.claude/settings.json</code>에 skills/plugins 설정 명시"
+          ]
+        },
+        {
+          "title": "5.8 VSCode 확장과 커뮤니티 확장 활용하기",
+          "points": [
+            "<strong>Claude Code for VS Code</strong>: Extensions 마켓플레이스에서 설치 — Hook, MCP 연동, 코드 리뷰·리팩토링 GUI 제공",
+            "<strong>Super Claude</strong>: 커뮤니티 기반 확장 — <code>pip install</code> 또는 <code>superclaude init/install</code>",
+            "<strong>도입 기준</strong>: VSCode 확장(GUI 선호, IDE 통합 작업) / Super Claude(CLI 파워유저)"
+          ]
+        },
+        {
+          "title": "5.9 실전 응용과 팀 협업 팁",
+          "points": [
+            "<strong>패턴 1</strong>: 탐색 → 계획 → 코딩 → 커밋 (가장 일반적·안정적)",
+            "<strong>패턴 2</strong>: 테스트로 시작 (TDD)",
+            "<strong>패턴 3</strong>: 비주얼 반복 (디자인 입력 → UI/UX 피드백 → 시각적 검증 반복)",
+            "<strong>팀 협업</strong>: 공유 CLAUDE.md에 Links/Tools/Testing/Features 섹션 포함, 환경별 테스트 스크립트 분기",
+            "Git Conflicts 보조 도구로 활용, ROADMAP.md 자동 추적"
+          ]
+        }
+      ],
+      "tables": [
+        {
+          "title": "표 3. 5장 고급 기능 한눈에 보기",
+          "headers": ["기능", "해결 문제", "핵심 명령/파일", "대표 활용"],
+          "rows": [
+            ["<strong>MCP</strong>", "외부 도구·DB·API 연결", "<code>claude mcp add</code>", "Playwright, GitHub, Supabase"],
+            ["<strong>서브에이전트</strong>", "역할 분리, 컨텍스트 격리", "<code>/agents</code> · <code>.claude/agents/</code>", "코드 리뷰어, 테스트 작성자"],
+            ["<strong>Hook</strong>", "반복 작업 자동화", "<code>/hooks</code> · settings.json", "완료 시 Slack 알림, 코드 포맷팅"],
+            ["<strong>Output Style</strong>", "응답 형식 표준화", "<code>/output-style</code>", "간결 모드, 학습 모드 전환"],
+            ["<strong>사용자 명령어</strong>", "반복 프롬프트 단축", "<code>.claude/commands/</code>", "/explain, /review, /optimize"],
+            ["<strong>스킬·플러그인</strong>", "도메인 지식·기능 확장", "<code>/plugin</code> · <code>.claude/skills/</code>", "코드 리뷰 스킬, 빌드 도구 통합"]
+          ]
+        },
+        {
+          "title": "표 4. Hook 이벤트 종류",
+          "headers": ["이벤트", "발생 시점", "대표 활용"],
+          "rows": [
+            ["<code>PreToolUse</code>", "도구 호출 직전", "실행 전 권한 검사, 위험 명령 차단"],
+            ["<code>PostToolUse</code>", "도구 호출 직후", "코드 자동 포맷팅, 린트 실행"],
+            ["<code>Stop</code>", "응답 완료 시", "Slack/이메일 작업 완료 알림"],
+            ["<code>Notification</code>", "Claude가 사용자에게 알림 시", "외부 알림 시스템 연동"],
+            ["<code>SubagentStop</code>", "서브에이전트 종료 시", "결과 집계, 후속 작업 트리거"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chs-part-3",
+      "title": "Part 3 — Codex CLI 완전 정복",
+      "range": "p.187 ~ p.223 (37페이지) · 6장~8장",
+      "first_page": 187,
+      "overview": "OpenAI <strong>Codex CLI</strong>(GPT-5 Codex 계열 기반)를 다루는 파트. 기억·지침·컨텍스트 기반의 개발 자동화 엔진으로, AGENTS.md를 중심으로 프로젝트 규칙을 정의하고 세션 관리·승인 정책·샌드박스로 안전성을 확보하며, MCP·config.toml 고급 설정과 세션 로그까지 활용한다. Claude Code와의 차이를 짚어보며 두 도구를 병행하는 하이브리드 워크플로의 기반을 마련한다.",
+      "sections": [
+        {
+          "title": "6장 Codex CLI 시작하기",
+          "subsections": [
+            {
+              "heading": "6.1 설치와 인증",
+              "points": [
+                "Node.js 20 LTS 이상 필요 — <code>npm install -g @openai/codex</code> 또는 Homebrew",
+                "인증 방식 2가지: <strong>Sign in with ChatGPT</strong>(OAuth, ChatGPT Plus 이상 무료 사용) / <strong>API key</strong>(종량제)",
+                "최초 실행 시 자동 승인 모드 vs 매번 승인 모드 선택"
+              ]
+            },
+            {
+              "heading": "6.2 기본 사용 흐름",
+              "points": [
+                "기본 모델 <code>gpt-5-2-codex</code> — 추론 수준 4단계: Low / <strong>Medium(기본)</strong> / High / Extra high",
+                "여러 줄 입력 <code>Ctrl+Enter</code>, 화면 초기화 <code>Ctrl+L</code>, <code>/image</code> 또는 클립보드로 이미지 첨부",
+                "세션 관리: <code>/new</code>(새 대화), <code>resume --last</code>(최근 세션 이어가기), <code>/quit</code>·<code>Ctrl+C</code>·<code>Ctrl+D</code>(종료)"
+              ]
+            },
+            {
+              "heading": "6.3 실행 모드와 권한 관리",
+              "points": [
+                "대화형(<code>codex</code>) / 비대화형(<code>codex exec</code>, CI/CD 적합) / 자동화(<code>--full-auto</code>)",
+                "Git 저장소 기반 동작이 기본 — 필요 시 <code>git init</code>",
+                "<strong>승인 정책 4종</strong>: untrusted, on-request(기본), on-failure, never",
+                "<strong>샌드박스 3종</strong>: read-only, workspace-write(기본), danger-full-access",
+                "<code>/approvals</code>로 현재 접근 레벨 확인 — Read Only / Auto / Full Access 조합 표시"
+              ]
+            },
+            {
+              "heading": "6.4 주요 슬래시 명령어",
+              "points": [
+                "<code>/compact</code> 대화 요약, <code>/diff</code> Git 변경 확인(스테이징·미스테이징 모두)",
+                "<code>/logout</code> 인증 정보 삭제, <code>/mention</code> 파일 명시 참조, <code>/review</code> 코드 리뷰 자동 수행",
+                "<code>/status</code>로 모델·디렉터리·승인·샌드박스·Context window·6h limit 확인"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "7장 Codex CLI로 프로젝트 운영하기",
+          "subsections": [
+            {
+              "heading": "7.1 AGENTS.md 파일 관리하기",
+              "points": [
+                "루트 <code>AGENTS.md</code>(전체 적용) / 서브폴더 <code>AGENTS.md</code>(영역별 지침)",
+                "<code>/init</code>으로 프로젝트 분석 후 초안 자동 생성 → 직접 수정 보완",
+                "포함 항목: 프로젝트 개요, 기술 스택, 실행 환경, 핵심 구조, 코딩 규칙, 테스트·배포 절차",
+                "<strong>모노레포 충돌 해결</strong>: 루트에 최소 공통 규칙 + 영역별 폴더 AGENTS.md, '이 폴더에서는 ...를 우선 적용' 명시",
+                "AGENTS.md 수정이 즉시 반영되지 않을 땐 <code>/new</code>로 새 세션 시작"
+              ]
+            },
+            {
+              "heading": "7.2 세션 관리와 작업 이어 쓰기",
+              "points": [
+                "세션 데이터: <code>~/.codex/sessions/</code> (Windows: <code>%USERPROFILE%</code>) JSON 저장",
+                "<code>codex resume --last</code>로 최근 세션 즉시 재개, 목록에서 특정 세션 선택도 가능",
+                "대화가 길어지면 <code>/compact</code> + 핵심 결정은 <code>docs/notes.md</code>·AGENTS.md에 별도 기록",
+                "Linux <code>find</code> 명령으로 오래된 세션 자동 정리 권장"
+              ]
+            },
+            {
+              "heading": "7.3 컨텍스트 관리와 토큰 최적화",
+              "points": [
+                "<strong>컨텍스트 우선순위</strong>: 시스템 메시지 > AGENTS.md > 사용자 프롬프트 > 파일 참조 > 대화 이력",
+                "5가지 토큰 절약 전략: AGENTS.md 간결화, 파일 참조 최소화, 요청 묶기, 기능 단위 세션 분리, 불필요 MCP 끄기"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "8장 Codex CLI 고급 기능 활용하기",
+          "subsections": [
+            {
+              "heading": "8.1 MCP 서버 연결",
+              "points": [
+                "설정 파일: macOS/Linux <code>~/.codex/config.toml</code>, Windows <code>C:\\Users\\…\\.codex\\</code>",
+                "<code>mcp_servers</code> 섹션에 서버 등록 → <code>/mcp tools</code>로 확인",
+                "Playwright(npx 기반), GitHub(<code>GITHUB_PERSONAL_TOKEN</code> 필요), Context7(라이브러리 문서) 연결 실습",
+                "인증 토큰은 OS별 자격 증명 관리자(Keychain/Credential Manager)에 저장"
+              ]
+            },
+            {
+              "heading": "8.2 config.toml 심화 설정",
+              "points": [
+                "핵심 항목: <code>model</code>, <code>model_reasoning_effort</code>(low/medium/high), <code>approval_policy</code>, <code>sandbox_mode</code>, <code>shell_environment_policy</code>",
+                "<strong>설정 우선순위</strong>: 명령줄 플래그 > 환경 변수(<code>CODEX_SANDBOX_MODE=…</code>) > config.toml",
+                "임시 변경은 환경 변수, 영구 변경은 config.toml 권장"
+              ]
+            },
+            {
+              "heading": "8.3 세션 로그 이해하기",
+              "points": [
+                "JSONL 형식, <code>~/.codex/sessions/</code>에 <code>rollover-{date}-{uuid}.jsonl</code>로 저장",
+                "주요 필드: <code>session_meta</code>(시작), <code>response_item</code>(응답), <code>event_log</code>(진행), <code>agent_reasoning</code>(추론)",
+                "resume 시 approval_policy/sandbox_mode는 기본값으로 재설정되므로 필요 시 다시 지정"
+              ]
+            }
+          ]
+        }
+      ],
+      "tables": [
+        {
+          "title": "표 5. Codex 승인 정책 × 샌드박스 조합 (접근 레벨)",
+          "headers": ["접근 레벨", "승인 정책", "샌드박스", "적합한 상황"],
+          "rows": [
+            ["<strong>Read Only</strong>", "untrusted", "read-only", "학습, 코드 리뷰, 보안 점검"],
+            ["<strong>Auto (기본)</strong>", "on-request", "workspace-write", "일반 개발 — 위험 작업만 승인"],
+            ["<strong>Full Access</strong>", "never", "danger-full-access", "완전 자동화, 신뢰된 환경 한정"]
+          ]
+        },
+        {
+          "title": "표 6. Claude Code vs Codex CLI 핵심 비교",
+          "headers": ["항목", "Claude Code", "Codex CLI"],
+          "rows": [
+            ["<strong>제공사</strong>", "Anthropic", "OpenAI"],
+            ["<strong>기본 모델</strong>", "Sonnet 4.5 / Opus 4.5", "gpt-5-2-codex (추론 수준 4단계)"],
+            ["<strong>컨텍스트 파일</strong>", "<code>CLAUDE.md</code>", "<code>AGENTS.md</code>"],
+            ["<strong>설정 파일</strong>", "<code>.claude/settings.json</code>", "<code>~/.codex/config.toml</code>"],
+            ["<strong>세션 저장</strong>", "<code>~/.claude/projects/</code>", "<code>~/.codex/sessions/</code> (JSONL)"],
+            ["<strong>인증</strong>", "API key", "ChatGPT OAuth 또는 API key"],
+            ["<strong>승인 모델</strong>", "permissions(allow/deny)", "approval_policy + sandbox_mode 조합"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chs-part-4",
+      "title": "Part 4 — Gemini CLI 완전 정복",
+      "range": "p.224 ~ p.275 (52페이지) · 9장~11장",
+      "first_page": 224,
+      "overview": "Google <strong>Gemini CLI</strong>는 초대형 컨텍스트 윈도우(1M)와 무료 티어(하루 1,000회)가 강점인 세 번째 AI 터미널 도구. GEMINI.md로 프로젝트 컨텍스트를 관리하고, 신뢰 폴더·샌드박스의 3중 보안 시스템과 settings.json 기반 세밀한 설정, IDE Companion·CLI Extensions로 환경을 확장한다.",
+      "sections": [
+        {
+          "title": "9장 Gemini CLI 시작하기",
+          "subsections": [
+            {
+              "heading": "9.1 설치와 인증",
+              "points": [
+                "Node.js 20+ 필수 — <code>npm install -g @google/gemini-cli</code> 또는 Homebrew",
+                "<strong>인증 3가지</strong>: Login with Google(개인, 무료) / API Key(<code>GEMINI_API_KEY</code>, CI/CD) / Vertex AI(기업, IAM 기반)",
+                "무료 계정: 하루 1,000회·분당 60회 / API 무료 티어: 하루 50회",
+                "설치 문제: command not found(npm 경로 확인), EACCES(sudo 또는 관리자 실행)"
+              ]
+            },
+            {
+              "heading": "9.2 사용하기",
+              "points": [
+                "단발성 <code>gemini -p '프롬프트'</code> / 대화형 <code>gemini --interactive</code>",
+                "<strong>참조 기호</strong>: <code>@파일명</code> 파일 컨텍스트 추가, <code>/명령어</code> 슬래시 명령",
+                "<code>--include-directories</code>로 외부 디렉토리 참조, 파이프(<code>|</code>)로 입력 전달",
+                "이미지 분석 지원, <code>--output-format json</code>으로 스크립트 연동"
+              ]
+            },
+            {
+              "heading": "9.3 명령과 실행 옵션",
+              "points": [
+                "<strong>승인 모드 3단계</strong>: default(기본) / auto_edit(편집 자동) / yolo(전체 자동, <code>--yolo</code>)",
+                "<code>--debug</code>(상세 로그), <code>--sandbox</code>(읽기 전용), <code>--allow-tools</code>(특정 도구만 허용)",
+                "주요 도구: <code>read_file</code>, <code>write_file</code>, <code>search_files</code>, <code>list</code>, <code>shell</code> (위험)",
+                "슬래시: <code>/chat save|resume|list</code>, <code>/memory add</code>(GEMINI.md 자동 추가), <code>/stats</code>, <code>/compress</code>"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "10장 Gemini CLI로 프로젝트 운영하기",
+          "subsections": [
+            {
+              "heading": "10.1 GEMINI.md 파일 관리하기",
+              "points": [
+                "역할: Claude의 CLAUDE.md, Codex의 AGENTS.md와 동일한 프로젝트 컨텍스트 파일",
+                "루트(전체) / 서브폴더(영역별 선택적 참조) 계층 구조",
+                "작성 항목: 프로젝트 개요, 주요 의존성, 코딩 규칙, 기본 명령, 주의 사항",
+                "Gemini CLI에 직접 검토·수정 요청 가능 — 변경 후 검증 질문으로 반영 확인"
+              ]
+            },
+            {
+              "heading": "10.2 세션 관리하기",
+              "points": [
+                "<code>/chat save {이름}</code>, <code>/chat resume {이름}</code>, <code>/chat list</code>, <code>/chat delete</code>, <code>/chat share</code>",
+                "저장 위치: <code>~/.gemini/tmp/{프로젝트_해시}/</code>",
+                "<strong>branching 패턴</strong>: <code>/chat save approach-readability</code> + <code>approach-performance</code> → A/B 비교",
+                "<code>/restore</code>는 시스템 파일 복원, <code>/chat resume</code>은 대화 맥락 복원 — 분리 사용"
+              ]
+            },
+            {
+              "heading": "10.3 사용자 정의 명령어",
+              "points": [
+                "<strong>TOML 형식</strong>: <code>description</code> + <code>prompt</code> 필수, <code>{{args}}</code>로 동적 인자 전달",
+                "전역(<code>~/.gemini/commands/</code>) vs 프로젝트(<code>.gemini/commands/</code>) — <strong>프로젝트가 우선</strong>",
+                "네이밍: 영문 소문자·밑줄, 점(<code>.</code>)으로 하위 분류",
+                "예: <code>/test</code>(Jest/Pytest 자동 생성), <code>/refactor-extract</code>(청크 추출)",
+                "오류: ParseError는 삼중 따옴표(<code>\"\"\"</code>) 누락 의심"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "11장 Gemini CLI 고급 기능 활용하기",
+          "subsections": [
+            {
+              "heading": "11.1 MCP 서버 연결",
+              "points": [
+                "설정: 전역 <code>~/.gemini/settings.json</code>, 프로젝트 <code>./.gemini/settings.json</code>",
+                "<code>gemini mcp add</code> CLI 또는 settings.json의 <code>mcpServers</code> 블록 직접 편집",
+                "Playwright(npx), GitHub(<code>env</code>로 PAT 전달), Context7(라이브러리 공식 문서 실시간 검색)",
+                "문제 해결: <code>gemini --debug</code>로 MCP 로딩 과정 상세 확인"
+              ]
+            },
+            {
+              "heading": "11.2 보안과 권한 관리 (3중 보안)",
+              "points": [
+                "<strong>① 승인 설정 (approve)</strong>: default / auto_edit / yolo",
+                "<strong>② 신뢰 폴더 (Trusted folder)</strong>: <code>trustedFolders.json</code>에 경로 등록 → 자동 승인",
+                "<strong>③ 샌드박스 (Sandbox)</strong>: 시스템 레벨 보호, settings.json에서 활성화",
+                "위험도 높은 코드: 신뢰 안 함 + 샌드박스 활성화 / 빠른 테스트: YOLO 모드"
+              ]
+            },
+            {
+              "heading": "11.3 settings.json 활용",
+              "points": [
+                "주요 카테고리: <code>model</code>(gemini-3-flash 빠름 / gemini-3-pro 정밀), <code>maxSessionTurns</code>, <code>tokenCompression</code>(70% 시 자동 압축), <code>systemPrompt</code>",
+                "UI: <code>theme</code>, <code>hideBanner</code>, <code>customWaitPhrases</code>, <code>showCitations</code>",
+                "도구: <code>allowed</code>(<code>read_file</code> 등 안전 도구 자동 허용) / <code>exclude</code>(<code>execute_command</code> 등 차단)",
+                "컨텍스트: <code>fileNames</code>(GEMINI.md 자동 포함), <code>includeDirectories</code>, <code>loadFromIncludeDirectories</code>",
+                "편집기: <code>preferredEditor: cursor</code>, <code>vimMode</code>, <code>enablePromptCompletion</code>",
+                "설정 우선순위: 명령줄 옵션 > 전역 > 기본값 (여러 settings.json은 병합)"
+              ]
+            },
+            {
+              "heading": "11.4 확장 기능 활용",
+              "points": [
+                "<strong>Gemini CLI Companion</strong>: VSCode/Cursor/Windsurf 연동 — Win/Linux <code>Ctrl+Shift+G</code>, macOS <code>Cmd+Shift+G</code>",
+                "Open Editor File Context(파일 전체) / Selection Context(선택 코드 16KB)",
+                "<strong>CLI Extensions</strong>: 프롬프트 + MCP + 사용자 명령어 패키지 — <code>~/.gemini/extensions/</code>",
+                "예: <code>gemini-cli-security</code> + <code>--yolo</code> 조합으로 보안 분석 자동 보고서 생성"
+              ]
+            },
+            {
+              "heading": "11.5 실전 활용 팁",
+              "points": [
+                "<strong>1M 컨텍스트 윈도우</strong>: 대형 프로젝트 분석에서 결정적 강점",
+                "관련 파일을 처음부터 함께 로드해 문맥 손실 방지",
+                "<code>/stats</code>로 사용량 모니터링, 체크포인트 기반 작업 진행"
+              ]
+            }
+          ]
+        }
+      ],
+      "tables": [
+        {
+          "title": "표 7. Gemini CLI 인증 방식 비교",
+          "headers": ["인증 방식", "발급/설정", "한도", "적합한 사용자"],
+          "rows": [
+            ["<strong>Login with Google</strong>", "Google 계정 로그인", "하루 1,000회 / 분당 60회 (무료)", "개인 사용자"],
+            ["<strong>Gemini API Key</strong>", "Google AI Studio → <code>GEMINI_API_KEY</code>", "무료 티어 하루 50회 (모델별 차이)", "CI/CD, 자동화 스크립트"],
+            ["<strong>Vertex AI</strong>", "gcloud auth + 프로젝트/IAM", "Google Cloud 과금 정책", "기업 환경, IAM 정책 적용 필요"]
+          ]
+        },
+        {
+          "title": "표 8. Gemini 승인 모드 비교",
+          "headers": ["모드", "편집 승인", "명령 실행 승인", "적합한 상황"],
+          "rows": [
+            ["<strong>default</strong>", "매번 승인", "매번 승인", "일반 개발, 신뢰 미확인 코드"],
+            ["<strong>auto_edit</strong>", "자동", "매번 승인", "익숙한 프로젝트 + 셸 명령은 통제"],
+            ["<strong>yolo (<code>--yolo</code>)</strong>", "자동", "자동", "학습·테스트 환경에서만 권장"]
+          ]
+        },
+        {
+          "title": "표 9. 세 도구의 컨텍스트 파일·CLI 비교",
+          "headers": ["항목", "Claude Code", "Codex CLI", "Gemini CLI"],
+          "rows": [
+            ["<strong>컨텍스트 파일</strong>", "<code>CLAUDE.md</code>", "<code>AGENTS.md</code>", "<code>GEMINI.md</code>"],
+            ["<strong>설정 파일</strong>", "<code>.claude/settings.json</code>", "<code>~/.codex/config.toml</code>", "<code>~/.gemini/settings.json</code>"],
+            ["<strong>세션 저장</strong>", "<code>~/.claude/projects/</code>", "<code>~/.codex/sessions/</code>", "<code>~/.gemini/tmp/{hash}/</code>"],
+            ["<strong>사용자 명령어</strong>", "<code>.claude/commands/*.md</code>", "—", "<code>.gemini/commands/*.toml</code>"],
+            ["<strong>컨텍스트 윈도우</strong>", "200K", "모델 의존", "<strong>1M</strong> (Gemini 강점)"],
+            ["<strong>무료 사용</strong>", "×", "ChatGPT Plus 이상", "Google 계정 (하루 1,000회)"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chs-part-5",
+      "title": "Part 5 — AI 바이브 코딩 워크플로",
+      "range": "p.276 ~ p.311 (36페이지) · 12장~14장",
+      "first_page": 276,
+      "overview": "Claude Code, Codex, Gemini CLI 세 도구를 <strong>실제 프로젝트(TODO 웹 서비스)에 적용</strong>하여 기획 → 설계 → 구현 → 테스트 → 배포 → 운영의 전체 흐름을 완성하는 파트. PRD/WBS 기반 준비, AI와 함께하는 TDD, 서브에이전트 코드 리뷰, Cloudflare 배포까지 — 세 도구를 역할별 분업하는 멀티-AI 워크플로를 학습한다.",
+      "sections": [
+        {
+          "title": "12장 프로젝트 계획 세우기",
+          "subsections": [
+            {
+              "heading": "12.1 PRD 작성하기",
+              "points": [
+                "<strong>PRD(제품 요구 사항 정의서)</strong>: 무엇을 만들고 어떤 기준으로 완성되는지 정의",
+                "구성: 제목/요약, 배경, 핵심 요구 사항, 비기능 요구 사항, 제외 범위, API 설계",
+                "3가지 작성법: ① 최소 정보만 정리 ② 직접 작성 ③ AI에게 초안 영감 요청",
+                "예시 — TODO 웹 서비스: HTML/CSS/JS 스택, 인증·DB·다중 사용자 제외, GET/POST/PUT/DELETE 엔드포인트 정의"
+              ]
+            },
+            {
+              "heading": "12.2 실행 계획과 WBS",
+              "points": [
+                "실행 계획(마일스톤·우선순위) + WBS(Work Breakdown Structure, 세부 작업 구조화)",
+                "Claude Code 계획 모드로 PRD 입력 → 실행 계획 자동 생성",
+                "<strong>AI 시대에도 WBS가 필요한 이유 4가지</strong>: 요구 사항 구체화, 구조 직접 설계, AI 결과 검증 기준, 학습 효과",
+                "Phase 템플릿: ① 초기 설정 ② 백엔드 ③ 프런트엔드 ④ 통합·배포"
+              ]
+            },
+            {
+              "heading": "12.3 컨텍스트 파일 작성",
+              "points": [
+                "세 도구별 파일: CLAUDE.md / AGENTS.md / GEMINI.md — 전역·프로젝트·모듈 3단계 계층",
+                "역할 분리: 컨텍스트 파일(AI 지침) + 별도 문서(<code>PRD.md</code>, <code>api-spec.md</code>, <code>db-schema.md</code>, <code>designs/*.xml</code>)",
+                "UI/디자인은 XML로 명세화하여 HTML/CSS 자동 생성에 활용"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "13장 실전 프로젝트 수행하기",
+          "subsections": [
+            {
+              "heading": "13.1 부트스트래핑과 단계별 개발",
+              "points": [
+                "PRD.md + 컨텍스트 파일 기반 초기 폴더·파일 생성, 라이브러리 설치 (uv, poetry)",
+                "plan.md 불러와 Phase 단위 진행 — 단계 완료 후 코드 확인 → 다음 단계 요청",
+                "문제 해결: 단계 너무 큼(작게 분리), 실행 오류(메시지 그대로 AI에 전달), 파일 혼란(트리 구조 요약 요청)"
+              ]
+            },
+            {
+              "heading": "13.2 AI 기반 테스트 주도 개발 (TDD)",
+              "points": [
+                "TDD가 AI 개발에 필요한 이유: 예측 가능한 결과, 테스트 설정 용이성, 리팩터링 안전성",
+                "4단계 사이클: ① 계획 → ② 테스트 작성 → ③ 최소 코드 구현 → ④ 실행·피드백",
+                "프론트엔드 테스트는 <strong>Playwright MCP</strong>로 시나리오 자동화 (요소 탐색, DOM 변화 감지)"
+              ]
+            },
+            {
+              "heading": "13.3 코드 품질 개선",
+              "points": [
+                "Claude Code 서브에이전트로 코드 리뷰 — 보안(SQL 인젝션, XSS), 성능, 가독성 점검",
+                "Gemini Security Extension으로 보안 점검 자동화 (비밀 정보, 인젝션 방어, 인증·인가, 프롬프트 인젝션)",
+                "리팩터링 예시: 인젝션 방어 없는 SQL → 안전한 구조로 개선, N+1 문제 해결",
+                "7단계 흐름: 리뷰 → 우선순위 → 수정 → 테스트 → 리팩터링 → 재테스트 → 다음 파일",
+                "<strong>우선순위</strong>: 보안(즉시) > 성능(문제 시) > 가독성·구조(점진적)"
+              ]
+            },
+            {
+              "heading": "13.4 배포와 운영",
+              "points": [
+                "입문자 추천: <strong>Cloudflare</strong> (정적 → Pages, 간단 API → Workers, FastAPI는 Railway)",
+                "Cloudflare MCP로 배포 자동화, 운영 단계에서 로그·오류 분석 및 해결책 제안 받기"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "14장 바이브 코딩을 위한 AI 터미널 도구 활용 전략",
+          "subsections": [
+            {
+              "heading": "14.1 풀스택 기술 활용",
+              "points": [
+                "입문자 로드맵: Python → SQL → Flask/FastAPI → HTML/CSS/JS → Docker → Flutter",
+                "6단계 풀스택 예시: ① Python 자동화 ② SQLite 데이터 ③ FastAPI ④ 풀스택 웹 ⑤ Docker 배포 ⑥ 앱 확장"
+              ]
+            },
+            {
+              "heading": "14.2 멀티 AI 도구 활용",
+              "points": [
+                "<strong>도구별 강점</strong>: Claude Code(설계·구조화·리팩터링) / Codex(반복 구현·테스트) / Gemini CLI(대규모 분석·검증)",
+                "<strong>비용 최적화 배치</strong>: Gemini(무료, 초기 탐색) → Codex(정확한 구현) → Claude(리팩터링) — 40~60% 비용 절감",
+                "워크플로: 아이디어/PRD(Claude) → 핵심 구현(Codex) → 대규모 분석(Gemini) → 최종 리팩터링·문서화(Claude)"
+              ]
+            },
+            {
+              "heading": "14.3 자동화 기술 활용",
+              "points": [
+                "Hook 기반 워크플로: 커밋 시 린트, PR 보안 검사, 빌드 알림 (Husky 등)",
+                "테스트·문서·배포(GitHub Actions) 자동화",
+                "MCP 통합 자동화: 외부 API, 데이터 수집, 서비스 연동",
+                "<strong>하이브리드 전략</strong>: 핵심 개발(Claude/Codex) + 워크플로(n8n/Make.com) + 배치(Gemini)"
+              ]
+            }
+          ]
+        }
+      ],
+      "tables": [
+        {
+          "title": "표 10. 멀티 AI 도구 분업 전략",
+          "headers": ["단계", "주 도구", "이유"],
+          "rows": [
+            ["<strong>아이디어 정리·PRD</strong>", "Claude Code", "설계·구조화에 강함, 계획 모드"],
+            ["<strong>초기 탐색·대규모 분석</strong>", "Gemini CLI", "1M 컨텍스트, 무료 티어로 비용 절감"],
+            ["<strong>핵심 기능 구현</strong>", "Codex CLI", "반복 구현·테스트 정확도"],
+            ["<strong>코드 리뷰·리팩터링</strong>", "Claude Code (서브에이전트)", "보안·성능·가독성 종합 점검"],
+            ["<strong>최종 문서화</strong>", "Claude Code", "구조적 설명 능력"]
+          ]
+        },
+        {
+          "title": "표 11. 프로젝트 폴더 구조 (Part 5 권장)",
+          "headers": ["파일/폴더", "역할", "대상"],
+          "rows": [
+            ["<code>PRD.md</code>", "전체 요구 사항 정의서", "사람·AI 공통 참조"],
+            ["<code>WBS.md</code> / <code>plan.md</code>", "작업 분해 및 Phase별 계획", "사람·AI 공통 참조"],
+            ["<code>designs/*.xml</code>", "화면별 디자인 명세", "HTML/CSS 자동 생성용"],
+            ["<code>CLAUDE.md</code>", "Claude Code용 지침", "Claude 세션 자동 로드"],
+            ["<code>AGENTS.md</code>", "Codex CLI용 지침", "Codex 세션 자동 로드"],
+            ["<code>GEMINI.md</code>", "Gemini CLI용 지침", "Gemini 세션 자동 로드"],
+            ["<code>docs/notes.md</code>", "핵심 결정·의사록 누적", "세션 간 컨텍스트 전달"]
+          ]
+        },
+        {
+          "title": "표 12. 배포 서비스 비교 (입문자 관점)",
+          "headers": ["서비스", "강점", "적합한 프로젝트"],
+          "rows": [
+            ["<strong>Cloudflare Pages</strong>", "정적 사이트 빠른 배포, 글로벌 CDN", "HTML/CSS/JS 정적 프론트엔드"],
+            ["<strong>Cloudflare Workers</strong>", "JS/TS 서버리스, 저비용", "간단 API, 엣지 함수"],
+            ["<strong>Netlify</strong>", "Git 연동·빌드 자동화", "JAMstack, 정적 사이트"],
+            ["<strong>Railway</strong>", "풀스택 통합 (DB·백엔드)", "FastAPI 등 입문자에게 가장 현실적"]
+          ]
+        }
+      ]
+    }
+  ]
+}

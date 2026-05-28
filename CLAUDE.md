@@ -1,0 +1,229 @@
+# Kyobo Library (정적 도서 라이브러리 + 교보 e-Library 연동 예정)
+
+교보문고에서 구매한 e-book을 페이지별 PNG → OCR → JSON → HTML 빌드 파이프라인으로
+정리한 정적 웹 라이브러리. NAS 위 nginx 컨테이너에 배포되어 LAN/외부에서 열람.
+
+> **인프라 참조**: NAS·SSH·Docker 공통 정보는 `../NAS.md`.
+> **자매 프로젝트**: `../NasVideoTrimmer/` (Blazor) — 같은 NAS·Docker·배포 패턴.
+> 이 문서는 **이 프로젝트의 컨벤션·빌드·배포·작업 로그**.
+
+---
+
+## GitHub 저장소·인증
+
+| 항목 | 값 |
+|---|---|
+| 원격 저장소 | (미생성 — 로컬 git만 운용. 필요해지면 `ckidsm` 계정에 KyoboLibrary 생성 예정) |
+| 인증 패턴 | `../NasVideoTrimmer/CLAUDE.md` 의 GitHub 인증 절 참고 (`github-com-ckidsm` host alias) |
+
+---
+
+## 커밋 메시지 작성 규칙
+
+NasVideoTrimmer와 동일한 형식. **Co-Authored-By 라인 절대 금지**, `git push` 자동 실행 금지.
+
+```
+YYYY.MM.DD [범위] 한 줄 요약
+
+1. 변경 파일/클래스명 (추가/수정/버그수정/리팩토링/삭제)
+   1-1. 변경 내용
+
+YUNDEOKSOO
+```
+
+자세한 규칙은 `../NasVideoTrimmer/CLAUDE.md` 의 "커밋 메시지 작성 규칙" 절 참고
+(같은 워크스페이스에서 동일 규칙 적용).
+
+---
+
+## 1. 한 줄 개요
+
+| 항목 | 값 |
+|---|---|
+| 형태 | 정적 사이트 (HTML/JS/JSON, 빌드 도구 없음) |
+| 데이터 빌드 | Python 3 + tesseract OCR (kor+eng) — 로컬에서만 수행 |
+| 미디어 처리 | 페이지 PNG → OCR → batch JSON → 통합 JSON → 도서 HTML |
+| 서빙 | NAS 위 nginx 컨테이너 (`nginx:latest`, `:8080`) |
+| 컨테이너명 | `kyobo-library-web` (이미 NAS에서 가동 중 · 2026-05-09 부터) |
+| 마운트 | `/volume1/docker/web-apps/kyobo-library` → `/usr/share/nginx/html` (ro) |
+| 접속 (LAN) | http://192.168.10.205:8080/ |
+| 접속 (외부) | https://redcodeme.synology.me:8080/ (HTTPS 설정 시) |
+
+**현재 상태 (2026-05-28)**: NAS 마운트 폴더에는 `"✅ 서버 정상 작동 중"` placeholder만 있고
+실 콘텐츠는 한 번도 배포되지 않았다. Phase A 의 첫 배포로 실 데이터를 올린다.
+
+---
+
+## 2. 폴더 구조
+
+```
+NAS/KyoboLibrary/                            ← OneDrive 동기화 (어디서든 작업)
+├── CLAUDE.md                                ← 이 문서
+├── README.md                                ← (옛 버전, Phase A에서 갱신 예정)
+├── .gitignore · .editorconfig · .dockerignore
+├── deploy.sh                                ← ★ 새 배포 진입점 (rsync → NAS)
+├── index.html                               ← 메인 (도서 카드 목록, 책 배열 하드코딩)
+├── viewer.html                              ← 공통 뷰어 템플릿
+├── add_book.sh                              ← 새 도서 추가 헬퍼 (수동)
+├── books/
+│   └── CLI_완전활용/
+│       ├── viewer.html                      ← 도서별 뷰어 사본
+│       └── summary/
+│           ├── index.html                   ← ★ 도서 본문 (498KB, generate_html.py 산출)
+│           ├── pages_data.json              ← 페이지 메타 (286KB)
+│           ├── chapters_data.json           ← 챕터 메타
+│           ├── batch_*.json (6개)           ← 원본 batch (수동/AI 입력)
+│           ├── generate_html.py             ← JSON → index.html 빌드
+│           ├── merge_batches.py             ← batch → pages_data.json 통합
+│           ├── verify_ocr.py                ← PNG → OCR → 검증
+│           ├── verification_report.{json,md}
+│           └── ocr_text/page_NNN.txt        ← OCR 캐시 (.gitignore)
+└── _archive/                                 ← 옛 스크립트 보관 (NAS 미전송)
+    ├── deploy_to_nas.sh                      ⚠️ NAS IP 오타 (192.168.10.250)
+    ├── 빠른_배포_가이드.md
+    ├── 수동_실행_명령어.md
+    └── 지금_바로_실행.sh
+```
+
+옛 스크립트들은 NAS IP 오타·구버전 워크플로라 새 `deploy.sh`로 대체.
+완전 삭제는 사용자 승인 후 (`_archive/` 째로 git에는 들어감, NAS는 안 감 — `.dockerignore`).
+
+---
+
+## 3. 어디서든 작업·배포 (NasVideoTrimmer 패턴)
+
+```
+[Mac A] 소스 수정 → OneDrive sync
+                       ↓
+                  ☁ OneDrive
+                       ↓
+[Mac B] 동일 폴더에서 자동 풀 → ./deploy.sh
+                                      ↓
+                      rsync → NAS 마운트 폴더
+                                      ↓
+                docker restart kyobo-library-web
+                (정적 파일이라 빠르게 반영)
+```
+
+**OneDrive sync 부담 메모**: OCR 텍스트 (`ocr_text/page_*.txt`, 200+개)와 PNG는
+`.gitignore` 에 포함되어 OneDrive에는 올라가도 git 추적은 안 함.
+필요하면 OneDrive 폴더 동기화 제외도 가능.
+
+---
+
+## 4. 데이터 빌드 파이프라인 (로컬 1회성)
+
+```
+원본 PDF 또는 책 페이지 PNG
+    │
+    │  (1) 수동/AI로 페이지별 요약 JSON 작성
+    ▼
+batch_127.json, batch_156.json, ... (6개, 페이지 범위별)
+    │
+    │  (2) merge_batches.py
+    ▼
+pages_data.json  +  chapters_data.json
+    │
+    │  (3) (선택) verify_ocr.py — tesseract로 OCR 후 요약 검증
+    ▼
+verification_report.{json,md} + ocr_text/page_*.txt
+    │
+    │  (4) generate_html.py — 사이드바·챕터 카드·scroll spy 포함 본문 생성
+    ▼
+books/<slug>/summary/index.html (498KB 단일 파일)
+```
+
+**전제 요구사항**:
+- Python 3.9+
+- `tesseract` (kor+eng 언어팩) — macOS: `brew install tesseract tesseract-lang`
+- `Pillow`, `pytesseract` — `pip install pillow pytesseract`
+
+빌드 자체는 NAS에서 안 한다 (NAS에는 빌드 결과물만 올림).
+
+---
+
+## 5. 로컬 미리보기 (Mac)
+
+정적 사이트라 Python 내장 서버로 충분.
+
+```bash
+cd /path/to/NAS/KyoboLibrary
+python3 -m http.server 8765
+# 브라우저: http://localhost:8765/
+```
+
+`file://` 로 직접 열면 `fetch('summary/pages_data.json')` 이 CORS로 막히므로
+반드시 HTTP 서버 경유.
+
+---
+
+## 6. NAS 배포
+
+### 6.1 진입점
+```bash
+./deploy.sh
+```
+내부 동작:
+1. `rsync -avz --delete --exclude-from=.dockerignore` 로 NAS 마운트 폴더 동기화
+   - 대상: `RedCode@192.168.10.205:/volume1/docker/web-apps/kyobo-library/`
+2. `ssh ... docker restart kyobo-library-web` (정적 파일이지만 캐시 비우기·확실성)
+3. `curl http://192.168.10.205:8080/` 헬스체크
+
+### 6.2 SSH·docker 절대경로
+DSM의 docker가 PATH 밖이라 `/usr/local/bin/docker` 절대경로 사용
+(NasVideoTrimmer와 동일 컨벤션, `../NAS.md` 참조).
+
+### 6.3 8080 컨테이너는 이미 떠 있음
+새로 띄울 필요 없음. 마운트 폴더만 업데이트 + restart 하면 끝.
+컨테이너 자체 변경(이미지·포트)은 NAS 측 Container Manager에서 별도 처리.
+
+---
+
+## 7. Phase B 계획 (다음 메시지부터)
+
+### 7.1 9000 포트 추가 서비스
+- 사용자 요구: 기존 8080은 그대로, 새로 **:9000** 서비스 추가
+- 같은 도커 인스턴스/컨테이너 안에서 포함 (별도 컨테이너 띄우지 않음 — 사용자 요청)
+- 가능한 형태: 새 nginx server 블록을 같은 컨테이너 안에 추가 + 호스트 9000 → 컨테이너 9000 매핑
+- 또는 별도 컨테이너가 더 깔끔할 수도 — 사용자 의도 재확인 필요
+
+### 7.2 교보 e-Library 연동
+- 정보 소스: `https://elibrary.kyobobook.co.kr/dig/elb/elibrary`
+- 메인 페이지 로그인: `https://ebook.kyobobook.co.kr/dig/pnd/welcome`
+- 기술적 제약:
+  - 교보문고는 공개 API 없음 — 스크래핑 필요
+  - 로그인은 보통 X-Frame-Options/CSP로 iframe 거부
+  - e-book 본문은 DRM 보호 → 직접 다운로드 불가
+- 가능한 접근:
+  - **링크 모음** (가장 단순): 메인에 "교보 e-Library 열기" 버튼만
+  - **백엔드 프록시** (복잡): 별도 컨테이너에 Python/Node 백엔드 + 사용자 세션 보관
+  - **확장 도우미** (특수): 브라우저 확장으로 데이터 추출
+- Phase B 시작 시 사용자와 정확한 의도 정렬 필요
+
+### 7.3 옛 스크립트 정리
+- `deploy_to_nas.sh` (IP 오타), `빠른_배포_가이드.md`, `수동_실행_명령어.md`,
+  `지금_바로_실행.sh` 삭제 또는 `_archive/` 로 이동 — 사용자 승인 후
+
+---
+
+## 8. 작업 로그
+
+### 2026-05-28: Phase A — 폴더 이동·인프라 정비
+
+**한 일**
+- `Claude/kyobo-library/` → `NAS/KyoboLibrary/` 이동 (`mv`, OneDrive sync는 자동)
+- 옛 파이썬 3개 분석 (`generate_html.py`/`merge_batches.py`/`verify_ocr.py`) → 워크플로 정리
+- 옛 `deploy_to_nas.sh` 에서 NAS IP 오타(`192.168.10.250` → 실제 `205`) 발견 → 사용 금지 메모
+- NAS 컨테이너 상태 확인: `kyobo-library-web` (nginx:latest), 마운트 ro, 8080 LISTEN, 실데이터는 placeholder 한 줄
+
+**추가된 파일**
+- `CLAUDE.md` (이 문서)
+- `.gitignore` (ocr_text, PNG, .DS_Store, verification_report, __pycache__)
+- `.editorconfig`
+- `.dockerignore` (rsync exclude 겸용)
+- `deploy.sh` (rsync + restart + 헬스체크)
+
+**다음 (Phase B 첫 메시지)**
+- 첫 NAS 실배포로 placeholder → 실 데이터 교체
+- 사용자와 9000 포트 구조·교보 연동 의도 정렬 후 구현
+- 로컬 git init + 초기 커밋 (Phase A 산출물 기준)

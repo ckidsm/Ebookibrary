@@ -1,0 +1,556 @@
+[
+  {
+    "num": 251,
+    "topics": ["Gemini CLI 고급 기능", "개발 자동화", "외부 도구 연동"],
+    "terms": ["Gemini CLI", "MCP 서버", "워크플로", "고급 활용"],
+    "summary": "11장은 Gemini CLI의 고급 기능 활용을 다루며, 외부 도구와의 연동 방법과 실무 적용 전략을 단계적으로 정리한다.<br>프로젝트 규모가 커지더라도 Gemini CLI 하나로 다양한 도구를 연결하고 복잡한 개발 환경을 AI 중심의 일관된 워크플로로 재구성하는 방법을 체계적으로 이해할 수 있다.<br>실무 개발자가 실무에서 바로 적용할 수 있는 고급 활용 전략을 중심으로 구성되었다.<br>",
+    "points": [
+      "· 11장은 Gemini CLI의 고급 기능과 외부 도구 연동 방법을 소개",
+      "· 다양한 외부 도구와의 연동 방법과 실무 적용 전략을 단계적으로 정리",
+      "· AI 중심의 일관된 워크플로로 복잡한 개발 환경을 재구성하는 방법 제시",
+      "· 실무에서 바로 적용 가능한 개발 자동화 경험을 제공"
+    ],
+    "chapter_intro": {
+      "title": "11장 Gemini CLI 고급 기능 활용하기",
+      "desc": "Gemini CLI가 제공하는 고급 기능을 중심으로 다양한 외부 도구와의 연동 방법과 실무 적용 전략을 단계적으로 정리한다."
+    },
+    "section_id": "11"
+  },
+  {
+    "num": 252,
+    "topics": ["MCP 서버 연결", "settings.json", "설정 파일 구조"],
+    "terms": ["MCP", "settings.json", "전역 설정", "프로젝트 설정"],
+    "summary": "MCP 서버를 Gemini CLI에 연결하는 방법을 설명하며, settings.json 파일의 구조와 역할을 이해하는 것이 핵심이다.<br>전역 설정과 프로젝트 설정의 차이를 설명하고, Windows/macOS/Linux 경로별 설정 위치를 안내한다.<br>MCP 서버 연결 방법으로 CLI 명령과 settings.json 직접 편집 두 가지를 소개한다.<br>",
+    "points": [
+      "· MCP 설정 파일의 전역 설정과 프로젝트 설정 위치 구분",
+      "· Windows: C:\\Users\\사용자이름\\.gemini\\settings.json",
+      "· macOS/Linux: ~/.gemini/settings.json",
+      "· CLI 명령으로 MCP 서버 추가하는 방법 소개",
+      "· settings.json 직접 편집을 통한 MCP 서버 연결 방법"
+    ],
+    "chapter_intro": {
+      "title": "11.1 MCP 서버 연결하기",
+      "desc": "Gemini CLI에서 MCP 서버를 연결하는 방법과 settings.json 설정 파일의 구조와 위치를 이해한다."
+    },
+    "section_id": "11.1"
+  },
+  {
+    "num": 253,
+    "topics": ["MCP 서버 연결", "Playwright MCP", "GitHub MCP"],
+    "terms": ["gemini mcp add", "settings.json", "Playwright MCP", "GitHub MCP"],
+    "summary": "기본 옵션과 프로젝트별 MCP 서버 연결 방식을 설명하며, CLI 명령과 settings.json 직접 편집 방법을 모두 다룬다.<br>Playwright, GitHub, Context7 등 실전에서 많이 사용하는 MCP 서버의 연결 실습을 진행한다.<br>settings.json 파일을 직접 편집하여 MCP 서버를 등록하는 방법도 안내한다.<br>",
+    "points": [
+      "· 기본 옵션과 프로젝트별 MCP 서버 등록 구분",
+      "· gemini mcp add 명령으로 MCP 서버 자동 등록",
+      "· Playwright, GitHub, Context7 MCP 서버 연결 실습",
+      "· settings.json에서 mcpServers 블록으로 MCP 서버를 등록하는 방법"
+    ],
+    "section_id": "11.1.2"
+  },
+  {
+    "num": 254,
+    "topics": ["Playwright MCP", "GitHub MCP", "settings.json 편집"],
+    "terms": ["Playwright MCP", "GitHub MCP", "npx", "PAT"],
+    "summary": "Playwright MCP를 CLI 명령과 settings.json 직접 편집으로 등록하는 두 가지 방법을 상세히 설명한다.<br>GitHub MCP는 파일 조회, 이슈, PR 관리 등 전반적인 GitHub 작업을 CLI에서 수행할 수 있게 해준다.<br>GitHub MCP 등록 시 PAT(Personal Access Token) 설정이 필요하며, 설정 방법을 JSON 예시로 보여준다.<br>",
+    "points": [
+      "· Playwright MCP를 CLI 명령 및 settings.json으로 등록하는 방법",
+      "· GitHub MCP로 파일 조회, 이슈, PR 관리 등 가능",
+      "· GitHub MCP 등록 시 PAT 환경변수 설정 필요",
+      "· settings.json에서 env 블록으로 환경변수 전달"
+    ],
+    "section_id": "11.1.2"
+  },
+  {
+    "num": 255,
+    "topics": ["Context7 MCP", "MCP 서버 관리", "문제 해결"],
+    "terms": ["Context7 MCP", "MCP 서버 관리", "라이브러리 문서 검색", "문제 해결"],
+    "summary": "Context7 MCP는 라이브러리의 공식 문서를 실시간으로 조회하여 최신 정보에 기반한 코드를 생성할 수 있게 해준다.<br>MCP 서버의 추가, 제거, 비활성화, 설정 변경 등 관리 방법을 설명한다.<br>MCP 서버 관련 문제 해결 가이드로 Node.js 버전 확인, 네트워크 문제 등을 다룬다.<br>",
+    "points": [
+      "· Context7 MCP로 라이브러리 공식 문서를 실시간 검색",
+      "· CLI 명령과 settings.json으로 Context7 MCP 등록",
+      "· MCP 서버 추가, 제거, 비활성화 등 관리 방법",
+      "· · 11.1.4 MCP 서버 관리하기에서 서버 목록 관리법 소개",
+      "· MCP 서버 문제 발생 시 Node.js 버전 확인부터 시작"
+    ],
+    "chapter_intro": {
+      "title": "11.1.4 MCP 서버 관리하기",
+      "desc": "MCP 서버의 추가, 제거, 비활성화 등 관리 방법과 문제 해결 가이드를 제공한다."
+    },
+    "section_id": "11.1.4"
+  },
+  {
+    "num": 256,
+    "topics": ["MCP 서버 관리", "선택적 활성화", "문제 해결 가이드"],
+    "terms": ["settings.json", "MCP 선택적 활성화", "디버그 모드", "gemini --debug"],
+    "summary": "settings.json에서 MCP 서버를 선택적으로 활성화/비활성화하는 방법을 설명한다.<br>MCP 서버 관련 문제 해결 가이드로 Node.js 버전 확인, 네트워크 문제, settings.json 문법 오류, GitHub PAT 권한 부족, 디버그 모드를 안내한다.<br>MCP 서버는 프로젝트 규모와 목적에 따라 적절히 구성하고 관리해야 한다.<br>",
+    "points": [
+      "· 명령줄로 MCP 서버를 선택적으로 활성화/비활성화",
+      "· settings.json에서 특정 MCP 서버만 비활성화 가능",
+      "· · 11.1.5 MCP 서버 관련 문제 해결 가이드 제공",
+      "· settings.json 문법 오류 시 JSONLint로 검증 권장",
+      "· gemini --debug 명령으로 상세 로그 확인 가능"
+    ],
+    "chapter_intro": {
+      "title": "11.1.5 MCP 서버 관련 문제 해결 가이드",
+      "desc": "MCP 서버 연결 및 동작 관련 문제를 해결하는 가이드를 Node.js 버전, 네트워크, JSON 문법, PAT 권한 등 항목별로 정리한다."
+    },
+    "section_id": "11.1.5"
+  },
+  {
+    "num": 257,
+    "topics": ["MCP 문제 해결", "디버그 모드", "MCP 서버 유지보수"],
+    "terms": ["gemini --debug", "JSON 문법 오류", "GitHub PAT", "MCP 로딩"],
+    "summary": "settings.json 문법 오류, GitHub PAT 권한 부족, 디버그 모드를 통한 상세 로그 확인 등 MCP 문제 해결 방법을 마무리한다.<br>MCP 서버는 프로젝트 규모와 목적에 따라 적절히 구성하고 관리해야 하며, 불필요한 서버는 제거하고 필요한 서버만 선택해 활성화한다.<br>오류 발생 시 Node.js 버전, 네트워크, JSON 문법, 토큰 권한 등을 점검하면 안정적으로 MCP 서버 환경을 유지할 수 있다.<br>",
+    "points": [
+      "· settings.json 문법 오류 시 JSONLint 또는 Cursor의 JSON 하이라이트 기능으로 검증",
+      "· GitHub MCP 작동 안 될 때 PAT 스코프(repo, admin, workflow) 확인",
+      "· gemini --debug 명령으로 MCP 서버 로딩 과정 상세 확인",
+      "· 불필요한 MCP 서버는 settings.json에서 제거하여 관리"
+    ],
+    "section_id": "11.1.5"
+  },
+  {
+    "num": 258,
+    "topics": ["보안과 권한 관리", "승인 설정", "신뢰 폴더", "샌드박스"],
+    "terms": ["approve", "Trusted folder", "Sandbox", "신뢰 올리기"],
+    "summary": "Gemini CLI의 보안 시스템은 승인 설정(approve), 신뢰 폴더(Trusted folder), 샌드박스(Sandbox) 세 축으로 구성된다.<br>신뢰 올리기(trust elevator)를 통해 특정 프로젝트에 대한 신뢰 수준을 높여 반복 승인 없이 작업할 수 있다.<br>신뢰 폴더를 설정하면 해당 폴더에서 Gemini CLI 실행 시 자동 승인이 적용된다.<br>",
+    "points": [
+      "· 보안 시스템의 세 축: 승인 설정, 신뢰 폴더, 샌드박스",
+      "· · 11.2.1 Gemini CLI의 보안 계층에서 보안 구조 설명",
+      "· · 11.2.2 신뢰 올리기로 반복 승인 없이 작업 가능",
+      "· 신뢰 폴더를 ~/.gemini/settings.json에서 설정 가능",
+      "· · 11.2.3 실습: 신뢰 폴더 설정하기 단계별 안내"
+    ],
+    "chapter_intro": {
+      "title": "11.2 보안과 권한 관리",
+      "desc": "Gemini CLI의 보안 시스템인 승인 설정, 신뢰 폴더, 샌드박스의 개념과 활용법을 체계적으로 설명한다."
+    },
+    "section_id": "11.2"
+  },
+  {
+    "num": 259,
+    "topics": ["신뢰 폴더 설정", "샌드박스 보안", "보안 설정 가이드"],
+    "terms": ["Trust folder", "trustedFolders", "permissions", "Sandbox"],
+    "summary": "신뢰 폴더 설정 실습으로 폴더 신뢰 활성화, Gemini CLI 실행, 권한 설정 확인, 신뢰 폴더 목록 확인 및 관리 과정을 단계별로 안내한다.<br>trustedFolders.json 파일에서 신뢰 경로를 직접 관리할 수 있으며, 신뢰 설정 시 주의사항도 설명한다.<br>· 11.2.4 샌드박스와 보안 설정 가이드에서 샌드박스 개념과 활성화 방법을 다룬다.<br>",
+    "points": [
+      "· 신뢰 폴더 설정 시 Trust folder/Trust parent folder/Don't trust 옵션 선택",
+      "· trustedFolders.json에서 신뢰 경로 직접 관리 가능",
+      "· permissions 명령으로 현재 권한 상태 확인",
+      "· · 11.2.4 샌드박스와 보안 설정 가이드 제공",
+      "· 명령줄에서 샌드박스 모드 활성화 및 설정 방법 안내"
+    ],
+    "chapter_intro": {
+      "title": "11.2.4 샌드박스와 보안 설정 가이드",
+      "desc": "샌드박스는 Gemini CLI가 주어진 프로젝트 내에서 시스템 레벨 보호를 제공하는 보안 기능이다."
+    },
+    "section_id": "11.2.4"
+  },
+  {
+    "num": 260,
+    "topics": ["샌드박스 설정", "상황별 보안", "보안 체크리스트"],
+    "terms": ["Sandbox", "YOLO 모드", "auto_edit", "보안 체크리스트"],
+    "summary": "기본 샌드박스를 settings.json에서 설정하는 방법과 상황별 보안 설정 가이드를 표로 정리한다.<br>개인 프로젝트, 오픈소스 코드 검토, 빠른 프로토타입 제작, 프로덕션 코드 수정, 학습 및 테스트 환경 등 상황에 따른 승인 설정, 신뢰 폴더, 샌드박스 조합을 안내한다.<br>보안 체크리스트로 기본 원칙과 정기 점검 항목을 제시한다.<br>",
+    "points": [
+      "· 상황별 보안 설정 가이드: 승인 설정, 신뢰 폴더, 샌드박스 조합 표 제공",
+      "· 위험도 높은 코드 다룰 때: 신뢰 안 함 + 샌드박스 활성화",
+      "· 빠른 테스트나 개발: YOLO 모드 사용",
+      "· 보안 체크리스트: 기본 원칙과 정기 점검 항목 제시",
+      "· 환경 변수(.env) 사용, 신뢰하지 않은 폴더에서 자동 코딩 차단 등 권장"
+    ],
+    "section_id": "11.2.4"
+  },
+  {
+    "num": 261,
+    "topics": ["settings.json 고급 설정", "설정 구조", "설정 우선순위"],
+    "terms": ["settings.json", "model", "security", "mcpServers", "editor"],
+    "summary": "Gemini CLI의 고급 설정을 settings.json 파일을 통해 관리하는 방법을 설명한다.<br>settings.json의 주요 구조로 model, security, mcpServers, editor 등의 항목을 JSON 예시와 함께 안내한다.<br>설정 적용 우선순위는 기본값 → 시스템 설정 → 전역 설정 → 프로젝트 설정 → 환경 변수 순으로 뒤에 적용된 설정이 앞 설정을 덮어쓴다.<br>",
+    "points": [
+      "· · 11.3 고급 설정 - settings.json 활용하기 시작",
+      "· settings.json 주요 구조: model, security, mcpServers, editor",
+      "· 가장 중요한 설정은 모델 선택과 보안 설정",
+      "· 설정 적용 순서: 기본값 → 시스템 → 전역 → 프로젝트 → 환경 변수",
+      "· Gemini CLI는 여러 settings.json을 병합하여 최종 설정을 구성"
+    ],
+    "chapter_intro": {
+      "title": "11.3 고급 설정 - settings.json 활용하기",
+      "desc": "settings.json을 활용해 Gemini CLI의 다양한 설정을 세밀하게 조정하고 최적화하는 방법을 다룬다."
+    },
+    "section_id": "11.3"
+  },
+  {
+    "num": 262,
+    "topics": ["settings.json 전략", "설정 편집", "프로젝트별 설정"],
+    "terms": ["settings.json 전략", "전역 설정", "프로젝트 설정", "Cursor 연동"],
+    "summary": "settings.json을 효율적으로 관리하기 위한 핵심 전략으로 전역 설정과 프로젝트 설정의 분리를 강조한다.<br>settings.json 편집 방법으로 전역 설정 파일 편집과 프로젝트별 설정 관리를 설명한다.<br>Cursor, VSCode 등 에디터와 연동 시 설정 충돌 방지를 위한 팁도 제공한다.<br>",
+    "points": [
+      "· 전역 설정과 프로젝트 설정을 분리하여 관리하는 전략",
+      "· · 11.3.2 settings.json 편집하기에서 편집 방법 안내",
+      "· Cursor 또는 사용 중인 에디터로 설정 파일을 열어 편집",
+      "· gemini/settings.json 파일을 프로젝트 루트에 배치하면 프로젝트별 설정 적용",
+      "· 프로젝트별 설정 변경 시 Playwright MCP 추가 등 실전 예제 제공"
+    ],
+    "section_id": "11.3.2"
+  },
+  {
+    "num": 263,
+    "topics": ["설정 카테고리", "모델 선택", "히스토리 관리", "컨텍스트 압축"],
+    "terms": ["model", "maxSessionTurns", "tokenCompression", "systemPrompt"],
+    "summary": "settings.json의 주요 설정 카테고리를 상세히 다루며, 기본 모델 선택(model), 대화 히스토리 길이 제한(maxSessionTurns), 컨텍스트 압축 기능(tokenCompression) 등을 설명한다.<br>시스템 프롬프트(systemPrompt)를 통해 AI의 역할과 동작 방식을 커스터마이징할 수 있다.<br>Python 프로젝트나 한국어 환경 등 다양한 활용 예시를 제공한다.<br>",
+    "points": [
+      "· · 11.3.3 주요 설정 카테고리 다루기에서 상세 설정 안내",
+      "· gemini-2.5-flash는 빠른 반응 속도, gemini-2.5-pro는 정밀한 분석 적합",
+      "· maxSessionTurns으로 대화 히스토리 길이 제한 설정",
+      "· tokenCompression으로 컨텍스트 70% 사용 시 자동 압축 시작",
+      "· systemPrompt로 AI 역할과 동작 방식 커스터마이징"
+    ],
+    "chapter_intro": {
+      "title": "11.3.3 주요 설정 카테고리 다루기",
+      "desc": "settings.json의 주요 설정 항목을 모델, 히스토리, 컨텍스트, 시스템 프롬프트 등 카테고리별로 상세히 설명한다."
+    },
+    "section_id": "11.3.3"
+  },
+  {
+    "num": 264,
+    "topics": ["UI 커스터마이징", "테마 설정", "도구 설정"],
+    "terms": ["theme", "hideBanner", "hideTips", "showCitations"],
+    "summary": "UI 커스터마이징 설정으로 테마(theme), 배너 및 팁 표시 제어(hideBanner, hideTips), 인용 표시(showCitations) 등을 다룬다.<br>대기 메시지 커스터마이징(customWaitPhrases)으로 Gemini CLI가 생각 중일 때 표시되는 메시지를 변경할 수 있다.<br>도구 설정에서 안전한 도구 자동 허용(allowed)과 위험한 도구 차단(exclude) 방법을 설명한다.<br>",
+    "points": [
+      "· theme: dark/light 테마 선택, hideBanner/hideTips로 배너 및 팁 숨기기",
+      "· showCitations으로 참고 출처 표시 활성화/비활성화",
+      "· customWaitPhrases로 대기 메시지 커스터마이징 가능",
+      "· allowed로 안전한 도구(read_file, list_directory 등) 자동 허용",
+      "· exclude로 위험한 도구(execute_command 등) 차단"
+    ],
+    "section_id": "11.3.3"
+  },
+  {
+    "num": 265,
+    "topics": ["도구 설정", "컨텍스트 파일", "입력 디렉터리"],
+    "terms": ["allowed", "exclude", "includeDirectories", "loadFromIncludeDirectories"],
+    "summary": "안전한 도구 자동 허용과 위험한 도구 차단 설정을 상세히 설명한다.<br>컨텍스트 파일 자동 지정(fileNames)으로 GEMINI.md, PROJECT_CONTEXT.md 등 특정 파일을 자동으로 컨텍스트에 포함시킬 수 있다.<br>참고 입력할 디렉터리 지정(includeDirectories)과 디렉터리 내용 자동 로드(loadFromIncludeDirectories) 설정도 안내한다.<br>",
+    "points": [
+      "· allowed로 read_file, list_directory 등 안전한 도구 자동 허용",
+      "· exclude로 execute_command, delete_file 등 위험 도구 차단",
+      "· fileNames로 GEMINI.md, README.md 등 자동 컨텍스트 파일 지정",
+      "· includeDirectories로 소스 코드, 문서, 설정, 스키마 디렉터리 지정",
+      "· loadFromIncludeDirectories로 디렉터리 내용 자동 로드 설정"
+    ],
+    "section_id": "11.3.3"
+  },
+  {
+    "num": 266,
+    "topics": ["편집기 설정", "Vim 모드", "자동 업데이트", "도구 승인"],
+    "terms": ["preferredEditor", "vimMode", "enablePromptCompletion", "approveMode"],
+    "summary": "편집 설정으로 선호 에디터(preferredEditor), Vim 모드(vimMode), 프롬프트 자동 완성(enablePromptCompletion) 등을 설명한다.<br>자동 업데이트 제어(disableAutoUpdate)로 Gemini CLI의 자동 업데이트를 끄거나 켤 수 있다.<br>도구 승인 정책(approveMode)은 default, auto_edit, yolo 세 가지 모드를 제공한다.<br>",
+    "points": [
+      "· preferredEditor: cursor로 설정하면 Cursor와 연동 최적화",
+      "· vimMode: 입력창에서 Vim 키바인딩 활성화",
+      "· enablePromptCompletion: 프롬프트 자동 완성 활성화",
+      "· disableAutoUpdate: 자동 업데이트 비활성화 설정",
+      "· approveMode: default(매번 승인), auto_edit(편집 자동 승인), yolo(전부 자동)"
+    ],
+    "section_id": "11.3.3"
+  },
+  {
+    "num": 267,
+    "topics": ["신뢰 폴더 설정", "도구 승인 모드", "자동 업데이트"],
+    "terms": ["folderTrust", "approveMode", "default", "auto_edit", "yolo"],
+    "summary": "신뢰 폴더 기능 활성화(folderTrust)와 도구 승인 정책 설정(approveMode)을 상세히 다룬다.<br>approveMode의 default, auto_edit, yolo 모드 각각의 특징과 적합한 사용 상황을 설명한다.<br>YOLO 모드는 모든 도구를 자동 승인하므로 학습이나 테스트 환경에서만 권장한다.<br>",
+    "points": [
+      "· folderTrust로 신뢰 폴더 기능 활성화/비활성화",
+      "· approveMode 기본값은 default로 매번 승인 요청",
+      "· auto_edit: 편집은 자동 승인, 명령은 수동 승인",
+      "· yolo: 전 도구를 자동 승인하여 빠르지만 위험 존재",
+      "· YOLO 모드는 학습/테스트 환경에서만 사용 권장"
+    ],
+    "section_id": "11.3.3"
+  },
+  {
+    "num": 268,
+    "topics": ["환경 변수 설정", "플랫폼별 설정", "API 키 관리"],
+    "terms": ["GEMINI_API_KEY", "GOOGLE_CLOUD_PROJECT", "환경 변수", "set/export"],
+    "summary": "Gemini CLI의 동작을 settings.json 외에도 환경 변수로 제어할 수 있으며, 주요 환경 변수를 표로 정리한다.<br>Windows(명령 프롬프트, PowerShell), macOS/Linux(Zsh/Bash) 등 플랫폼별 환경 변수 설정 방법을 안내한다.<br>환경 변수는 세션별로 사용하는 임시 설정이며, CLI 출력에서는 환경 변수가 발견될 때 마스킹 처리된다.<br>",
+    "points": [
+      "· · 11.3.4 환경 변수로 설정 제어하기",
+      "· GEMINI_API_KEY, GOOGLE_CLOUD_PROJECT, GEMINI_MODEL 등 주요 환경 변수",
+      "· Windows: set/setx 명령, PowerShell: $env 변수 사용",
+      "· macOS/Linux: export 명령으로 환경 변수 설정",
+      "· 환경 변수는 세션별 임시 설정으로, CLI에서 마스킹 처리됨"
+    ],
+    "chapter_intro": {
+      "title": "11.3.4 환경 변수로 설정 제어하기",
+      "desc": "Gemini CLI 동작을 환경 변수로 제어하는 방법과 플랫폼별 설정 방법을 안내한다."
+    },
+    "section_id": "11.3.4"
+  },
+  {
+    "num": 269,
+    "topics": ["고급 설정 예시", "개인 사용자 설정", "코드 리뷰 설정"],
+    "terms": ["settings.json 예시", "개인 설정", "코드 리뷰 설정", "gemini-2.5-flash"],
+    "summary": "개인 사용자를 위한 전역 설정과 보안 중심의 코드 리뷰 전략 설정 두 가지 실전 예시를 제시한다.<br>개인 설정은 gemini-2.5-flash 모델, 다크 테마, 자동 승인, Cursor 연동 등을 포함한다.<br>코드 리뷰 설정은 read_file, search_files만 허용하고, write_file, execute_command는 차단하여 분석 전용으로 구성한다.<br>",
+    "points": [
+      "· · 11.3.5 고급 설정 예시에서 두 가지 실전 설정 제시",
+      "· 예시 1: 개인 사용자용 빠른 개발 환경 설정",
+      "· 예시 2: 보안 중심의 코드 리뷰 전략 설정",
+      "· preferredEditor: cursor로 Cursor와 연동 최적화",
+      "· 코드 리뷰 설정은 write_file, execute_command 차단으로 분석 전용"
+    ],
+    "chapter_intro": {
+      "title": "11.3.5 고급 설정 예시",
+      "desc": "실제 프로젝트에서 활용할 수 있는 개인 사용자 설정과 코드 리뷰 전략 설정 두 가지 예시를 제시한다."
+    },
+    "section_id": "11.3.5"
+  },
+  {
+    "num": 270,
+    "topics": ["Gemini CLI 확장 기능", "IDE 통합", "Gemini CLI Companion"],
+    "terms": ["Gemini CLI Companion", "VSCode 확장", "IDE 통합", "Extensions"],
+    "summary": "Gemini CLI의 확장 기능으로 IDE 통합(Gemini CLI Companion)과 기능 확장 패키지(CLI Extensions) 시스템을 소개한다.<br>Gemini CLI Companion은 VSCode, Cursor, Windsurf 등과 연동하여 IDE 내에서 Gemini CLI 기능을 활용할 수 있게 해준다.<br>Open Editor File Context와 Selection Context 기능으로 에디터의 파일과 선택 코드를 Gemini CLI에 전달할 수 있다.<br>",
+    "points": [
+      "· · 11.4 Gemini CLI 확장 기능 활용하기",
+      "· · 11.4.1 Gemini CLI Companion: IDE 통합으로 VSCode/Cursor 연동",
+      "· Windows/Linux: Ctrl+Shift+G, macOS: Cmd+Shift+G로 Companion 실행",
+      "· Open Editor File Context: 열린 파일 전체를 컨텍스트로 전달",
+      "· Selection Context: 선택한 코드만 16KB까지 전달 가능"
+    ],
+    "chapter_intro": {
+      "title": "11.4 Gemini CLI 확장 기능 활용하기",
+      "desc": "Gemini CLI의 IDE 통합과 기능 확장 패키지 시스템을 활용하여 개발 환경을 확장하는 방법을 다룬다."
+    },
+    "section_id": "11.4"
+  },
+  {
+    "num": 271,
+    "topics": ["CLI Extensions", "기능 확장 패키지", "보안 점검 자동화"],
+    "terms": ["CLI Extensions", "gemini-cli-security", "Extensions 설치", "확장 패키지"],
+    "summary": "CLI Extensions는 Gemini CLI의 기능을 확장하는 패키지 시스템으로, 보안 점검 자동화, 테스트 코드 자동 생성, 작업 일정 자동 관리 등의 기능을 추가할 수 있다.<br>Extensions는 프롬프트 파일(GEMINI.md), MCP 서버 구성, 사용자 정의 명령어 패턴 등으로 구성된다.<br>gemini-cli-security 등 구체적인 Extensions 설치 및 활용 예시를 제공한다.<br>",
+    "points": [
+      "· · 11.4.2 CLI Extensions: 기능 확장 패키지 시스템",
+      "· Extensions는 프롬프트 파일, MCP 서버 구성, 사용자 정의 명령어로 구성",
+      "· gemini-cli-security: 보안 점검 자동화 패키지 예시",
+      "· Extensions 설치: ~/.gemini/extensions/ 폴더에서 관리",
+      "· gemini extensions list 명령으로 설치된 Extensions 확인"
+    ],
+    "chapter_intro": {
+      "title": "11.4.2 CLI Extensions: 기능 확장 패키지 시스템",
+      "desc": "CLI Extensions를 통해 Gemini CLI의 기능을 확장하는 패키지를 설치, 관리, 활용하는 방법을 설명한다."
+    },
+    "section_id": "11.4.2"
+  },
+  {
+    "num": 272,
+    "topics": ["Extensions 관리", "비활성화/제거", "확장 Extensions 로드"],
+    "terms": ["Extensions 관리", "비활성화", "제거", "업데이트", "확장 로드"],
+    "summary": "Extensions의 비활성화, 재활성화, 업데이트, 제거 등 관리 방법을 상세히 안내한다.<br>특정 프로젝트에서만 Extensions를 사용하거나 전체적으로 비활성화하는 방법도 설명한다.<br>Extensions를 설치한 후에는 비활성화/활성화, 업데이트, 제거 및 관련 설정 수정이 가능하다.<br>",
+    "points": [
+      "· Extensions 폴더 구조: ~/.gemini/extensions/ 아래에 구성",
+      "· gemini extensions disable/enable 명령으로 비활성화/활성화",
+      "· ~/.gemini/extensions/ 폴더에서 직접 제거 가능",
+      "· gemini extensions 명령으로 업데이트 및 목록 확인",
+      "· GitHub 기반 Extensions 배포 및 공유도 가능"
+    ],
+    "section_id": "11.4.2"
+  },
+  {
+    "num": 273,
+    "topics": ["Extensions 활용", "보안 분석 자동화", "YOLO 모드 활용"],
+    "terms": ["/security:analyze", "/extensions list", "--yolo", "보안 분석"],
+    "summary": "Extensions가 정상적으로 로드되었는지 확인하는 방법과 보안 분석 결과를 파일로 바로 작성하는 --yolo 옵션 활용법을 설명한다.<br>/extensions list 명령으로 설치된 Extensions 확인이 가능하다.<br>보안 분석 결과를 파일로 바로 작성하려면 --yolo 옵션을 조합해 자동화할 수 있다.<br>",
+    "points": [
+      "· /security:analyze-github-pr 명령으로 GitHub PR 보안 분석",
+      "· /extensions list로 설치된 Extensions 확인",
+      "· --yolo 옵션으로 보안 분석 결과를 파일로 자동 작성",
+      "· gemini \"/security:analyze\" --yolo -e security > report.md"
+    ],
+    "section_id": "11.4.2"
+  },
+  {
+    "num": 274,
+    "topics": ["1M 컨텍스트 윈도우", "실전 활용 팁", "Gemini CLI 장점"],
+    "terms": ["1M 컨텍스트 윈도우", "Codex", "Claude Code", "컨텍스트 활용"],
+    "summary": "Gemini CLI의 실전 활용 팁으로 1M 컨텍스트 윈도우의 유용한 이유와 활용 전략을 설명한다.<br>Gemini CLI는 대규모 컨텍스트 윈도우, 검색 및 비전 통합, AI 터미널 도구 간 상호보완 등의 특징이 있다.<br>컨텍스트 활용 최적화 팁으로 관련 파일 함께 로드, /stats 명령으로 사용량 모니터링, 체크포인트 기반 작업 등을 안내한다.<br>",
+    "points": [
+      "· · 11.5 실전 활용 팁에서 Gemini CLI의 실전 활용법 정리",
+      "· · 11.5.1 Gemini CLI가 유용한 이유: 1M 컨텍스트 윈도우 활용",
+      "· · 11.5.2 1M 컨텍스트 윈도우 활용 전략으로 대형 프로젝트 분석",
+      "· 관련 파일을 처음부터 함께 로드하여 문맥 손실 방지",
+      "· /stats 명령으로 사용량 모니터링, 체크포인트 기반 작업"
+    ],
+    "chapter_intro": {
+      "title": "11.5 실전 활용 팁",
+      "desc": "Gemini CLI를 실전에서 효과적으로 활용하기 위한 전략과 팁을 1M 컨텍스트 윈도우 활용을 중심으로 정리한다."
+    },
+    "section_id": "11.5"
+  },
+  {
+    "num": 275,
+    "topics": ["컨텍스트 활용 팁", "Part 5 소개", "AI 바이브 코딩"],
+    "terms": ["컨텍스트 최적화", "체크포인트", "/stats", "Part 5"],
+    "summary": "컨텍스트 활용 최적화 팁으로 관련 파일을 처음부터 함께 로드하고, /stats 명령으로 사용량을 모니터링하며, 체크포인트 기반으로 작업하는 방법을 정리한다.<br>Part 4에서는 AI 기반 터미널 도구를 활용하는 방법을 다루었고, Part 5에서는 실제 프로젝트에 적용하는 실전 워크플로를 다룬다.<br>Gemini CLI의 1M 컨텍스트 윈도우를 최대한 활용하는 것이 핵심이다.<br>",
+    "points": [
+      "· 관련 파일을 처음부터 함께 로드하여 문맥 손실 방지",
+      "· /stats 명령으로 토큰 사용량 모니터링",
+      "· 체크포인트 기반으로 컨텍스트를 관리하며 작업",
+      "· Part 4 마무리 및 Part 5로의 전환 안내"
+    ],
+    "section_id": "11.5.2"
+  },
+  {
+    "num": 276,
+    "topics": ["Part 5 AI 바이브 코딩", "자동화 개발 흐름", "프로젝트 실전"],
+    "terms": ["Part 5", "AI 바이브 코딩", "자동화 개발 흐름", "워크플로"],
+    "summary": "Part 5는 AI 바이브 코딩 워크플로를 주제로 기획부터 배포까지 이어지는 자동화 개발 흐름을 완성하는 파트이다.<br>Claude Code, Codex, Gemini CLI 세 가지 AI 터미널 도구를 실제 프로젝트에 적용한다.<br>12장에서는 PRD 작성, 실행 계획, 컨텍스트 파일 준비를 다루고, 13장에서는 실전 개발 사이클을 경험하며, 14장에서는 멀티 도구 활용 전략을 정리한다.<br>",
+    "points": [
+      "· Part 5: AI 바이브 코딩 워크플로 - 기획부터 배포까지 자동화 개발 흐름 완성",
+      "· Claude Code, Codex, Gemini CLI 세 가지 도구를 실제 프로젝트에 적용",
+      "· 12장: PRD 작성, 실행 계획, 컨텍스트 파일 준비",
+      "· 13장: AI와 함께 부트스트래핑, 기능 구현, 테스트, 배포 실전",
+      "· 14장: 바이브 코딩과 멀티 도구 활용 전략 정리"
+    ],
+    "chapter_intro": {
+      "title": "Part 5 AI 바이브 코딩 워크플로: 기획부터 배포까지 이어지는 자동화 개발 흐름 완성",
+      "desc": "Claude Code, Codex, Gemini CLI를 실제 프로젝트에 적용하여 기획부터 배포까지 자동화 개발 흐름을 완성하는 파트이다."
+    },
+    "section_id": "Part 5"
+  },
+  {
+    "num": 277,
+    "topics": ["프로젝트 계획", "PRD 작성", "컨텍스트 파일", "WBS"],
+    "terms": ["PRD", "WBS", "CLAUDE.md", "AGENTS.md", "GEMINI.md"],
+    "summary": "12장은 프로젝트 계획 세우기를 다루며, PRD로 프로젝트 범위를 정리하고 실행 계획과 WBS 작업을 구조화한다.<br>세 도구가 참조할 컨텍스트 파일(CLAUDE.md, AGENTS.md, GEMINI.md) 작성까지의 준비 과정을 다룬다.<br>이 단계는 단순한 기획 문서화가 아니라 AI 기반 개발 전체의 품질을 결정하는 핵심 준비 작업이다.<br>",
+    "points": [
+      "· 12장: 프로젝트 계획 세우기 - PRD, 실행 계획, 컨텍스트 파일 준비",
+      "· PRD로 프로젝트 범위 정리, 실행 계획과 WBS 작업 구조화",
+      "· CLAUDE.md, AGENTS.md, GEMINI.md 컨텍스트 파일 작성",
+      "· AI 기반 개발 전체의 품질을 결정하는 핵심 준비 작업"
+    ],
+    "chapter_intro": {
+      "title": "12장 프로젝트 계획 세우기",
+      "desc": "실전 프로젝트를 시작할 때 가장 중요한 단계인 PRD 작성, 실행 계획 수립, 컨텍스트 파일 작성까지의 준비 과정을 다룬다."
+    },
+    "section_id": "12"
+  },
+  {
+    "num": 278,
+    "topics": ["PRD 작성하기", "기본 용어", "PRD 구성 요소"],
+    "terms": ["PRD", "PM", "프론트엔드", "백엔드", "MVP", "기술 스택"],
+    "summary": "AI 터미널 도구로 프로젝트를 시작하면 가장 먼저 해야 할 일은 명확한 요구 정의이며, PRD가 그 역할을 한다.<br>기본 용어로 PM, 프론트엔드/백엔드, API, 프레임워크, 기술 스택, MVP, 페르소나 등을 정리한다.<br>PRD란 제품 요구 사항 정의서로 무엇을 만들고 어떤 기준으로 완성되었는지 정의하는 문서이다.<br>",
+    "points": [
+      "· · 12.1 PRD 작성하기에서 PRD 개념과 작성법 안내",
+      "· · 12.1.1 기본 용어 정리: PM, API, 프레임워크, 기술 스택, MVP 등",
+      "· · 12.1.2 PRD란: 제품 요구 사항 정의서",
+      "· PRD 주요 구성 요소: 제목/요약, 배경, 핵심 요구 사항, 비기능 요구 사항 등",
+      "· PRD는 AI 개발 과정에서 의도를 전달하는 핵심 문서"
+    ],
+    "chapter_intro": {
+      "title": "12.1 PRD 작성하기",
+      "desc": "AI 터미널 도구로 프로젝트를 시작할 때 필요한 PRD(제품 요구 사항 정의서)의 개념과 작성법을 설명한다."
+    },
+    "section_id": "12.1"
+  },
+  {
+    "num": 279,
+    "topics": ["AI와 PRD 작성", "TODO 웹 서비스 PRD", "PRD 작성법"],
+    "terms": ["PRD 작성법", "최소한의 정보", "AI 활용 PRD", "TODO 앱"],
+    "summary": "AI와 함께하는 PRD 작성법으로 최소한으로 필요한 정보만 정리하는 방식, 직접 작성하기, AI에게 초안 영감 요청하기 세 가지 방법을 설명한다.<br>개인용 TODO 웹 서비스 PRD 예시를 통해 제목, 목표, 핵심 기능, 기술 스택, 비기능 요구 사항 등 실전 PRD 구성을 보여준다.<br>컨텍스트 파일(CLAUDE.md, AGENTS.md, GEMINI.md) 생성의 기반이 되는 PRD 작성이 중요하다.<br>",
+    "points": [
+      "· · 12.1.3 AI와 함께하는 PRD 작성법 세 가지 소개",
+      "· 최소한의 정보만 정리: 제목, 핵심 기능, 기술 스택 등",
+      "· AI에게 초안 영감 요청 시 프롬프트 예시 제공",
+      "· · 12.1.4 예시: 개인용 TODO 웹 서비스 PRD",
+      "· PRD에 기술 스택(HTML, CSS, JavaScript), 비기능 요구 사항 포함"
+    ],
+    "section_id": "12.1.3"
+  },
+  {
+    "num": 280,
+    "topics": ["TODO 웹 서비스 PRD", "제외 범위", "API 설계"],
+    "terms": ["제외 범위", "API 설계", "GET/POST/PUT/DELETE", "비기능 요구 사항"],
+    "summary": "TODO 웹 서비스 PRD 예시의 나머지 부분으로 비기능 요구 사항(직관적 UI, 최신 브라우저 정상 동작, 단순한 구조)을 정리한다.<br>제외 범위로 사용자 인증, 데이터베이스 연동, 다중 사용자 지원, 고급 정렬/검색 기능을 명시한다.<br>API 설계로 GET/POST/PUT/DELETE 엔드포인트를 정의하여 백엔드 연동 방식을 제공한다.<br>",
+    "points": [
+      "· 비기능 요구 사항: 직관적 UI, 최신 브라우저 정상 동작, 단순한 구조",
+      "· 제외 범위: 사용자 인증, DB 연동, 다중 사용자, 고급 검색",
+      "· API 설계: GET/POST/PUT/DELETE /todos 엔드포인트 정의",
+      "· PRD 예시를 통해 실전 문서 작성 방법 학습"
+    ],
+    "section_id": "12.1.4"
+  },
+  {
+    "num": 281,
+    "topics": ["실행 계획", "WBS 작성", "AI 시대 실행 계획"],
+    "terms": ["실행 계획", "WBS", "Work Breakdown Structure", "Claude Code 계획 모드"],
+    "summary": "PRD가 완성되면 다음 단계는 실행 계획과 WBS 작성이며, 실행 계획은 마일스톤과 우선순위를 정의하고 WBS는 세부 작업을 구조화한다.<br>실행 계획의 역할은 명확한 목표 설정, 작업 간 의존성 파악, 리스크 대응, 진행률 관리이고, WBS는 세부 작업 구조 시각화를 담당한다.<br>AI 시대에도 WBS가 필요한 이유로 요구 사항의 구체적 파악, 구조적 설계, AI 검증, 학습 효과 등을 제시한다.<br>",
+    "points": [
+      "· · 12.2 실행 계획과 WBS 작성하기",
+      "· · 12.2.1 실행 계획과 WBS 개념 설명",
+      "· 실행 계획: 마일스톤, 우선순위 정의 / WBS: 세부 작업 구조화",
+      "· · 12.2.2 Claude Code의 계획 모드 활용법",
+      "· · 12.2.3 AI 시대에도 WBS가 필요한 이유 4가지 제시"
+    ],
+    "chapter_intro": {
+      "title": "12.2 실행 계획과 WBS 작성하기",
+      "desc": "PRD를 바탕으로 실행 계획을 수립하고 WBS로 세부 작업을 구조화하는 방법을 AI 도구 활용법과 함께 설명한다."
+    },
+    "section_id": "12.2"
+  },
+  {
+    "num": 282,
+    "topics": ["Claude Code 계획 모드", "WBS 필요성", "AI 계획 수립"],
+    "terms": ["Claude Code 계획 모드", "WBS 필요성", "구조적 설계", "검증 기준"],
+    "summary": "Claude Code의 계획 모드를 활용하면 PRD를 입력하고 자동으로 실행 계획을 생성할 수 있다.<br>AI 시대에도 WBS가 필요한 이유로 요구 사항을 구체적으로 파악, 프로젝트 구조적 설계, AI가 생성한 계획의 검증 기준 제공, 학습 효과 등 네 가지를 설명한다.<br>Codex와 Gemini CLI 등 다른 도구에서도 유사한 방식으로 계획을 수립할 수 있다.<br>",
+    "points": [
+      "· Claude Code 계획 모드로 PRD 기반 실행 계획 자동 생성",
+      "· AI 시대에도 WBS가 필요한 4가지 이유",
+      "· 1. 요구 사항을 더 구체적으로 파악 가능",
+      "· 2. 프로젝트 구조를 직접 설계할 수 있다",
+      "· 3. AI가 생성한 계획의 검증 기준이 된다"
+    ],
+    "section_id": "12.2.3"
+  },
+  {
+    "num": 283,
+    "topics": ["AI 활용 단계별 계획", "WBS 활용", "간단한 WBS 템플릿"],
+    "terms": ["단계별 계획 수집", "WBS 템플릿", "Phase 구분", "TODO 앱 WBS"],
+    "summary": "AI를 활용한 단계별 계획 수집 방법으로 AI 터미널 도구에 하나씩 질문하며 단계별로 계획을 모으는 방식을 설명한다.<br>TODO 앱의 간단한 WBS 예시로 프로젝트 설정, 백엔드 개발, API 엔드포인트 구현 등의 단계를 보여준다.<br>간단한 WBS 템플릿으로 Phase 1(초기 설정)부터 Phase 4(통합 및 배포)까지의 구조를 제시한다.<br>",
+    "points": [
+      "· · 12.2.4 예시: AI를 활용한 단계별 계획 수집",
+      "· TODO 앱 WBS: 프로젝트 설정, 백엔드 개발, API 구현 등 단계별 구성",
+      "· · 12.2.5 간단한 WBS 템플릿 제공",
+      "· Phase 1: 초기 설정, Phase 2: 백엔드 개발",
+      "· Phase 3: 프런트엔드 개발, Phase 4: 통합 및 배포"
+    ],
+    "section_id": "12.2.4"
+  },
+  {
+    "num": 284,
+    "topics": ["WBS 템플릿", "WBS 특징", "프로젝트 구조화"],
+    "terms": ["WBS 템플릿", "핵심 단계 중심", "AI 확장 전제", "학습 친화적 설계"],
+    "summary": "WBS 템플릿의 Phase 2(백엔드 개발)부터 Phase 4(통합 및 배포)까지의 세부 항목을 제시한다.<br>이 템플릿의 특징으로 핵심 단계 중심, AI 확장 전제, 학습 친화적 설계 세 가지를 강조한다.<br>템플릿은 그대로 복사해 사용할 수 있으며, 프로젝트 특성에 맞게 항목을 자유롭게 추가하거나 수정하면 된다.<br>",
+    "points": [
+      "· Phase 2: 백엔드 개발 - API 엔드포인트, 조회/생성/수정/삭제 API, 단위 테스트",
+      "· Phase 3: 프런트엔드 개발 - HTML 레이아웃, CSS 스타일링, JavaScript 기능",
+      "· Phase 4: 통합 및 배포 - 백엔드/프런트엔드 연동, 전체 기능 테스트, 배포",
+      "· 템플릿 특징: 핵심 단계 중심, AI 확장 전제, 학습 친화적 설계",
+      "· 프로젝트 특성에 맞게 자유롭게 항목 추가/수정 가능"
+    ],
+    "section_id": "12.2.5"
+  },
+  {
+    "num": 285,
+    "topics": ["컨텍스트 파일 작성", "세 도구 공통 원칙", "파일과 역할 분리"],
+    "terms": ["CLAUDE.md", "AGENTS.md", "GEMINI.md", "컨텍스트 파일"],
+    "summary": "컨텍스트 파일 작성하기에서는 CLAUDE.md(Claude Code용), AGENTS.md(Codex용), GEMINI.md(Gemini CLI용) 세 파일의 작성 원칙과 역할을 설명한다.<br>세 도구의 공통 컨텍스트 설계 원칙으로 프로젝트 제목과 기술 스택, 코딩 규칙, 공통 사항 등을 포함하며 계층적으로 구성한다.<br>컨텍스트 파일과 별도 문서의 역할을 분리하여 PRD.md, api-spec.md, db-schema.md, designs 폴더 등으로 관리한다.<br>",
+    "points": [
+      "· · 12.3 컨텍스트 파일 작성하기에서 세 도구별 컨텍스트 파일 작성법 안내",
+      "· · 12.3.1 세 도구의 공통 컨텍스트 설계 원칙",
+      "· 전역, 프로젝트, 모듈 3단계로 컨텍스트 파일 계층 구분",
+      "· · 12.3.2 컨텍스트 파일과 별도 문서의 역할 분리",
+      "· PRD.md, api-spec.md, db-schema.md, designs 폴더로 문서 분리 관리"
+    ],
+    "chapter_intro": {
+      "title": "12.3 컨텍스트 파일 작성하기",
+      "desc": "CLAUDE.md, AGENTS.md, GEMINI.md 세 도구별 컨텍스트 파일의 작성 원칙과 역할 분리 방법을 설명한다."
+    },
+    "section_id": "12.3"
+  }
+]

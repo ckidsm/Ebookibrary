@@ -1,0 +1,453 @@
+[
+  {
+    "num": 156,
+    "topics": ["Supabase 회원가입", "조직 생성", "프로젝트 생성"],
+    "terms": ["Supabase", "Get started", "Continue with GitHub", "Organization", "MyOrganization"],
+    "summary": "페이지에서 권한을 승인하는 절차가 추가된다.<br>1) Get started 화면에서 'Continue with GitHub' 또는 이메일/비밀번호로 회원가입.<br>2) 처음 로그인하면 조직(organization)을 먼저 만들어야 한다. 조직은 프로젝트를 담는 컨테이너로 보면 된다. 개인 사용자라면 본인 이름으로 하나만 있으면 충분. 로그인한 뒤 조직 생성 창이 뜨지 않으면 대시보드에서 [New organization] 버튼으로 새 조직을 생성한다.<br>3) 조직을 생성하고 나면 프로젝트 생성 창이 뜬다. 창이 뜨지 않으면 대시보드의 [New project] 버튼을 클릭. Project name·Database password·Region을 입력하고, 데이터베이스 비밀번호는 나중에 MCP 연결할 때 필요하므로 반드시 안전한 곳에 저장한다.",
+    "points": [
+      "1단계: Get started → Continue with GitHub 또는 이메일 회원가입",
+      "2단계: 조직(Organization) 생성 — Name(예: MyOrganization), Type(Personal), Plan(Free $0/month)",
+      "3단계: 새 프로젝트 생성 — Project name(예: kimgilbut's Project), Database password, Region(Seoul 권장)",
+      "데이터베이스 비밀번호는 MCP 연결 시 필요하므로 <strong>반드시 안전한 곳에 보관</strong>",
+      "조직 = 여러 프로젝트를 묶는 단위, 개인은 보통 1개로 충분"
+    ],
+    "section_id": "5.2.3"
+  },
+  {
+    "num": 157,
+    "topics": ["프로젝트 생성", "Connect 버튼", "MCP Server URL"],
+    "terms": ["Project name", "Database password", "Region", "Connect", "Server URL"],
+    "summary": "프로젝트 생성이 완료되면 대시보드가 열린다. 대시보드 상단에 보이는 [Connect] 버튼을 클릭한다.<br>연결 창의 탭 중 'MCP'를 선택하고 Server URL을 복사한다. 이 URL을 사용해 Claude Code에서 Supabase MCP를 등록한다.<br>Supabase MCP 등록하기: Supabase MCP는 프로젝트 단위로 별도 등록이 필요한 특수 MCP다(URL이 프로젝트마다 다름).<br>1) 터미널에서 다음 명령으로 Supabase MCP를 연결한다 — <code>claude mcp add --transport http supabase {Server URL}</code>.<br>2) Claude Code를 실행(또는 /mcp 실행)하면 Supabase MCP는 처음에 needs authentication 상태로 표시된다. 화면의 supabase 항목을 선택한다.",
+    "points": [
+      "프로젝트 대시보드 상단 [Connect] 버튼 클릭",
+      "Connection string / App Frameworks / Mobile Frameworks / ORMs / <strong>MCP</strong> 탭 중 MCP 선택",
+      "표시되는 Server URL을 복사",
+      "등록 명령: <code>claude mcp add --transport http supabase {Server URL}</code>",
+      "초기 상태는 needs authentication — supabase 항목을 선택해 인증 진행 필요"
+    ],
+    "section_id": "5.2.3"
+  },
+  {
+    "num": 158,
+    "topics": ["Supabase 인증", "MCP connected", "테이블 생성"],
+    "terms": ["Authenticate", "Authorize Claude Code", "MCP Config Diagnostics", "contacts 테이블"],
+    "summary": "supabase MCP의 작업 메뉴에서 [Authenticate] 항목을 선택한다.<br>웹 브라우저가 열리고 'Authorize API access for Claude Code (supabase)' 화면이 뜨면 [Authorize Claude Code (supabase)] 버튼을 클릭해 인증을 완료한다.<br>인증 완료 후 터미널에 'Authentication Successful' 메시지가 표시된다.<br>Claude Code 가서 다시 /mcp를 실행하면 supabase 항목이 connected로 보이면 연결 성공이다.<br>· Supabase MCP 사용하기: Supabase MCP를 연결한 뒤에는 Claude에게 자연어로 다음 작업들을 요청할 수 있다.<br>1) 테이블 생성 — '이름(name)과 전화번호(phone_number)를 저장할 contacts 테이블을 만들어줘'.",
+    "points": [
+      "supabase의 [Authenticate] → 브라우저 → [Authorize Claude Code (supabase)] 클릭",
+      "터미널에 'Authentication Successful' 표시",
+      "/mcp 재실행 시 supabase 'connected'로 변경되면 성공",
+      "테이블 생성 예: '이름(name), 전화번호(phone_number) 컬럼이 있는 contacts 테이블 만들어줘'",
+      "Claude Code가 적절한 SQL 쿼리를 자동 작성·실행"
+    ],
+    "section_id": "5.2.3"
+  },
+  {
+    "num": 159,
+    "topics": ["데이터 조회", "SQL 자동 실행", "5.2.4 더 많은 MCP 탐색"],
+    "terms": ["GROUP BY", "BYW COUNT", "modelcontextprotocol.io", "awesome-mcp-servers"],
+    "summary": "데이터 생성 및 조회 — 여러 데이터를 자동으로 추가한다거나, 분 종류별로도 입력과 조회를 자연어로 요청할 수 있다.<br>예) 'contacts 테이블에 한국 사람 5명 추가해줘. 자동 사용자 정보를 사용해줘' 같이 요청해도 임의로 데이터를 만들어 추가한다.<br>간단한 분석 처리 — Claude Code가 대시보드 SQL GROUP BY와 COUNT 함수를 사용해 집계 결과를 제공한다. 그 결과를 표 형태로 깔끔하게 정리해 보여줄 수 있다.<br>· 5.2.4 더 많은 MCP 서버 탐색하기: 앞서 소개한 세 가지 MCP 서버(Playwright, GitHub, Supabase)는 실무에서 자주 사용하는 핵심 도구들이다. 외에도 MCP 생태계는 매우 광범위해서 다양한 도구가 있다.<br>MCP 공식 목록: <code>modelcontextprotocol.io</code>, MCP 공유 마켓: <code>github.com/punkpeye/awesome-mcp-servers</code>.",
+    "points": [
+      "데이터 자동 생성·조회를 자연어로 요청 (예: '한국 사람 5명 추가해줘')",
+      "GROUP BY, COUNT 등 SQL 집계도 Claude가 자동 작성·실행",
+      "결과를 표 형태로 정리해 표시",
+      "공식 목록: <code>modelcontextprotocol.io</code>",
+      "커뮤니티 모음: <code>github.com/punkpeye/awesome-mcp-servers</code>"
+    ],
+    "section_id": "5.2.4"
+  },
+  {
+    "num": 160,
+    "topics": ["MCP SDK", "Python·TypeScript", "MCP 직접 제작"],
+    "terms": ["Python SDK", "TypeScript SDK", "modelcontextprotocol/python-sdk", "modelcontextprotocol/typescript-sdk"],
+    "summary": "필요한 도구가 마켓에 없을 때 직접 만들 수 있도록 MCP는 Python과 TypeScript용 SDK를 제공한다.<br>Python SDK: <code>github.com/modelcontextprotocol/python-sdk</code>.<br>TypeScript SDK: <code>github.com/modelcontextprotocol/typescript-sdk</code>.<br>SDK에는 기본 템플릿, 요청 및 응답 형식, 리소스 정의 방식 등이 포함되어 있어 단순한 CLI 도구도 MCP 서버 형태로 쉽게 확장할 수 있다.<br>MCP는 단순히 외부 도구를 연결하는 기능이 아니라 AI가 다양한 시스템을 제어하고 자동화할 수 있도록 확장하는 핵심 생태계이다. 필요한 MCP만 선택해 설치하고 공식 리스트를 참고해 더 많은 도구를 탐색한 뒤 필요하면 MCP를 직접 제작하는 방식으로 Claude Code의 활용 범위를 계속 넓힐 수 있다.",
+    "points": [
+      "Python SDK: <code>github.com/modelcontextprotocol/python-sdk</code>",
+      "TypeScript SDK: <code>github.com/modelcontextprotocol/typescript-sdk</code>",
+      "SDK 제공 항목: 기본 템플릿, 요청/응답 형식, 리소스 정의",
+      "단순 CLI 도구도 MCP 서버로 쉽게 확장 가능",
+      "MCP = AI가 다양한 시스템을 제어·자동화하도록 확장하는 핵심 생태계"
+    ],
+    "section_id": "5.2.4"
+  },
+  {
+    "num": 161,
+    "topics": ["서브에이전트", "역할 분리", "/agents 명령"],
+    "terms": ["서브에이전트", "subagent", "code-reviewer", "doc-writer", "test-writer", "/agents", "Project", "Personal"],
+    "summary": "· 5.3 서브에이전트로 역할 분리하기를 시작한다.<br>개발 흐름에서 본격 하나의 AI에 모든 일을 맡기지 말고, 작업 영역에 따라 특화된 보조 AI를 두는 편이 효과적인 경우가 많다. Claude Code의 서브에이전트는 이런 역할 분리를 위한 기능이다.<br>· 5.3.1 서브에이전트란: 특정 분야에 특화된 AI 보조이다. 예) 코드 리뷰 전용, 문서 작성 전용, 테스트 작성 전용 등 각각의 역할을 가진 별도 AI 인스턴스로 구성. 부모 Claude는 큰 그림을 보고 결정하고, 서브에이전트는 구체적 영역에서 깊이 들어간다.<br>예시: <code>Subagent(code-reviewer)</code>, <code>Subagent(doc-writer)</code>, <code>Subagent(test-writer)</code>.<br>· 5.3.2 서브에이전트 만들고 사용하기: <code>/agents</code> 명령으로 만들 수 있다. Claude Code는 서브에이전트 저장 위치 두 가지를 제공 — Project(프로젝트 단위) / Personal(개인용).",
+    "points": [
+      "서브에이전트 = 특정 영역에 특화된 AI 보조 (코드 리뷰·문서·테스트 등)",
+      "부모 Claude는 큰 그림, 서브에이전트는 구체적 영역에 집중",
+      "예시: <code>Subagent(code-reviewer)</code>, <code>Subagent(doc-writer)</code>, <code>Subagent(test-writer)</code>",
+      "<code>/agents</code> 명령으로 서브에이전트 생성·관리",
+      "저장 범위: <strong>Project</strong>(<code>.claude/agents/</code>) 또는 <strong>Personal</strong>(<code>~/.claude/agents/</code>)"
+    ],
+    "chapter_intro": {
+      "title": "5.3 서브에이전트로 역할 분리하기",
+      "desc": "특정 영역에 특화된 보조 AI(서브에이전트)를 만들어 코드 리뷰·문서 작성·테스트 작성 등을 위임하는 방법을 다룬다."
+    },
+    "section_id": "5.3"
+  },
+  {
+    "num": 162,
+    "topics": ["서브에이전트 생성 메뉴", "AI 모델 선택", "도구 선택"],
+    "terms": ["Generate with Claude", "Manual configuration", "Sonnet", "Opus", "Haiku", "Inherit from parent", "All tools"],
+    "summary": "<code>/agents</code> 실행 후 [Create new agent] 선택 → 위치(Project/Personal) 선택.<br>이름·역할 설정 단계에서 두 가지 옵션 — <strong>Generate with Claude</strong>(설명만 입력하면 Claude가 설정 파일을 자동 작성) / <strong>Manual configuration</strong>(YAML/마크다운 파일을 직접 작성).<br>AI 모델 선택: Sonnet(기본·균형), Opus(깊은 사고/복잡한 작업), Haiku(가벼운 빠른 작업), Inherit from parent(부모 Claude의 모델 사용).<br>도구 선택: 기본은 <strong>All tools</strong>(All Tools 선택). 보안·격리가 필요하면 특정 도구만 선택해 권한 제한.",
+    "points": [
+      "<strong>Generate with Claude</strong>: 설명만 입력하면 Claude가 설정 파일 자동 작성",
+      "<strong>Manual configuration</strong>: YAML/마크다운 파일 직접 작성",
+      "모델 옵션: Sonnet(균형) / Opus(복잡 작업) / Haiku(경량) / Inherit from parent",
+      "기본은 All tools 사용 — 필요 시 특정 도구만 선택해 권한 제한",
+      "도구 제한 메뉴에서 [Continue]로 다음 단계 진행"
+    ],
+    "section_id": "5.3.2"
+  },
+  {
+    "num": 163,
+    "topics": ["배경색 선택", "에이전트 파일 저장", "YAML front matter 구조"],
+    "terms": ["Background color", ".claude/agents/{name}.md", "Name", "Description", "Model", "Tools", "Rules", "System prompt"],
+    "summary": "마지막으로 배경색을 선택한 뒤 [Enter]를 누르면 에이전트 파일이 <code>.claude/agents/{에이전트명}.md</code> 위치에 자동 생성된다. 이후 파일은 일반적인 설정 문서이므로 필요할 때 직접 수정할 수도 있다.<br>· 서브에이전트 파일 구조: 생성된 파일은 YAML 프론트매터로 다음과 같은 정보를 포함한다.<br>- <strong>Name</strong>: 서브에이전트 이름(필수).<br>- <strong>Description</strong>: 역할 설명(자동 호출 정확도와 직결).<br>- <strong>Model</strong>: 사용할 AI 모델.<br>- <strong>Tools</strong>: 접근할 수 있는 도구 목록.<br>- <strong>Rules</strong>: 작업 시 우선되는 규칙(선택).<br>- <strong>System prompt</strong>(메인 지시문): 에이전트가 수행할 기본 동작 정의.",
+    "points": [
+      "배경색 선택 후 <code>.claude/agents/{name}.md</code> 자동 생성",
+      "파일은 일반 설정 문서이므로 직접 편집 가능",
+      "YAML front matter 항목: Name, Description, Model, Tools, Rules, System prompt",
+      "<strong>Description</strong>은 자동 호출 정확도와 직결 — 명확하게 작성",
+      "System prompt = 에이전트의 기본 행동 정의 (가장 중요)"
+    ],
+    "section_id": "5.3.2"
+  },
+  {
+    "num": 164,
+    "topics": ["에이전트 파일 확인", "수정", "Edit agent → Open in editor"],
+    "terms": ["security-performance-reviewer", "/agents", "Edit agent", "Open in editor", "Cursor"],
+    "summary": "방금 만든 에이전트 파일을 직접 열어보면 위에서 설명한 YAML 구조와 함께 사용자가 입력한 내용이 그대로 들어 있는 것을 확인할 수 있다(예: security-performance-reviewer.md).<br>· 서브에이전트 수정: 다음 사항도 서브에이전트의 규칙 등 변경하고 싶으면 <code>/agents</code> 명령을 다시 실행해 만든 에이전트 목록에서 [Edit agent] → [Open in editor]로 선택한다. Cursor 같은 코드 에디터로 해당 파일이 열려 직접 수정할 수 있다.<br>또는 <code>.claude/agents/</code> 폴더를 직접 열어 수정해도 된다(Cursor 같은 에디터 사용 가능). 처음에는 [Generate with Claude]로 빠르게 만든 뒤, 운영하면서 점차 직접 다듬어 가는 흐름이 일반적이다. 보안이나 코딩 컨벤션처럼 자주 적용해야 할 규칙은 별도의 System prompt에 명확히 적어둔다.",
+    "points": [
+      "생성된 .md 파일에 YAML + 사용자 입력 내용 그대로 저장",
+      "수정 1) <code>/agents</code> → 목록에서 [Edit agent] → [Open in editor]",
+      "수정 2) <code>.claude/agents/</code> 폴더의 파일을 Cursor 등으로 직접 편집",
+      "초기에는 Generate with Claude로 빠르게, 이후 직접 다듬는 흐름이 일반적",
+      "자주 적용할 규칙은 System prompt에 명확히 기록"
+    ],
+    "section_id": "5.3.2"
+  },
+  {
+    "num": 165,
+    "topics": ["서브에이전트 호출 방식", "비용 관리"],
+    "terms": ["자동 호출", "명시적 호출", "단일 작업", "비용 절감"],
+    "summary": "· 5.3.3 서브에이전트 운영과 비용 관리: 서브에이전트는 잘 만들었더라도 운영 방식을 잘못 잡으면 비용·효율이 함께 무너진다. 이 절에서는 서브에이전트를 실제 사용하면서 알아두면 좋은 핵심 규칙들을 정리한다.<br>· 비용을 줄이는 실무 운영 전략: 1) 관련 작업을 하나로 묶어 요청한다 — 서브에이전트는 호출될 때마다 자체 컨텍스트를 다시 구성한다. 따라서 짧고 잦은 호출보다 긴 단일 호출이 효율적이다.<br>2) 모델을 신중하게 선택한다 — 명령형 단순 작업은 Sonnet, 보안·아키텍처 같은 깊은 사고는 Opus, 단순 매크로는 Haiku로 비용을 차등화한다.<br>3) 명시적 호출과 자동 호출을 분리한다 — 명시적 호출은 사용 시점이 분명할 때, 자동 호출은 description의 키워드 가중치를 활용한다.",
+    "points": [
+      "서브에이전트는 호출 시 컨텍스트를 자체 구성 → 짧고 잦은 호출보다 긴 단일 호출이 효율적",
+      "관련 작업을 묶어 한 번에 요청 (예: '리뷰 + 보안 검사 + 성능 점검')",
+      "모델 차등화: 단순 → Haiku, 일반 → Sonnet, 복잡·깊은 사고 → Opus",
+      "명시적 호출 vs 자동 호출 분리 — 자동 호출은 description 키워드 가중치 활용",
+      "200K 컨텍스트가 별도 할당되므로 부모 컨텍스트와 무관하게 운영"
+    ],
+    "section_id": "5.3.3"
+  },
+  {
+    "num": 166,
+    "topics": ["서브에이전트 문제 해결", "트러블슈팅"],
+    "terms": ["Agent not found", "$ARGUMENTS", "description", "파일 위치"],
+    "summary": "서브에이전트 사용 시 흔히 발생하는 문제와 해결법을 정리한다.<br>문제 1 — Claude가 'Agent not found' 표시: 1) 파일 위치 확인 — 프로젝트 단위는 <code>.claude/agents/</code>, 사용자 단위는 <code>~/.claude/agents/</code>. 2) 파일명과 YAML <code>name</code> 값이 일치하는지 확인. 3) YAML 문법 오류 — 누락, 들여쓰기 오류, 따옴표 누락 같은 흔한 오류 점검.<br>문제 2 — 명시한 서브에이전트가 실행되지 않음: 명시 호출 시 정확한 이름을 쓰고, 자동 호출 시 description이 모호하면 Claude가 호출하지 않는다 → description을 더 구체적으로 작성.<br>문제 3 — 자동으로 자주 호출되어 발생하는 문제: 1) 서브에이전트마다 200K 컨텍스트 토큰을 소모. 2) description 시 우선 등장 단어가 도구·일반적이면 의도와 다른 호출 빈발 → description 키워드를 작업 특화 단어로 좁힌다.",
+    "points": [
+      "<strong>Agent not found</strong>: 파일 위치(.claude/agents 또는 ~/.claude/agents), YAML <code>name</code>, 문법 오류 점검",
+      "명시 호출 실패: 정확한 이름 사용 / 자동 호출 실패: description 구체화",
+      "과도한 자동 호출: description 키워드를 작업 특화 단어로 좁히기",
+      "각 호출마다 200K 컨텍스트가 소모되므로 비용 영향 큼",
+      "최후의 수단: 자동 호출 비활성 → 사용자가 직접 명시 호출만 사용"
+    ],
+    "section_id": "5.3.3"
+  },
+  {
+    "num": 167,
+    "topics": ["Hook 자동화", "Hook 개요", "이벤트 종류"],
+    "terms": ["Hook", "PreToolUse", "PostToolUse", "Stop", "Notification", "SubagentStop", "PreCompact", "UserPromptSubmit", "SessionStart"],
+    "summary": "· 5.4 Hook으로 작업 흐름 자동화하기를 시작한다.<br>Claude Code의 강력한 기능 중 하나는 작업 흐름 자체를 자동화할 수 있다는 점이다. 이 자동화의 핵심 메커니즘이 바로 Hook 이다. Hook은 Claude Code가 특정 시점에 자동으로 사전 정의한 명령(셸 스크립트나 커맨드)을 실행하도록 하는 기능이다.<br>· 5.4.1 Hook 개요: Hook은 Claude Code가 특정 시점에 셸 명령이나 스크립트를 자동 실행하게 하는 메커니즘.<br>이벤트 종류: <strong>PreToolUse</strong>(도구 호출 직전), <strong>PostToolUse</strong>(도구 호출 직후), <strong>UserPromptSubmit</strong>(사용자 입력 직후), <strong>Notification</strong>(사용자 알림 시), <strong>Stop</strong>(응답 완료 시), <strong>SubagentStop</strong>(서브에이전트 종료 시), <strong>PreCompact</strong>(자동 압축 직전), <strong>SessionStart</strong>(세션 시작 시).<br>· 5.4.2 Hook 설정하기: Hook 설정은 JSON 파일(settings.json)을 편집해 작성한다. 스코프는 Local/User/Project가 가능하다.",
+    "points": [
+      "Hook = 특정 시점에 셸 명령/스크립트 자동 실행",
+      "<strong>이벤트 8종</strong>: PreToolUse, PostToolUse, UserPromptSubmit, Notification, Stop, SubagentStop, PreCompact, SessionStart",
+      "설정 파일: <code>settings.json</code> (Local/User/Project)",
+      "예: 코드 변경 후 자동 포맷, 작업 완료 시 Slack 알림",
+      "Slack Webhook URL을 발급받아 Hook과 연결하는 실습으로 이어진다"
+    ],
+    "chapter_intro": {
+      "title": "5.4 Hook으로 작업 흐름 자동화하기",
+      "desc": "특정 시점에 셸 명령/스크립트를 자동 실행하는 Hook을 활용해 작업 알림·코드 포맷팅 등을 자동화하는 방법을 다룬다."
+    },
+    "section_id": "5.4"
+  },
+  {
+    "num": 168,
+    "topics": ["Slack 앱 생성", "Incoming Webhooks", "settings.json 편집"],
+    "terms": ["api.slack.com/apps", "Create New App", "From scratch", "Incoming Webhooks", "Webhook URL"],
+    "summary": "Slack 알림 Hook을 만들기 위해 Webhook URL을 먼저 발급받는다.<br>1) <code>api.slack.com/apps</code>에서 [Create New App] 클릭 → 'From scratch' 선택. 앱 이름(예: ClaudeCode)과 워크스페이스를 지정 후 [Create App].<br>2) 좌측 메뉴에서 [Incoming Webhooks] 선택 → 활성화 토글을 [On]으로 → [Add New Webhook to Workspace] → 알림을 받을 채널 선택 → [허용]. 생성된 Webhook URL을 복사.<br>· 명령으로 Hook을 설정하기: Cursor에서 settings.json을 직접 편집하는 방법.<br>1) Cursor에서 사이드바 열고 ClaudeCode(클로드)를 실행한다.<br>2) 다음과 같은 순서로 진행 — Hook event(예: Stop), Add new hook, Command 입력 필드에 temp 입력, 스코프(예: User)로 저장.<br>3) Cursor를 실행 후 사용자 홈 폴더(<code>~/.claude</code>)의 <code>settings.json</code> 위치를 열어 hooks 구조를 직접 편집한다.",
+    "points": [
+      "1) api.slack.com/apps → Create New App → From scratch (이름·워크스페이스)",
+      "2) Incoming Webhooks 활성화 → Add New Webhook to Workspace → 채널 선택",
+      "3) 생성된 Webhook URL 복사 (한 번 노출되니 즉시 보관)",
+      "Cursor에서 ~/.claude/settings.json 열어 hooks 구조 편집",
+      "Hook event(Stop 등) 선택, Command 입력, 스코프(User/Project) 저장"
+    ],
+    "section_id": "5.4.2"
+  },
+  {
+    "num": 169,
+    "topics": ["Hook 스크립트 작성", "curl Webhook POST", "Hook 테스트"],
+    "terms": ["matcher", "command", "type", "curl", "Webhook URL", "ClaudeCode 작업이 완료되었습니다"],
+    "summary": "settings.json의 hooks 구조 예시 — Stop 이벤트에 matcher \"\", hooks 배열에 type \"command\", command에 <code>curl -X POST -H 'Content-Type: application/json' -d '{\"text\":\"ClaudeCode 작업이 완료되었습니다.\"}' {Slack_Webhook_URL}</code> 삽입.<br>command의 'temp' 부분을 운영체제에 맞게 변경(예: 실제 발급받은 URL)해 저장하면 hooks.sla​ck.com/services/YOUR/WEBHOOK/URL 주소로 가서 Webhook URL이 추가된다.<br>· 테스트하기: Claude Code를 실행한 뒤 간단한 요청을 입력한다. 작업이 완료되면 Slack 채널에 'ClaudeCode 작업이 완료되었습니다!' 메시지가 도착한다.<br>Slack 알림 외에도 다양한 자동화를 구현할 수 있다(5-3 표 참고).",
+    "points": [
+      "settings.json hooks 구조: <code>matcher</code> + <code>hooks: [{ type, command }]</code>",
+      "Stop 이벤트 + curl 명령으로 Slack에 메시지 POST",
+      "command 예: <code>curl -X POST -H 'Content-Type: application/json' -d '{\"text\":\"ClaudeCode 작업이 완료되었습니다.\"}' {WEBHOOK_URL}</code>",
+      "Claude 작업 완료 시 Slack 채널에 알림 메시지 도착",
+      "Slack 외에도 다양한 자동화 시나리오 구현 가능"
+    ],
+    "section_id": "5.4.2"
+  },
+  {
+    "num": 170,
+    "topics": ["조건부 Hook (matcher)", "파일 리스너", "Hook 사용 주의 사항"],
+    "terms": ["PreToolUse", "PostToolUse", "matcher", "watcher", "JSON", "타임아웃", "보안"],
+    "summary": "· 5.4.3 Hook 활용하기: matcher를 사용하면 특정 도구 사용 시에만 Hook 실행 가능.<br>예) PreToolUse + PostToolUse 이벤트에 matcher 'Edit' 또는 'Bash' 지정 → 해당 도구가 호출될 때만 Hook 실행.<br>watcher 패턴 Hook으로 파일 변경 감지도 가능.<br>· 5.4.4 Hook 사용시 주의 사항: 6가지 점검 항목.<br>1) JSON 구조 오류 확인 (<code>.claude/settings.json</code>이 JSON으로 유효한지 검증).<br>2) Webhook URL 정확성 확인.<br>3) 환경별 명령어 확인 (Windows: CMD/PowerShell, macOS: bash/zsh).<br>4) 필수 도구 설치 확인 (curl, jq 등).<br>5) 타임아웃 문제 — Hook 기본 타임아웃 60초.<br>6) 보안 주의 사항 — Webhook URL, API 키 같은 민감 정보를 공개 저장소에 커밋 금지.",
+    "points": [
+      "matcher로 특정 도구 호출 시에만 Hook 실행 (예: Edit·Bash)",
+      "watcher 패턴으로 파일 변경 감지 → 자동화 트리거",
+      "1) JSON 구조 오류 확인 (jq, JSONLint)",
+      "2) Webhook URL 정확성 확인",
+      "3) 환경별 명령어(CMD/PowerShell vs bash/zsh)",
+      "4) 필수 도구 설치(curl, jq 등)",
+      "5) 기본 타임아웃 60초 — 긴 명령은 분리·백그라운드화",
+      "6) 보안: Webhook URL, API 키 공개 저장소 커밋 금지"
+    ],
+    "section_id": "5.4.4"
+  },
+  {
+    "num": 171,
+    "topics": ["개인 설정 분리", "Hook 검토 보안", "/hooks 적용"],
+    "terms": [".claude/settings.local.json", "/hooks", "보안", "외부 Hook 검토"],
+    "summary": "개인용 설정이나 실험용 Hook은 <code>.claude/settings.local.json</code>에 저장하면 팀 설정과 분리된다.<br>외부에서 받은 Hook 설정은 실행하기 전에 반드시 내용을 검토해야 한다. Hook은 사용자 권한으로 임의의 명령을 실행할 수 있다.<br>Hook은 Claude Code를 더 스마트하고 자율적인 개발 도구로 발전시켜 준다. 특히 Slack 알림 하나만 추가해도 작업 완료 시점을 놓치지 않고 즉시 대응할 수 있다. 이제는 코드를 맡겨놓고 다른 일을 하다가 알림을 받으면 바로 돌아오는 개발 루틴을 만들 수 있다.<br>Hook 설정을 변경한 후에는 <code>/hooks</code> 명령으로 검토해야 적용된다. 이는 악의적인 Hook 수정으로부터 현재 세션을 보호하기 위한 안전장치이다.",
+    "points": [
+      "개인용·실험용 Hook은 <code>.claude/settings.local.json</code> → 팀 설정과 분리",
+      "외부 Hook은 실행 전 반드시 내용 검토 (사용자 권한으로 임의 명령 실행 가능)",
+      "Slack 알림으로 작업 완료 시점을 놓치지 않고 즉시 대응",
+      "Hook 변경 후 <code>/hooks</code>로 검토해야 적용 — 세션 보호 장치",
+      "코드를 맡기고 다른 일을 하다 알림을 받는 개발 루틴 구축"
+    ],
+    "section_id": "5.4.4"
+  },
+  {
+    "num": 172,
+    "topics": ["Output Style", "기본 3종", "작동 방식", "변경 방법"],
+    "terms": ["Output Style", "Default", "Explanatory", "Learning", "/output-style"],
+    "summary": "· 5.5 Output Style로 맞춤 설정하기를 시작한다.<br>· 5.5.1 기본 제공 Output Style 3종 — <strong>1. Default</strong>: 개발 생산성 중심의 기본 스타일(설명은 간결하게, 모범답안에 가까운 코드 위주). <strong>2. Explanatory</strong>: 코드 외에도 학습/설계/유지보수에 도움이 되는 추가 설명을 포함(주석·구조·이유 강조). <strong>3. Learning</strong>: 학습 모드 — Claude가 일부 코드를 직접 작성하지 않고 사용자에게 [TODO(human)] 식의 단서를 남겨 학습을 유도.<br>· 5.5.2 Output Style의 작동 방식: Output Style은 Claude의 응답 형식과 작동에 다음 위치에서 작동한다(시스템 프롬프트와 대체).<br>1) 기본 시스템 프롬프트는 선택한 스타일로 적용. 2) keep-coding-instructions(코딩 지시 유지 여부) 옵션이 있다. 3) 스타일별 프로젝트 단위 가능. 4) 하위와 시스템과 모델 동작에 영향을 준다.<br>· 5.5.3 Output Style 변경 방법: <code>/output-style</code> 명령으로 가능.",
+    "points": [
+      "<strong>Default</strong>: 간결, 모범답안 코드 위주 (개발 생산성)",
+      "<strong>Explanatory</strong>: 구조·이유 등 추가 설명 포함 (학습·설계·유지보수)",
+      "<strong>Learning</strong>: <code>[TODO(human)]</code> 단서로 학습 유도",
+      "Output Style은 시스템 프롬프트로 작용 → 모델 동작에 영향",
+      "<code>/output-style</code> 명령으로 스타일 변경"
+    ],
+    "chapter_intro": {
+      "title": "5.5 Output Style로 맞춤 설정하기",
+      "desc": "Claude의 출력 형식을 Default(간결) / Explanatory(설명 포함) / Learning(학습 도움) 등으로 조절하는 Output Style 기능을 다룬다."
+    },
+    "section_id": "5.5"
+  },
+  {
+    "num": 173,
+    "topics": ["사용자 정의 Output Style", "YAML 프론트매터", "마크다운 본문"],
+    "terms": ["~/.claude/output-styles/", ".claude/output-styles/", "name", "description", "keep-coding-instructions"],
+    "summary": "· 5.5.4 사용자 정의 Output Style 만들기: 기존 제공 스타일 외에도 코드 리뷰 위주, 한국어 응답 등 특정 작업에 맞는 Output Style을 직접 만들 수 있다.<br>저장 위치 — 사용자 단위: <code>~/.claude/output-styles/{이름}.md</code>, 프로젝트 단위: <code>.claude/output-styles/{이름}.md</code>.<br>예: security-reviewer라는 스타일을 만들면 위 두 위치 중 하나에 .md 파일을 생성한다.<br>· 파일은 YAML 프론트매터 + 마크다운 본문으로 구성.<br>1) YAML 프론트매터(YAML front matter) — name(스타일 이름), description(설명), keep-coding-instructions(코딩 지시 유지, true/false).<br>2) 마크다운 본문 규칙 — Claude가 따라야 할 작업 규칙을 항목별로 작성. 작성 후 <code>/output-style</code>로 새 스타일 사용 가능.",
+    "points": [
+      "사용자 단위: <code>~/.claude/output-styles/{name}.md</code>",
+      "프로젝트 단위: <code>.claude/output-styles/{name}.md</code>",
+      "YAML 프론트매터 항목: <code>name</code>, <code>description</code>, <code>keep-coding-instructions</code>",
+      "마크다운 본문에 구체적 작업 규칙·문장 규범 작성",
+      "<code>/output-style</code>로 새 스타일 즉시 적용 가능"
+    ],
+    "section_id": "5.5.4"
+  },
+  {
+    "num": 174,
+    "topics": ["사용자 정의 명령어", "명령어 만들기", "$ARGUMENTS 인수"],
+    "terms": ["사용자 정의 명령어", ".claude/commands/", "explain.md", "$ARGUMENTS", "/review", "/optimize", "/compare"],
+    "summary": "· 5.6 사용자 정의 명령어로 자동화 워크플로 구축하기를 시작한다.<br>사용자 정의 명령어는 자주 사용하는 프롬프트나 작업 단계를 한 번의 슬래시 명령으로 자동 실행할 수 있게 해주는 기능이다.<br>5장에서 다룬 기능들과 결합하면 강력한 자동화 워크플로를 구성할 수 있다. 자주 쓰는 코드 리뷰, 코드 개선 요청 등을 <code>/review</code>, <code>/optimize</code>, <code>/compare</code> 같은 슬래시 명령어로 만들 수 있다.<br>· 5.6.1 사용자 정의 명령어 만들기: 1) 전역 명령어는 <code>~/.claude/commands/</code> 폴더에 저장. 2) 프로젝트 명령어는 <code>.claude/commands/</code> 폴더에 저장. Cursor를 사용해 .md 파일을 생성한다.<br>· 5.6.2 인수 활용하기: 명령어를 실행할 때 인자를 전달해 동적으로 사용할 수 있다(<code>$ARGUMENTS</code>).<br>예: <code>/explain script.js</code> → script.js 파일이 인자로 명령어에 전달된다.",
+    "points": [
+      "사용자 정의 명령어 = 반복 프롬프트를 슬래시 명령으로 자동 실행",
+      "전역: <code>~/.claude/commands/{name}.md</code>",
+      "프로젝트: <code>.claude/commands/{name}.md</code>",
+      "<code>$ARGUMENTS</code>: 사용자 입력값(파일·문자열)을 명령어에 동적 전달",
+      "예: <code>/explain script.js</code> → script.js가 인자로 전달"
+    ],
+    "chapter_intro": {
+      "title": "5.6 사용자 정의 명령어로 자동화 워크플로 구축하기",
+      "desc": "자주 쓰는 프롬프트를 .claude/commands/에 .md 파일로 정의해 슬래시 명령(/review, /explain, /compare 등)으로 빠르게 실행한다."
+    },
+    "section_id": "5.6"
+  },
+  {
+    "num": 175,
+    "topics": ["프로젝트 표준 워크플로 자동화", "고급 기능", "특화 도구·모델 선택"],
+    "terms": ["optimize.md", ".claude/commands/optimize.md", "YAML 헤더", "description", "model"],
+    "summary": "· 5.6.3 프로젝트 표준 워크플로 자동화하기: 프로젝트에 명령어를 <code>.claude/commands/</code> 폴더에 저장하면 그 프로젝트 안에서 공유된다. 예) 최적화 명령(<code>/optimize</code>)을 만들어 모든 팀원이 사용할 수 있다.<br>1) Cursor에서 프로젝트 폴더(<code>.claude_test</code>)에 <code>.claude</code> → New Folder로 <code>.claude/commands</code> 경로를 만든다.<br>2) commands 폴더에 optimize.md 작성.<br>3) 프로젝트 안에서 Claude Code를 실행한 뒤 <code>/optimize 어떤_파일.ts</code>처럼 사용하면 프로젝트 표준 최적화 작업이 실행된다.<br>· 5.6.4 고급 기능과 실전 활용: YAML 프론트매터에 다양한 옵션을 지정해 특화 도구를 만들 수 있다.<br>1) 특정 도구만 허용하기 — <code>allowed-tools</code> 헤더로 명령어가 사용할 도구를 한정.<br>2) 명령어별 모델 선택하기 — <code>model</code> 헤더로 명령어 실행 시 사용할 모델 지정(예: opus).",
+    "points": [
+      "프로젝트 명령어는 <code>.claude/commands/optimize.md</code> 형태로 저장",
+      "팀원 모두가 같은 명령어 사용 가능",
+      "사용 예: <code>/optimize 어떤_파일.ts</code>",
+      "고급 1) <code>allowed-tools</code>: 명령어가 사용할 도구만 한정",
+      "고급 2) <code>model</code>: 명령어 실행 시 사용할 AI 모델 지정 (예: opus)"
+    ],
+    "section_id": "5.6.3"
+  },
+  {
+    "num": 176,
+    "topics": ["명령어 그룹화", "커뮤니티 확장"],
+    "terms": ["폴더 구조", "Claude Command Suite", "Awesome Claude Code"],
+    "summary": "사용자 정의 명령어가 많아지면 폴더 구조로 그룹화할 수 있다. <code>.claude/commands/</code> 아래에 하위 폴더(예: <code>review/</code>, <code>refactor/</code>)를 만들고 그 안에 .md 파일을 두면 슬래시 경로(<code>/review:security</code> 같은 콜론 표기)로 분류해 호출할 수 있다.<br>· 커뮤니티 명령어 모음 활용: 1) <strong>Claude Command Suite</strong>: 커뮤니티에서 정리한 명령어 모음. 다양한 코드 리뷰·테스트·문서화 명령을 모아두었다. GitHub: <code>github.com/qdhenry/Claude-Command-Suite</code>. 2) <strong>Awesome Claude Code</strong>: 커뮤니티에서 모은 좋은 활용법·확장·도구 모음. GitHub: <code>github.com/hesreallyhim/awesome-claude-code</code>.",
+    "points": [
+      "명령어 폴더 그룹화: <code>.claude/commands/{group}/{name}.md</code>",
+      "콜론 표기로 호출: <code>/review:security</code> 형태",
+      "<strong>Claude Command Suite</strong>: 커뮤니티 정리 명령어 모음 — qdhenry/Claude-Command-Suite",
+      "<strong>Awesome Claude Code</strong>: 활용법·확장·도구 모음 — hesreallyhim/awesome-claude-code",
+      "처음에는 커뮤니티 모음에서 가져와 시작 → 점차 자기 워크플로에 맞게 다듬기"
+    ],
+    "section_id": "5.6.4"
+  },
+  {
+    "num": 177,
+    "topics": ["명령어 트러블슈팅", "활용 팁"],
+    "terms": ["명령어 인식", "파일 경로", "$ARGUMENTS", "README"],
+    "summary": "사용자 정의 명령어가 자주 발생하는 문제와 해결.<br>문제 1 — 명령어가 인식되지 않을 때: 파일 경로 확인(전역 또는 프로젝트), 파일 확장자(.md) 확인, Claude Code 재시작.<br>문제 2 — $ARGUMENTS가 동작하지 않을 때: 정확한 표기(<code>$ARGUMENTS</code>) 사용, 인수가 명령어 호출 시 실제로 전달됐는지 확인.<br>문제 3 — 파일 참조가 작동 안 할 때: <code>@docs/style-guide.md</code> 같은 파일 참조는 실제 파일이 존재해야 한다(경로 확인).<br>· 보안 — 사용자 정의 명령어는 자유롭게 만들 수 있는 만큼 보안에 주의.<br>· 자주 쓰는 요청은 명령어로 만들기 / 명령어가 늘면 README로 정리해 팀에 공유하면 좋다.",
+    "points": [
+      "명령어 인식 실패: 파일 경로(.claude/commands), .md 확장자, 재시작 확인",
+      "$ARGUMENTS 미동작: 정확한 표기, 인수 실제 전달 확인",
+      "파일 참조(@docs/...) 미동작: 실제 파일 존재 여부 확인",
+      "보안: 명령어가 임의 작업을 수행할 수 있으니 외부 명령어 도입 시 검토",
+      "활용 팁: 자주 쓰는 요청을 명령어로 → README로 팀 공유"
+    ],
+    "section_id": "5.6.4"
+  },
+  {
+    "num": 178,
+    "topics": ["플러그인과 스킬", "스킬 살펴보기", "플러그인 살펴보기"],
+    "terms": ["스킬", "skill.md", "name", "description", "allowed-tools", "플러그인", "plugin.json", "commands·agents·skills·hooks"],
+    "summary": "· 5.7 플러그인과 스킬로 Claude Code 확장하기를 시작한다.<br>Output Style이 응답 방식의 변형이라면, Claude의 능력 자체를 확장하는 두 가지 도구가 더 있다. 스킬과 플러그인이다. 그런 두 기능은 Claude Code의 기능을 사용자가 자신만의 방식으로 확장하고 공유할 수 있게 해주는 도구이다.<br>· 5.7.1 스킬 살펴보기: 스킬은 Claude가 특정 작업을 수행할 때 자동으로 참조하는 전문 지식 파일이다. Output Style과 비슷하게 .md 파일로 저장되며 다음 값을 갖는다.<br>- <strong>name</strong>: 스킬 이름(필수, 파이썬 변수 명명 규칙).<br>- <strong>description</strong>: 자동 호출의 정확도와 직결.<br>- <strong>allowed-tools</strong>: 스킬이 사용할 수 있는 도구 제한.<br>· 5.7.2 플러그인 살펴보기: 플러그인은 Claude Code의 기능 자체를 확장하는 패키지이다. plugin.json 안에 commands(슬래시 명령어), agents(서브에이전트), skills(스킬), hooks(자동화) 등을 묶을 수 있다.",
+    "points": [
+      "스킬 = 특정 작업 시 Claude가 자동 참조하는 전문 지식 파일(.md)",
+      "스킬 YAML: <code>name</code>, <code>description</code>(자동 호출 정확도와 직결), <code>allowed-tools</code>",
+      "플러그인 = Claude Code의 기능 자체를 확장하는 패키지 (plugin.json 기반)",
+      "plugin.json 안에 commands / agents / skills / hooks를 묶어 배포 가능",
+      "마켓플레이스 / 자체 폴더로 모두 사용 가능"
+    ],
+    "chapter_intro": {
+      "title": "5.7 플러그인과 스킬로 Claude Code 확장하기",
+      "desc": "Claude의 능력 자체를 확장하는 스킬(자동 참조 지식 파일)과 플러그인(commands·agents·skills·hooks를 묶는 패키지)을 다룬다."
+    },
+    "section_id": "5.7"
+  },
+  {
+    "num": 179,
+    "topics": ["플러그인 설치", "마켓플레이스 등록", "플러그인 설치"],
+    "terms": ["/plugin", "/plugin marketplace add", "anthropics/claude-code", "/plugin install", "plugin-marketplace"],
+    "summary": "· 5.7.3 플러그인 설치하고 사용하기: Claude Code는 플러그인을 마켓플레이스나 깃허브 저장소에서 설치할 수 있다. <strong>마켓플레이스</strong>(marketplace)는 플러그인을 모아둔 저장소이다. Claude Code 공식 마켓이 있고, 사용자가 자체 마켓플레이스를 만들 수도 있다.<br>실무에서 알아 사용하는 documents-skill처럼 특정 플러그인 패키지를 안내하는 식으로 시작한다.<br>· 1단계: 마켓플레이스 등록하기 — <code>/plugin marketplace add anthropics/claude-code</code> (Claude Code 공식 마켓플레이스 등록).<br>· 2단계: 플러그인 설치하기 — 마켓플레이스가 등록되면 플러그인을 설치할 수 있다. <code>/plugin</code> 명령으로 마켓플레이스가 표시되며, 또는 <code>/plugin install 플러그인이름</code>으로 직접 설치한다.<br>· 3단계: 플러그인 실제 활용하기 — 설치된 후에는 스킬이 자동 호출되거나, 새 슬래시 명령어를 직접 호출해 활용한다.",
+    "points": [
+      "마켓플레이스: 플러그인을 모아둔 저장소 (공식·자체 모두 가능)",
+      "1단계: <code>/plugin marketplace add anthropics/claude-code</code>",
+      "2단계: <code>/plugin install {플러그인이름}</code> 또는 <code>/plugin</code> 메뉴에서 선택",
+      "3단계: 스킬은 자동 호출, 슬래시 명령어는 직접 호출",
+      "documents-skill 같은 실무 패키지로 시작"
+    ],
+    "section_id": "5.7.3"
+  },
+  {
+    "num": 180,
+    "topics": ["팀 공유 settings.json", "사용자 정의 스킬", "code-review 스킬"],
+    "terms": ["settings.json", "extraKnownMarketplaces", "enabledPlugins", ".claude/skills/", "code-review"],
+    "summary": "· 5.7.4 팀 프로젝트에서 플러그인과 스킬 공유하기: 팀 프로젝트에서 같은 플러그인·스킬을 공유하려면 settings.json에 마켓플레이스와 플러그인을 명시해 함께 공유한다.<br>예) <code>.claude/settings.json</code>의 <code>extraKnownMarketplaces</code>에 마켓 URL 등록 + <code>enabledPlugins</code>에 사용할 플러그인 명시.<br>저장소에 함께 커밋하면 팀원이 프로젝트를 클론할 때 동일한 플러그인 환경이 적용된다.<br>· 5.7.5 사용자 정의 스킬로 프로젝트 지식 자동화하기: 자주 사용하는 작업을 스킬로 만들어 자동화할 수 있다. 예) 모든 PR 리뷰·코드 리뷰는 일정한 기준으로 진행되도록 code-review 스킬을 만든다.<br>저장 위치는 사용자(<code>~/.claude/skills/</code>) 또는 프로젝트(<code>.claude/skills/</code>). 별도 명령 없이 Claude가 code-review 스킬을 자동 참조한다.<br>· 5.7.6 플러그인과 스킬 관리 명령으로 이어진다.",
+    "points": [
+      "팀 공유: <code>.claude/settings.json</code>에 <code>extraKnownMarketplaces</code> + <code>enabledPlugins</code> 명시",
+      "저장소 커밋 → 팀원이 클론할 때 동일 환경 적용",
+      "사용자 정의 스킬: <code>~/.claude/skills/</code> 또는 <code>.claude/skills/</code>",
+      "예: code-review 스킬 — 일정한 기준으로 코드 리뷰 자동 참조",
+      "별도 명령 없이 Claude가 자동 참조 (description의 키워드가 핵심)"
+    ],
+    "section_id": "5.7.5"
+  },
+  {
+    "num": 181,
+    "topics": ["플러그인·스킬 관리 명령", "확장 마무리"],
+    "terms": ["/plugin", "/plugin marketplace add", "/plugin install", "/plugin enable", "/plugin disable", "/plugin uninstall"],
+    "summary": "플러그인·스킬 관리를 위한 슬래시 명령을 정리한다.<br><code>/plugin</code> — 마켓플레이스 메뉴 표시.<br><code># 마켓플레이스 추가</code><br><code>/plugin marketplace add anthropics/claude-code</code><br><code># 플러그인 설치/활성화/비활성화/제거</code><br><code>/plugin install 플러그인이름@마켓플레이스</code><br><code>/plugin enable 플러그인이름@마켓플레이스</code><br><code>/plugin disable 플러그인이름@마켓플레이스</code><br><code>/plugin uninstall 플러그인이름@마켓플레이스</code><br>스킬과 플러그인은 Claude Code를 단순한 자동화 도구가 아니라, 프로젝트의 요구에 맞게 확장 가능한 개발 환경으로 만들어 준다. 프로젝트 규모와 팀의 작업 방식에 맞춰 필요한 스킬을 구성하고, 플러그인을 단계적으로 도입하면 보다 체계적이고 일관된 AI 개발 작업 흐름을 구축할 수 있다.",
+    "points": [
+      "<code>/plugin marketplace add {owner/repo}</code>: 마켓플레이스 등록",
+      "<code>/plugin install {name}@{marketplace}</code>: 설치",
+      "<code>/plugin enable / disable</code>: 활성·비활성화",
+      "<code>/plugin uninstall</code>: 제거",
+      "프로젝트 규모·팀 방식에 맞춰 스킬 구성, 플러그인 단계적 도입"
+    ],
+    "section_id": "5.7.6"
+  },
+  {
+    "num": 182,
+    "topics": ["VSCode 확장과 커뮤니티 확장", "VSCode 확장"],
+    "terms": ["VSCode", "Claude Code for VS Code", "Extensions", "Cmd+Esc", "Ctrl+Esc"],
+    "summary": "· 5.8 VSCode 확장과 커뮤니티 확장 활용하기를 시작한다.<br>사용자 경험 개선이나 Claude Code의 새로운 사용 방법으로 다양한 확장 도구가 등장하고 있다. 개발 환경 전반에 영향을 끼치는 정도의 도구는 적은데, 대표적인 것이 VSCode 확장과 Super Claude(커뮤니티 확장)이다. 이 절에서는 두 가지의 차이와 사용 시점을 정리한다.<br>· 5.8.1 VSCode 확장: Claude Code의 기본적으로 터미널 단위 작동하지만 Anthropic은 VSCode에서 Claude를 더 쉽게 사용할 수 있도록 공식 확장(Claude Code for VS Code)을 제공한다.<br>1) Hook, MCP, /commands 같은 모든 기능을 직접 호출 가능. 2) <code>.hook</code>, <code>.commands</code> 같은 영역 고급 명령을 화면에서도 볼 수 있다. 따라서 실무에서 다음과 같이 활용한다.<br>1) Visual로 실행하고 코드, 문서 사이드바에서 즉시 호출.<br>2) 단축키 <strong>Claude Code for VSCode</strong>: 입력 후 Anthropic 로고가 표시된 공식 확장 프로그램 선택해 [Install] 버튼을 클릭한다.",
+    "points": [
+      "VSCode 확장: 터미널 외에 IDE 안에서도 Claude를 직접 사용",
+      "Hook, MCP, 슬래시 명령 등 모든 기능을 GUI에서 호출",
+      "단축키: macOS <code>Cmd+Esc</code>, Windows/Linux <code>Ctrl+Esc</code>로 Claude Code 호출",
+      "Extensions에서 'Claude Code'(Anthropic 공식) 검색 → Install",
+      "코드 변경·리팩터링 등을 IDE에서 시각적으로 처리"
+    ],
+    "chapter_intro": {
+      "title": "5.8 VSCode 확장과 커뮤니티 확장 활용하기",
+      "desc": "Claude Code를 IDE에서 사용하는 공식 VSCode 확장과, 커뮤니티 확장(Super Claude)의 차이점·도입 기준을 다룬다."
+    },
+    "section_id": "5.8"
+  },
+  {
+    "num": 183,
+    "topics": ["커뮤니티 확장 Super Claude", "도입 시점·활용 기준"],
+    "terms": ["Super Claude", "pip install superclaude", "superclaude install", ".claude/commands/", "표 5-3"],
+    "summary": "· 5.8.2 커뮤니티 확장: Super Claude — Super Claude는 Claude Code의 공개 구조를 활용해 다양한 프레임워크와 도구를 제공하는 커뮤니티 도구이다. 그런 가지 보면 사용해본다.<br>1) 터미널에서 다음 명령으로 설치 — <code>pip install superclaude</code>.<br>2) 다음 명령으로 실행 — <code>superclaude install</code>.<br><code>~/.claude/superclaude/</code> 폴더가 자동으로 생성되고, 이 안에 다양한 Super Claude의 명령어들이 들어 있다.<br>· 5.8.3 확장 도입 시점과 활용 기준 — 표 5-3로 VSCode 확장과 Super Claude의 차이를 정리한다.<br>VSCode 확장은 시각적으로 Claude Code의 기본 워크플로를 확장하는 데 적합하다(GUI 선호, 일반 개발 흐름).<br>Super Claude는 추가적인 명령어 시스템을 도입해 워크플로 자체를 강화한다(CLI 파워유저, 명령어 기반 워크플로).",
+    "points": [
+      "<strong>Super Claude</strong>: Claude Code 공개 구조를 활용한 커뮤니티 도구",
+      "설치: <code>pip install superclaude</code> → <code>superclaude install</code>",
+      "<code>~/.claude/superclaude/</code>에 다양한 명령어 자동 생성",
+      "VSCode 확장 → GUI 선호·일반 개발 흐름·시각적 작업 시",
+      "Super Claude → CLI 파워유저·명령어 기반 워크플로 강화 시"
+    ],
+    "section_id": "5.8.2"
+  },
+  {
+    "num": 184,
+    "topics": ["빠른 인턴 활용", "고급 워크플로 패턴 1·2"],
+    "terms": ["좋은 예", "나쁜 예", "탐색·계획·코딩·커밋", "TDD", "테스트 주도 개발"],
+    "summary": "· 5.9 실전 응용과 팀 협업 팁을 시작한다.<br>· 5.9.1 Claude Code를 빠른 인턴으로 활용하기 — Claude Code는 신입 인턴처럼 다룬다고 생각하면 좋다. 좋은 예/나쁜 예를 구분해 명확한 지시와 결과 확인이 핵심이다.<br>좋은 예: 사용자가 구체적인 작업을 명확히 지시한다.<br>나쁜 예: 모호한 요청으로 인해 의도와 다른 결과가 나온다.<br>· 5.9.2 고급 워크플로 활용하기 — 패턴 1: <strong>탐색 → 계획 → 코딩 → 커밋</strong>. 1) 탐색(explore): 프로젝트 전체 파일 읽기. 2) 계획(plan): 구현할 단계 정리. 3) 코드(code): 실제 코드 작성. 4) 검증(test): 테스트 실행. 5) 커밋(commit): 변경 내용을 Git에 커밋.<br>패턴 2: <strong>테스트 주도 개발(TDD)</strong>. 테스트부터 작성 → 작은 기능을 만든 뒤 → 테스트 실행으로 검증.",
+    "points": [
+      "Claude Code = 빠른 인턴 — 명확한 지시 + 결과 확인 필수",
+      "좋은 예: 구체적 작업 지시 / 나쁜 예: 모호한 요청",
+      "<strong>패턴 1</strong>: 탐색(explore) → 계획(plan) → 코딩(code) → 검증(test) → 커밋(commit)",
+      "<strong>패턴 2</strong>: TDD — 테스트 먼저 작성 → 최소 코드 → 검증",
+      "단계별로 분리해 진행할수록 일관성 향상"
+    ],
+    "chapter_intro": {
+      "title": "5.9 실전 응용과 팀 협업 팁",
+      "desc": "Claude Code를 빠른 인턴처럼 활용하는 패턴(탐색-계획-코딩-커밋, TDD, 비주얼 반복)과 팀 협업·공유 환경 설정 팁을 다룬다."
+    },
+    "section_id": "5.9"
+  },
+  {
+    "num": 185,
+    "topics": ["비주얼 반복 패턴", "팀 협업과 공유 환경"],
+    "terms": ["Visual iteration", "디자인 입력", "초기 구현", "시각적 검증", "공유 CLAUDE.md", "macOS·Windows·Linux"],
+    "summary": "패턴 3: <strong>비주얼 반복(Visual iteration)</strong>. 디자인을 시각적으로 만들어가는 패턴. Claude에게 디자인 시안이나 와이어프레임을 보여주고 코드 생성을 요청 → 결과를 시각적으로 확인 → 피드백 → 반복.<br>1) 디자인 입력: 시안/스크린샷을 Claude에게 제공.<br>2) 초기 구현: Claude가 1차 코드 생성.<br>3) 시각적 검증: <code>npm run dev</code>로 실행 결과 확인.<br>4) 반복 개선: 피드백 → 수정.<br>· 5.9.3 팀 협업과 공유 환경 설정으로 일관된 개발 문화 만들기 — 팀 협업에서는 Claude Code를 공유된 환경처럼 활용하면 일관성이 크게 올라간다. 가장 중요한 것은 공유 CLAUDE.md 작성이다. 팀의 코딩 컨벤션, 디렉터리 구조, 기술 스택, 보안 규칙 등을 한 곳에 정리해두면 모든 팀원이 같은 기준으로 작업할 수 있다.<br>공유 CLAUDE.md에 포함할 항목: 프로젝트 메인 정보, 기술 스택, 컨벤션 룰, 자주 쓰는 명령어, 보안·접근 규칙, 환경별(Windows·macOS·Linux) 차이 등.",
+    "points": [
+      "<strong>패턴 3 비주얼 반복</strong>: 디자인 입력 → 초기 구현 → 시각적 검증 → 반복",
+      "<code>npm run dev</code>로 실행 결과를 보며 피드백 → 수정 사이클",
+      "팀 협업 핵심: <strong>공유 CLAUDE.md</strong>",
+      "포함 항목: 메인 정보, 기술 스택, 컨벤션, 명령어, 보안·접근 규칙",
+      "환경별(Windows·macOS·Linux) 차이를 명시해 일관성 유지"
+    ],
+    "section_id": "5.9.3"
+  }
+]

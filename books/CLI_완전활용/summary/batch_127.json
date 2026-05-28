@@ -1,0 +1,443 @@
+[
+  {
+    "num": 127,
+    "topics": ["4장 도입", "AI 개발 파트너", "프로젝트 운영"],
+    "terms": ["Claude Code", "CLAUDE.md", "대화형 컨텍스트", "프로젝트 단위 워크플로", "AI 개발 파트너"],
+    "summary": "4장 'Claude Code로 프로젝트 운영하기'의 도입 페이지이다.<br>3장에서 Claude Code의 기본 작동 방식과 CLI 인터페이스를 익혔다면, 이제부터는 실제 프로젝트 단위로 Claude Code를 운영하는 방법을 살펴본다.<br>Claude Code는 단순히 파일을 편집하는 도구가 아니라, 프로젝트 전체를 이해하고 지속적으로 맥락을 유지하며 작업 흐름을 함께 설계하는 'AI 개발 파트너'이다.<br>이 장에서는 프로젝트 메모리 구조의 핵심인 CLAUDE.md, 대화형 컨텍스트 관리 방식, 프로젝트 단위 워크플로 설정 전략을 중심으로 다룬다.",
+    "points": [
+      "3장의 CLI 인터페이스 학습에 이어 실제 프로젝트 단위 운영 방법으로 확장",
+      "Claude Code = 프로젝트 전체를 이해·맥락 유지·작업 흐름 설계의 AI 개발 파트너",
+      "이 장의 3대 축: CLAUDE.md(메모리), 대화형 컨텍스트 관리, 프로젝트 워크플로 전략",
+      "실무에서 Claude Code를 안정적으로 활용하는 방법을 체계적으로 정리"
+    ],
+    "chapter_intro": {
+      "title": "4장 Claude Code로 프로젝트 운영하기",
+      "desc": "Claude Code를 실제 프로젝트에서 AI 개발 파트너로 활용하는 방법을 다룬다. CLAUDE.md, 컨텍스트 관리, 워크플로 설정 전략을 중심으로 실무 노하우를 정리한다."
+    },
+    "section_id": "4장"
+  },
+  {
+    "num": 128,
+    "topics": ["CLAUDE.md", "위치와 적용 범위", "전역/프로젝트/모듈 스코프"],
+    "terms": ["CLAUDE.md", "전역", "프로젝트 루트", "서브폴더", "프로젝트 메모리"],
+    "summary": "· 4.1 CLAUDE.md 파일 관리하기에서 Claude Code의 핵심 설정 파일인 CLAUDE.md를 다루기 시작한다.<br>· 4.1.1 CLAUDE.md의 위치와 적용 범위를 3단계로 설명한다.<br>1) 전역 <code>~/.claude/CLAUDE.md</code>: 모든 프로젝트 공통 개인 기본 규칙(코딩 컨벤션, 도구, 보안).<br>2) 프로젝트 루트 <code>/my-project/CLAUDE.md</code>: 해당 프로젝트 전체 적용, 팀 공유 가능.<br>3) 서브폴더 <code>/frontend/CLAUDE.md</code>·<code>/backend/CLAUDE.md</code>·<code>/apps/admin/CLAUDE.md</code>: 모듈별 세부 규칙.<br>· 4.1.2 CLAUDE.md와 일반 대화의 차이로 이어진다.",
+    "points": [
+      "<strong>전역</strong>: <code>~/.claude/CLAUDE.md</code> — 모든 프로젝트에서 공통 적용되는 개인 기본 규칙",
+      "<strong>프로젝트 루트</strong>: <code>/my-project/CLAUDE.md</code> — 프로젝트 전체 규칙, 팀원과 공유",
+      "<strong>서브폴더</strong>: <code>/frontend/CLAUDE.md</code>, <code>/backend/CLAUDE.md</code> 등 — 영역별 세부 규칙",
+      "프로젝트 단위 규칙은 ~/.claude가 아니라 <strong>프로젝트 폴더에 두어 팀원과 공유</strong>",
+      "CLAUDE.md는 보안 규칙, 컴포넌트 패턴, 도메인 규칙, 코드 영역별 권한 등을 정의"
+    ],
+    "chapter_intro": {
+      "title": "4.1 CLAUDE.md 파일 관리하기",
+      "desc": "Claude Code의 핵심 설정 파일인 CLAUDE.md의 위치(전역·프로젝트·서브폴더), 적용 범위, 작성 및 관리 원칙을 체계적으로 설명한다."
+    },
+    "section_id": "4.1"
+  },
+  {
+    "num": 129,
+    "topics": ["일반 대화 vs CLAUDE.md", "/init 명령", "포함 항목"],
+    "terms": ["CLAUDE.md", "일반 대화", "/init", "프로젝트 목적", "기술 스택"],
+    "summary": "· 4.1.2 CLAUDE.md와 일반 대화의 차이를 표로 비교한다(위치, 컨텍스트 윈도우, 영속성, 적용 범위).<br>이 차이로 인해 CLAUDE.md는 단순한 메모를 넘어 일관성 있는 코드 작성, 일관된 스타일·규칙 유지, 신규 멤버 온보딩 단축, 변경 지시 감소의 4가지 효과를 얻는다.<br>· 4.1.3 /init 명령으로 CLAUDE.md 자동 생성하기: Claude Code는 <code>/init</code>으로 기존 프로젝트의 코드·설정·파일을 분석하여 CLAUDE.md 초안을 자동 생성한다.<br>· 4.1.4 CLAUDE.md에 포함해야 할 주요 항목으로 1)프로젝트 목적/맥락, 2)기술 스택을 시작으로 권장 항목을 안내한다.",
+    "points": [
+      "<strong>일반 대화 vs CLAUDE.md</strong>: 위치, 컨텍스트 윈도우, 영속성, 적용 범위가 다름 (표로 비교)",
+      "효과 1) 일관성 있는 코드 작성, 2) 모든 세션에서 일관된 스타일·규칙 유지",
+      "효과 3) 신규 멤버가 새 환경의 규칙을 빠르게 익혀 온보딩 단축",
+      "효과 4) '이 규칙 지켜줘' 같은 변경 지시를 매번 입력할 필요가 없어짐",
+      "<code>/init</code>은 기존 프로젝트의 코드·설정·파일을 분석해 CLAUDE.md 초안 자동 생성",
+      "포함 항목 권장: ① 프로젝트 목적/맥락 ② 기술 스택 (다음 페이지에서 ③ 프로젝트 구조 ~ ⑤ 명령어로 이어짐)"
+    ],
+    "section_id": "4.1.3"
+  },
+  {
+    "num": 130,
+    "topics": ["CLAUDE.md 권장 항목", "마크다운 문법", "작성 원칙"],
+    "terms": ["프로젝트 구조", "핵심 규칙·금지", "개발 명령어", "마크다운", "필수/중요/금지"],
+    "summary": "CLAUDE.md 권장 항목 ③~⑤를 마무리한다.<br>③ 프로젝트 구조: 폴더·파일 트리를 간략히 기술해 Claude가 '어디에 무엇을 생성할지' 빠르게 판단하게 함.<br>④ 핵심 규칙 및 금지 사항: 반드시 지킬 규칙 3~5개만 명확히. 너무 많으면 컨텍스트 공간을 점유.<br>⑤ 개발 명령어(선택): docker-compose, npm run dev, uvicorn 등 기본 명령 정리.<br>CLAUDE.md 작성에 유용한 마크다운 문법(제목 #/##/###, 리스트, 코드 블록, 강조)도 안내.<br>· 4.1.5 CLAUDE.md 작성 및 관리 원칙 시작: 1) 중요 규칙은 강조하기, 2) 100줄 이내 유지, 3) 정기적으로 업데이트하기.",
+    "points": [
+      "<strong>③ 프로젝트 구조</strong>: backend/app/, tests/, frontend/src/, docker-compose.yml 같은 트리를 간략히 기록",
+      "<strong>④ 핵심 규칙·금지</strong>: 3~5개만 명확히 (예: 타입 힌트 필수, 함수 200줄 이하, any 금지→unknown, 하드코딩 URL 금지→환경 변수)",
+      "<strong>⑤ 개발 명령어</strong>: <code>docker-compose up</code>, <code>npm run dev</code>, <code>uvicorn app:app</code> 등 (선택 추가: .env 템플릿, API 스펙, 테스트 규칙)",
+      "<strong>마크다운 문법</strong>: 제목(#/##/###), 리스트(-), 코드 블록(```), 강조(**bold**)",
+      "<strong>4.1.5 원칙 1</strong>: Claude는 '<strong>필수</strong>', '<strong>중요</strong>', '<strong>금지</strong>' 표현에 높은 가중치를 둠",
+      "<strong>4.1.5 원칙 2</strong>: 100줄 이내 유지 — 세부는 coding-style.md, api-design.md로 분리",
+      "<strong>4.1.5 원칙 3</strong>: 변경 시 CLAUDE.md를 정기적으로 업데이트 (Claude Code는 변경된 내용을 다시 읽음)"
+    ],
+    "section_id": "4.1.4"
+  },
+  {
+    "num": 131,
+    "topics": ["파일 참조 최소화", "CLAUDE.md 기본 템플릿"],
+    "terms": ["파일 참조", "별도 문서", "CLAUDE.md 템플릿", "프로젝트명", "기술 스택"],
+    "summary": "· 4.1.5 원칙 4) 파일 참조는 최소화한다. CLAUDE.md 분량이 커지지 않도록 별도 문서(coding-style.md, api-design.md)로 분리해 참조하지만, 참조된 파일은 컨텍스트에 함께 로드되므로 토큰 비용이 증가한다.<br>필수 정보가 아니면 직접 포함하지 말고 필요한 순간만 파일을 열어 요청하는 방식이 효율적이다.<br>· 4.1.6 CLAUDE.md 기본 템플릿: 프로젝트에 바로 적용할 수 있는 템플릿을 제공한다.<br>구성: # [프로젝트명], ## 목적, ## 기술 스택(Backend/Frontend/Infra), ## 프로젝트 구조, ## 규칙 및 금지 사항, ## 명령어.",
+    "points": [
+      "별도 문서 분리 예: <code>@coding-style.md</code>, <code>@api-design.md</code>",
+      "참조된 파일은 컨텍스트에 함께 로드되므로 <strong>토큰 비용이 증가</strong>",
+      "필수 정보가 아니면 직접 포함 X → 필요한 순간만 파일을 열어 요청",
+      "기본 템플릿 구성: 프로젝트명, 목적, 기술 스택(Backend/Frontend/Infra), 구조, 규칙·금지, 명령어",
+      "예시 트리: backend/(app, tests), frontend/(src), docker-compose.yml"
+    ],
+    "section_id": "4.1.6"
+  },
+  {
+    "num": 132,
+    "topics": ["계획 모드", "사용 시점과 역할", "내부 작동"],
+    "terms": ["계획 모드", "plan mode", "WebFetch", "WebSearch", "분석·설계"],
+    "summary": "· 4.2 계획 모드를 실제 작업 흐름에 적용하기를 시작한다.<br>복잡한 기능을 구현하거나 기존 구조를 변경하는 작업에서는 '무엇을, 어떤 순서로, 어디에 만들 것인가'를 먼저 계획해야 안전하다. Claude Code의 계획 모드는 코드를 직접 작성하기 전에 분석과 설계만 수행할 수 있게 해주어 이 부담을 효율적으로 줄여준다.<br>· 4.2.1 계획 모드를 사용해야 할 시점과 역할: 명확하지 않은 요구사항을 가진 작업, 기존 코드 구조를 크게 변경하는 작업, 여러 파일·계층을 동시에 수정해야 하는 작업, 새로운 기능 도입 또는 도구 변경 작업.<br>· 4.2.2 계획 모드의 내부 작동 방식: 일반 모드는 요청 즉시 코드를 수정하지만, 계획 모드는 코드 변경 없이 읽기·검색·기록 도구만 사용하며 WebFetch/WebSearch도 활용한다.",
+    "points": [
+      "계획 모드 = 코드 수정 없이 분석·설계·리스크 파악만 수행하는 모드",
+      "<strong>사용 시점</strong>: 명확하지 않은 요구사항, 기존 구조 큰 변경, 여러 파일·계층 동시 수정, 새 기능 도입",
+      "내부 작동: 읽기/검색/기록 도구만 활성, 코드 수정 도구는 비활성",
+      "WebFetch / WebSearch도 함께 활용해 외부 문서·스펙 참고",
+      "출력은 변경 계획 형태(파일별 수정 사항, 의존성, 순서)로 사용자 검토 후 구현 단계로 전환"
+    ],
+    "chapter_intro": {
+      "title": "4.2 계획 모드를 실제 작업 흐름에 적용하기",
+      "desc": "복잡한 작업에서 코드 수정 전 분석·설계만 수행하는 계획 모드를 다룬다. 사용 시점, 내부 작동, 구현 단계 전환, 기본값 설정, 실전 활용 3가지 전략을 정리한다."
+    },
+    "section_id": "4.2"
+  },
+  {
+    "num": 133,
+    "topics": ["계획→구현 전환", "기본값 설정", "실전 활용 3전략"],
+    "terms": ["Yes auto-accept", "manually approve", "permissionMode", "plan", "settings.json"],
+    "summary": "· 4.2.3 실제 단계에서 구현 단계로 전환하는 방법: 계획이 충분히 정리되면 다음 4가지 옵션 중 하나로 구현으로 넘어간다.<br>1) <strong>Yes, and auto-accept edits</strong>: Claude의 계획대로 모든 수정을 자동 수락.<br>2) <strong>Yes, and manually approve edits</strong>: 매 변경마다 수동 승인.<br>3) <strong>No, keep planning</strong>: 계획을 더 다듬도록 요청.<br>· 4.2.4 계획 모드를 기본값으로 설정하기: <code>.claude/settings.json</code>의 <code>permissionMode: \"plan\"</code>으로 진입 시 항상 계획 모드 사용.<br>· 4.2.5 계획 모드를 실전에서 활용하는 세 가지 전략으로 이어진다(대규모 작업은 계획부터, 계획 반복으로 점진 개선, 대화 없이 설계안만 빠르게 비교).",
+    "points": [
+      "<strong>전환 옵션 3가지</strong>: Yes auto-accept / Yes manually approve / No, keep planning",
+      "기본값 설정: <code>.claude/settings.json</code>에 <code>{ \"permissionMode\": \"plan\" }</code>",
+      "<strong>전략 1</strong>: 대규모 리팩터링·아키텍처 변경은 반드시 계획부터 요청해 구조 파악",
+      "<strong>전략 2</strong>: 계획을 반복 생성하며 점진적으로 개선",
+      "<strong>전략 3</strong>: 대화 없이 <code>--permission-mode plan -p</code>로 설계안만 즉시 파일 저장"
+    ],
+    "section_id": "4.2.3"
+  },
+  {
+    "num": 134,
+    "topics": ["설계안 비교", "Redux vs Zustand 예시"],
+    "terms": ["--permission-mode plan", "-p", "redux.md", "zustand.md", "diff"],
+    "summary": "· 4.2.5의 세 번째 전략 '대화 없이 설계안만 빠르게 생성해 비교하기'의 구체 예시를 보여준다.<br>Claude Code는 대화형 세션을 열지 않고도 명령형 모드(<code>--permission-mode plan -p</code>)로 설계안을 파일로 즉시 저장한다.<br>예: 동일한 기능을 Redux 기반과 Zustand 기반으로 각각 구현한다 가정하고 두 명령으로 redux.md/zustand.md를 생성한 뒤 <code>diff redux.md zustand.md</code>로 비교한다.<br>생성된 설계안은 팀 내 설계 리뷰 문서, 기술 선택 보고서, PR 설명 자료로도 활용 가능하며, diff 결과로 요구 충족도·복잡도·유지보수성을 객관적으로 판단할 수 있다.",
+    "points": [
+      "<code>claude --permission-mode plan -p \"Redux 기반 글로벌 상태 관리 구현 전략\" > redux.md</code>",
+      "<code>claude --permission-mode plan -p \"Zustand 기반 글로벌 상태 관리 구현 전략\" > zustand.md</code>",
+      "<code>diff redux.md zustand.md</code>로 두 설계안 비교",
+      "활용처: 팀 내 설계 리뷰 문서, 기술 선택 보고서, PR 설명 자료",
+      "diff 결과로 요구 충족도·복잡도·유지보수성을 객관적으로 판단 가능"
+    ],
+    "section_id": "4.2.5"
+  },
+  {
+    "num": 135,
+    "topics": ["컨텍스트 관리", "토큰 기본 개념", "입력/출력 토큰"],
+    "terms": ["컨텍스트 윈도우", "토큰", "입력 토큰", "출력 토큰", "토크나이저"],
+    "summary": "· 4.3 컨텍스트 관리와 토큰 최적화하기를 시작한다.<br>Claude Code를 효율적으로 활용하려면 모델이 처리할 수 있는, 즉 한 순간 컨텍스트가 무엇이고 토큰이 어떻게 작동하는지 이해해야 한다.<br>· 4.3.1 토큰의 기본 개념 이해하기: 토큰은 Claude 같은 LLM이 텍스트를 처리하는 기본 단위. 영어는 단어 수와 비슷하나 한국어는 1단어가 보통 2~3토큰으로 분할된다.<br>입력 토큰(시스템 프롬프트, 사용자 메시지, CLAUDE.md, 도구 정의, MCP 스키마)과 출력 토큰(응답 텍스트, 코드 생성)으로 구분되며, 컨텍스트 윈도우 안에 모든 토큰이 함께 처리된다.",
+    "points": [
+      "<strong>토큰</strong>: LLM이 텍스트를 처리하는 최소 단위 (영어 ≈ 단어 수, 한국어 ≈ 단어당 2~3토큰)",
+      "<strong>입력 토큰</strong>: 시스템 프롬프트, 사용자 메시지, CLAUDE.md, 도구 정의, MCP 스키마",
+      "<strong>출력 토큰</strong>: Claude의 응답, 코드 생성 결과",
+      "컨텍스트 윈도우 = 입력 + 출력이 함께 들어가는 작업 공간",
+      "토큰 단위가 비용·지연 시간·메모리 효율을 모두 좌우한다"
+    ],
+    "chapter_intro": {
+      "title": "4.3 컨텍스트 관리와 토큰 최적화하기",
+      "desc": "Claude Code의 토큰 작동 구조와 컨텍스트 윈도우를 이해하고, 비용·지연을 줄이면서 효율적으로 작업하는 전략을 다룬다."
+    },
+    "section_id": "4.3"
+  },
+  {
+    "num": 136,
+    "topics": ["토큰 사용량 확인", "토큰 절약 전략"],
+    "terms": ["/context", "claude-tokenize", "tiktoken", "토큰 절약", "오래된 대화"],
+    "summary": "토큰 사용량을 확인하는 3가지 방법을 안내한다.<br>1) <code>/context</code> 명령: 대화 세션의 토큰 사용량을 시스템 프롬프트, 도구, 메시지, CLAUDE.md 단위로 확인.<br>2) 로그 파일에서 직접 확인: <code>~/.claude/projects/</code>에 JSONL로 기록되는 input_tokens, output_tokens 등을 확인.<br>3) 웹 기반 토큰 계산기 사용: token-counter.app, claude-tokenize 등으로 텍스트를 미리 토큰화.<br>토큰 절약을 위한 5가지 전략: 1) 오래된 대화는 <code>/clear</code>로 정리, 2) CLAUDE.md를 간결하게 유지, 3) 빌드 에러를 줄여 재실행 비용 최소화, 4) 사용자 지시에서 불필요한 수식어 줄이기, 5) 프롬프트 캐싱 활용(4.3.3절).",
+    "points": [
+      "<strong>방법 1</strong>: <code>/context</code> 명령으로 구성 요소별 토큰 수 시각화",
+      "<strong>방법 2</strong>: <code>~/.claude/projects/</code> JSONL 로그에서 input/output_tokens 확인",
+      "<strong>방법 3</strong>: token-counter.app, claude-tokenize.vercel.app 같은 웹 계산기",
+      "<strong>절약 1</strong>: <code>/clear</code>로 오래된 대화 정리",
+      "<strong>절약 2</strong>: CLAUDE.md 간결 유지",
+      "<strong>절약 3</strong>: 빌드 에러 최소화로 재실행 토큰 낭비 방지",
+      "<strong>절약 4</strong>: 불필요한 수식어 제거",
+      "<strong>절약 5</strong>: 프롬프트 캐싱(4.3.3절)"
+    ],
+    "section_id": "4.3.1"
+  },
+  {
+    "num": 137,
+    "topics": ["모델별 비교", "프롬프트 캐싱"],
+    "terms": ["Sonnet 4.5", "Opus 4.5", "프롬프트 캐싱", "비용", "캐시 히트"],
+    "summary": "· 4.3.2 모델별 성능, 컨텍스트 크기, 비용 비교: Claude Sonnet 4.5와 Opus 4.5를 컨텍스트 크기, 사고 깊이, 가성비, 적합 작업 기준으로 비교한다.<br>두 모델 모두 200K 컨텍스트를 지원하며 Sonnet 4.5는 일반 개발에, Opus 4.5는 복잡한 구조·심화 분석이 필요할 때 적합하다.<br>가격은 Opus 4.5가 Sonnet 대비 약 5배 비싸며 실 세션 비용으로 환산하면 Opus가 대략 1.7배 가량 더 많이 든다.<br>· 4.3.3 프롬프트 캐싱으로 비용 절감하기: 자주 반복되는 시스템 프롬프트·CLAUDE.md를 캐싱해 재사용하면 입력 토큰 비용을 크게 줄일 수 있다(첫 호출에서 캐시 생성 → 다음 호출에서 캐시 히트).",
+    "points": [
+      "Sonnet 4.5: 200K 토큰, 가성비·일반 개발·반복 구현·코드 리뷰에 적합",
+      "Opus 4.5: 200K 토큰, 복잡 구조 설계·심화 분석·깊은 사고가 필요한 작업에 적합",
+      "Opus 4.5는 Sonnet 4.5 대비 약 <strong>5배</strong> 비싼 단가",
+      "동일 작업 기준 실 세션 비용은 Opus 4.5가 Sonnet 4.5의 약 <strong>1.7배</strong>",
+      "프롬프트 캐싱: 1차 호출에서 캐시 생성, 2차 호출부터 캐시 히트로 입력 토큰 비용 대폭 절감"
+    ],
+    "section_id": "4.3.2"
+  },
+  {
+    "num": 138,
+    "topics": ["비용 계산 예시", "긴 대화 컨텍스트 구조"],
+    "terms": ["캐시 미사용", "캐시 사용", "200K 토큰", "300~600 메시지"],
+    "summary": "프롬프트 캐싱 효과를 일별 사용량 기준 비용 계산 예시로 보여준다.<br>캐시 미사용 시: 시스템 프롬프트 3,800토큰 + CLAUDE.md 1,000토큰 등을 매 호출마다 부과해 일 합계 약 $0.01005.<br>캐시 사용 시: 동일 입력의 캐시 히트분에 10% 가격만 부과 → 일 합계 약 $0.00214로 약 60% 절감.<br>· 4.3.4 긴 대화를 유지하기 위한 컨텍스트 구조 이해하기: Claude Sonnet 4.5 기준 200K 컨텍스트 안에서 시스템·도구·메시지·캐시 영역이 어떻게 배분되는지 설명하며, 평균 메시지 크기 300~600토큰이면 한 세션에 약 300~600개 메시지를 운영할 수 있다.",
+    "points": [
+      "캐시 미사용: 시스템 3,800 + CLAUDE.md 500 + 사용자 1,000 등을 매 호출마다 가산",
+      "예시 일 합계: 캐시 미사용 약 <strong>$0.01005</strong> → 캐시 사용 약 <strong>$0.00214</strong> (≈60% 절감)",
+      "200K 컨텍스트에서 시스템/도구/메시지/캐시/예약 영역으로 배분",
+      "평균 메시지 300~600토큰 가정 시 한 세션 300~600개 메시지 운영 가능",
+      "긴 대화일수록 압축·정리(<code>/compact</code>)와 분할 세션 전략이 중요"
+    ],
+    "section_id": "4.3.4"
+  },
+  {
+    "num": 139,
+    "topics": ["/context 명령", "컨텍스트 구성 요소", "세션 메모리 관리"],
+    "terms": ["/context", "System Prompt", "System Tools", "Messages", "MCP Tools", "Memory Files", "Reserved/Autocompact"],
+    "summary": "<code>/context</code> 명령을 실행하면 현재 세션 컨텍스트의 구성과 사용량을 시각적으로 확인할 수 있다.<br>주요 영역: System Prompt(Claude Code 기본 동작 명령), System Tools(Read/Write/Edit 같은 빌트인 도구), Messages(전체 대화 기록), Reserved/Autocompact buffer(자동 압축을 대비한 예약 영역), MCP Tools(등록된 MCP 서버 스키마), Memory Files(CLAUDE.md 및 관련 파일).<br>· 4.3.5 안정적인 세션 유지를 위한 메모리 관리 전략으로 이어진다 — Claude Code는 컨텍스트가 가득 차기 전 'compressing context'를 표시하며 자동 요약을 실행한다.",
+    "points": [
+      "<code>/context</code>: 컨텍스트 총 사용량 + 영역별 토큰을 시각화",
+      "주요 영역: System Prompt / System Tools / Messages / Reserved·Autocompact / MCP Tools / Memory Files",
+      "Memory Files = CLAUDE.md 및 참조 파일 로드 내용",
+      "'compressing context' 메시지 = 자동 요약 메커니즘 작동 중",
+      "작업 종류(코드 분석/간단/대규모)에 따라 메모리 할당이 달라짐"
+    ],
+    "section_id": "4.3.5"
+  },
+  {
+    "num": 140,
+    "topics": ["/compact 명령", "/clear 명령", "수동 컨텍스트 관리"],
+    "terms": ["/compact", "/clear", "컨텍스트 압축", "세션 초기화"],
+    "summary": "<code>/compact</code>는 현재 대화를 핵심만 남기는 압축 요약으로 변환해 토큰을 줄인다(특정 주제로 초점 지정도 가능).<br><code>/clear</code>는 전체 대화 이력을 삭제해 새 세션처럼 초기화한다.<br>비교 — /compact: 맥락 유지, 토큰만 줄임 / /clear: 모든 내용 삭제, 완전 초기화.<br>적절한 사용 시점 — /clear는 기능 단위 개발이 끝난 시점·대규모 리팩터링 완료 후 등 새로운 작업으로 전환할 때 / /compact는 프론트엔드→백엔드 같은 영역 전환 후, Git 커밋 이후 남은 컨텍스트 정리 시.<br><code>/context</code> 사용량이 70% 이상이면 둘 중 하나를 사용해 압축·정리하는 것이 효과적이다.",
+    "points": [
+      "<code>/compact</code>: 대화를 핵심만 남기는 압축 요약 (특정 주제 지정 가능)",
+      "<code>/clear</code>: 전체 대화 이력 삭제, 새 세션처럼 시작",
+      "/compact는 맥락 유지, /clear는 완전 초기화",
+      "/clear 사용 시점: 기능 단위 개발 종료, 대규모 리팩터링 완료 후",
+      "/compact 사용 시점: 영역 전환(프론트→백엔드), Git 커밋 이후 정리",
+      "<strong>트리거 기준</strong>: <code>/context</code> 사용량 70% 이상"
+    ],
+    "section_id": "4.3.5"
+  },
+  {
+    "num": 141,
+    "topics": ["토큰 사용 최적화 전략", "CLAUDE.md 비효율 vs 개선"],
+    "terms": ["토큰 최적화", "비효율 5,000토큰", "개선 700토큰", "분리 문서"],
+    "summary": "· 4.3.6 토큰 사용 최적화 전략을 본격적으로 설명한다.<br>1) CLAUDE.md를 간결하게 유지하기: 비효율적인 5,000토큰 예시(전체 설정·구조·규칙·코드 샘플 모두 포함)와 개선된 700토큰 예시(핵심 규칙만 + 분리 문서 참조)를 비교한다.<br>핵심 원칙은 핵심 규칙만 포함, 리스트·테이블 사용, 코드 예시 3~5줄 이하 제한, 35자 이하 표현으로 30~50% 절감.<br>2) 개선된 예시 구조: 메인 CLAUDE.md + docs/ 분리(api-guide.md, deploy-guide.md 등) + 필요 시 @참조.",
+    "points": [
+      "비효율 예시(약 5,000토큰): 모든 설정·전체 구조·전체 규칙·긴 코드 예시 포함",
+      "개선 예시(약 700토큰): 핵심 규칙만 + 별도 문서로 분리",
+      "원칙: 핵심 규칙만, 리스트/테이블 사용, 코드 예시 3~5줄 이하",
+      "35자 이하 표현으로 토큰 30~50% 절감",
+      "예시 구조: CLAUDE.md + docs/db-guide.md + docs/api-guide.md + docs/deploy-guide.md"
+    ],
+    "section_id": "4.3.6"
+  },
+  {
+    "num": 142,
+    "topics": ["MCP 토큰 절약", "대화 분리 전략", "멀티 터미널"],
+    "terms": ["MCP", "대화 분리", "멀티 터미널", "Header/Footer/Sidebar"],
+    "summary": "MCP 토큰을 절약하려면 필요한 MCP 서버만 등록한다(GitHub MCP, Web Search MCP, Database MCP, Playwright MCP 등은 각각 컨텍스트에 스키마 토큰을 추가).<br>대화 분리 전략: 한 세션에서 여러 주제를 다루지 말고 작업 단위(파일·기능·계층)로 분리한다(예: Header/Footer/Sidebar 작업을 하나의 세션에 합치지 말기, 비슷한 요청은 한 묶음으로 처리).<br>멀티 터미널 전략: 터미널 1=백엔드 전용, 2=프론트엔드 전용, 3=문서화·배포처럼 물리적으로 분리해 컨텍스트 충돌을 방지하고 메모리 효율을 높인다.",
+    "points": [
+      "MCP 서버는 필요한 것만 등록 — 등록한 서버 스키마가 모두 컨텍스트에 추가",
+      "대화 분리: 한 세션에 여러 주제를 합치지 말고 작업 단위로 나누기",
+      "비슷한 요청은 한 묶음으로 처리해 왕복 줄이기",
+      "멀티 터미널: 터미널 1(백엔드) / 2(프론트엔드) / 3(문서화·배포) 분리",
+      "물리적 분리는 컨텍스트 충돌 방지 + 메모리 효율 증가"
+    ],
+    "section_id": "4.3.6"
+  },
+  {
+    "num": 143,
+    "topics": ["실전 최적화 흐름 4단계", "프롬프트 캐싱 비용 절감"],
+    "terms": ["계획부터 요청", "/context 점검", "/clear 문서화", "프롬프트 캐싱"],
+    "summary": "Claude Code의 토큰·컨텍스트 최적화를 단계별로 요약한다.<br>1) <strong>큰 작업은 먼저 계획부터 요청하기</strong>: 아키텍처 변경처럼 큰 작업은 곧바로 수정하지 말고 계획을 요청해 변경 파일·순서·리스크를 정리한다.<br>2) <strong>/context로 사용량 점검하기</strong>: 200K 컨텍스트 중 약 20K(10%)가 기본 세션이고 나머지 180K(90%)를 작업에 사용. 정기적으로 점검·관리한다.<br>3) <strong>복잡한 작업의 문서화와 /clear 사용</strong>: 진행 상황을 plan-progress.md에 저장 → /clear로 초기화 → 새 세션에서 plan-progress.md를 읽으며 이어가기.<br>4) <strong>프롬프트 캐싱으로 비용 절감</strong>: 캐시된 콘텐츠는 입력 토큰 가격의 10%만 부과 → 최대 90% 비용 절감, 지연 시간 85% 절감.",
+    "points": [
+      "1단계: 큰 작업은 곧바로 수정하지 말고 계획부터 요청 (변경 파일·순서·리스크 정리)",
+      "2단계: <code>/context</code>로 사용량 점검 — 기본 세션 약 20K, 작업 가용 약 180K",
+      "3단계: 진행을 plan-progress.md에 저장 → <code>/clear</code> → 새 세션에서 그 파일을 읽고 이어가기",
+      "4단계: 프롬프트 캐싱으로 캐시 히트분의 입력 토큰 가격을 10%만 부과",
+      "효과: <strong>비용 최대 90% 절감, 지연 시간 85% 절감</strong>"
+    ],
+    "section_id": "4.3.6"
+  },
+  {
+    "num": 144,
+    "topics": ["5장 도입", "고급 기능", "개발 자동화 플랫폼"],
+    "terms": ["Claude Code 고급 기능", "확장성", "자동화", "AI 워크플로"],
+    "summary": "5장 'Claude Code 고급 기능 활용하기'의 도입 페이지이다.<br>지금까지 Claude Code의 기본 작동 원리와 프로젝트 단위 작업 흐름을 익혔다면, 이제부터는 Claude Code를 단순한 AI 코드 어시스턴트가 아닌 '개발 자동화 플랫폼'으로 확장하는 단계로 들어간다.<br>5장에서는 Claude Code의 확장성과 자동화 능력을 극대화하는 핵심 기능을 중심으로 살펴본다. 이 장의 핵심은 'Claude Code를 내 작업 방식에 맞게 확장하고 자동화하는 것'이다. AI가 내 코드를 대신 작성하는 수준을 넘어, AI가 내 워크플로 전체를 관리하고 실행하는 환경을 만드는 것이 목표이다.",
+    "points": [
+      "4장까지의 기본 작동 원리·프로젝트 단위 작업 흐름 학습 완료",
+      "Claude Code를 단순 AI 코드 어시스턴트 → 개발 자동화 플랫폼으로 확장",
+      "5장 핵심: 확장성과 자동화 능력 극대화",
+      "AI가 코드 작성을 넘어 워크플로 전체를 관리·실행하는 환경 구축이 목표"
+    ],
+    "chapter_intro": {
+      "title": "5장 Claude Code 고급 기능 활용하기",
+      "desc": "Claude Code의 확장성과 자동화 능력을 극대화하는 핵심 기능을 다룬다. MCP, 서브에이전트, Hook, Output Style, 사용자 정의 명령어, 플러그인·스킬, IDE/커뮤니티 확장까지 — AI 워크플로 자동화 환경을 구축한다."
+    },
+    "section_id": "5장"
+  },
+  {
+    "num": 145,
+    "topics": ["MCP 개요", "MCP 활용 의미", "MCP 서버 예시"],
+    "terms": ["MCP", "Model Context Protocol", "Anthropic", "GitHub MCP", "Web Search MCP", "Supabase MCP", "Playwright MCP"],
+    "summary": "· 5.1 MCP 이해하고 설정하기를 시작한다.<br>· 5.1.1 MCP 개요: MCP(Model Context Protocol)는 Anthropic이 개발한 오픈 프로토콜로, AI 모델이 외부 도구·시스템을 표준 방식으로 사용할 수 있게 해주는 인터페이스이다. USB-C 같은 표준이라 보면 된다.<br>MCP를 활용하는 의미: AI가 단순 텍스트 처리에 머물지 않고 실제 시스템에 접근(파일, DB, 외부 API 호출)할 수 있게 된다.<br>대표 MCP 서버 예시 — 도구 실행: GitHub MCP(<code>create_pr</code>·이슈 등록·코드 수정), Supabase MCP(<code>query</code> 등 DB 작업·테이블 작성), Playwright MCP(<code>screenshot</code>·웹 자동화). 리소스 접근: GitHub MCP의 파일 조회, Supabase MCP의 DB 스키마 조회. 프롬프트·인증 도구도 사용할 수 있다.",
+    "points": [
+      "MCP = Anthropic이 만든 오픈 프로토콜, AI ↔ 외부 도구·시스템 표준 연결",
+      "USB-C처럼 다양한 MCP 서버를 같은 방식으로 연결",
+      "<strong>도구 실행</strong>: GitHub MCP(create_pr), Supabase MCP(쿼리), Playwright MCP(스크린샷)",
+      "<strong>리소스 접근</strong>: 파일/DB/스키마 등 외부 데이터 읽기",
+      "MCP 서버를 사용하려면 적절한 서버를 찾아 설치한 후 Claude Code에 연결"
+    ],
+    "chapter_intro": {
+      "title": "5.1 MCP 이해하고 설정하기",
+      "desc": "MCP(Model Context Protocol)의 개념과 활용 의미를 이해하고, Claude Code에 MCP 서버를 설치·설정하는 방법을 다룬다."
+    },
+    "section_id": "5.1"
+  },
+  {
+    "num": 146,
+    "topics": ["MCP 서버 설치 명령", "통신 방식", "stdio/HTTP/SSE"],
+    "terms": ["claude mcp add", "stdio", "HTTP", "SSE", "transport"],
+    "summary": "· 5.1.2 MCP 서버 설치 및 사용 방법을 설명한다.<br>설치는 <code>claude mcp add 이름 -- 실행명령</code> 형태로 추가한다(예: <code>claude mcp add playwright -- npx @playwright/mcp@latest</code>).<br>MCP 서버의 통신 방식 3가지:<br>1) <strong>stdio</strong>: 가장 일반적, 로컬에서 npx/uvx로 프로세스를 실행하고 표준 입출력으로 통신.<br>2) <strong>HTTP</strong>: 원격 서버에 HTTP로 연결하는 방식. 모든 설치가 필요 없고 업데이트도 간편하다(예: GitHub MCP).<br>3) <strong>SSE(Server-Sent Events)</strong>: 서버에서 클라이언트로 실시간 이벤트를 푸시. 실시간 MCP 서버에 적합하지만 구현이 복잡하고 호스팅이 필요해 동작 가능 여부가 제한적이다.",
+    "points": [
+      "기본 설치: <code>claude mcp add 이름 -- 실행명령</code> (스코프 옵션 -s Local|Project|User)",
+      "<strong>stdio</strong>: npx/uvx로 로컬 프로세스 실행, 가장 일반적",
+      "<strong>HTTP</strong>: 원격 서비스 연결, 설치 불필요·업데이트 간편 (예: github-copilot.com/mcp)",
+      "<strong>SSE</strong>: 서버 → 클라 실시간 푸시, 호스팅 환경 필요",
+      "Authorization 헤더로 토큰 전달도 지원"
+    ],
+    "section_id": "5.1.2"
+  },
+  {
+    "num": 147,
+    "topics": ["MCP 스코프", "스코프 표", "서버 목록·삭제·관리"],
+    "terms": ["Local", "Project", "User", "claude mcp list", "claude mcp remove", "settings.json"],
+    "summary": "MCP 스코프 3종을 표로 정리한다 — Local: <code>~/.claude/CLAUDE.md</code>에 저장, 개인 전용 / Project: 프로젝트의 <code>.mcp.json</code>에 저장, 팀 공유 / User: 모든 프로젝트에 적용.<br>설치 시 추천 옵션: 개인 도구는 Local, 팀 도구는 Project, 자주 쓰는 공통 도구는 User.<br>작업별 추천 스코프 안내 후 MCP 서버 목록을 <code>claude mcp list</code>로, 삭제는 <code>claude mcp remove 이름</code>으로 관리한다.<br>고급: 설정 파일(<code>.claude/settings.json</code> 또는 <code>.mcp.json</code>)을 직접 편집해 mcpServers 블록에 등록할 수도 있다.",
+    "points": [
+      "<strong>Local</strong>: <code>~/.claude/CLAUDE.md</code>, 개인 전용",
+      "<strong>Project</strong>: 프로젝트의 <code>.mcp.json</code>, 팀 공유",
+      "<strong>User</strong>: 모든 프로젝트에 공통 적용",
+      "추천: 자주 쓰는 도구 → User, 팀 공통 → Project, 개인 실험 → Local",
+      "<code>claude mcp list</code>로 등록된 서버와 상태 확인",
+      "<code>claude mcp remove 이름</code>으로 삭제, settings.json 직접 편집도 가능"
+    ],
+    "section_id": "5.1.2"
+  },
+  {
+    "num": 148,
+    "topics": ["mcpServers JSON 구조", "stdio/HTTP/SSE 비교"],
+    "terms": ["mcpServers", "command", "args", "type", "url", "stdio", "HTTP", "SSE"],
+    "summary": "MCP 서버 등록을 위한 JSON 구조를 보여준다.<br>stdio 형: <code>{ \"command\": \"npx\", \"args\": [\"-y\", \"@playwright/mcp@latest\"] }</code>.<br>HTTP 형: <code>{ \"type\": \"http\", \"url\": \"https://api.githubcopilot.com/mcp\" }</code>.<br>Playwright MCP를 추가한다면 위 stdio 예시처럼 Claude Code를 재시작한다.<br>MCP 서버 통신 방식 비교 — stdio: 가장 일반적, 로컬 실행, 자동 시작 / HTTP: 원격 서비스 연결, 설치 불필요 / SSE: 실시간 이벤트 푸시, 별도 호스팅 필요. 각 방식의 장단점을 정리해 적합한 상황을 안내한다.",
+    "points": [
+      "stdio: <code>command</code> + <code>args</code> 조합, npx/uvx 기반",
+      "HTTP: <code>type: \"http\"</code> + <code>url</code>, 원격 서비스에 직접 접속",
+      "SSE: 실시간 push가 필요한 경우 (별도 호스팅)",
+      "stdio가 가장 단순·안정적, 신규 도입 시 우선",
+      "HTTP는 설치 불필요·업데이트 자동, 인증 필요 시 Authorization 헤더 사용"
+    ],
+    "section_id": "5.1.2"
+  },
+  {
+    "num": 149,
+    "topics": ["5.2 시작", "Playwright MCP 웹 브라우저 자동화"],
+    "terms": ["Playwright MCP", "@playwright/mcp", "웹 크롤링", "스크린샷", "E2E 테스트"],
+    "summary": "· 5.2 주요 MCP 서버 설치하고 사용하기를 시작한다.<br>· 5.2.1 Playwright MCP: 웹 브라우저 자동화 — 웹 크롤링, 폼 입력 자동화, 스크린샷 캡처, 페이지 데이터 추출, E2E 테스트 등 사용 사례가 다양하다.<br>설치: <code>claude mcp add playwright -- npx @playwright/mcp@latest</code> (Local 스코프 기본).<br>설치 후 <code>claude mcp list</code>로 connected 확인. Playwright MCP 사용 예: Claude에게 \"www.naver.com에 접속해 스크린샷을 찍어줘\"처럼 자연어로 요청 가능.",
+    "points": [
+      "<strong>Playwright MCP</strong>: 웹 크롤링, 폼 자동 입력, 스크린샷, 페이지 데이터 추출, E2E 테스트",
+      "설치: <code>claude mcp add playwright -- npx @playwright/mcp@latest</code>",
+      "Local 스코프 기본 → 필요 시 <code>-s User</code>로 전역 등록",
+      "확인: <code>claude mcp list</code>에서 'connected' 상태",
+      "사용 예: \"www.naver.com에 접속해 스크린샷 찍어줘\" 같은 자연어 요청"
+    ],
+    "chapter_intro": {
+      "title": "5.2 주요 MCP 서버 설치하고 사용하기",
+      "desc": "실전에서 자주 사용되는 Playwright MCP, GitHub MCP, Supabase MCP의 설치와 활용 방법을 단계별로 다룬다."
+    },
+    "section_id": "5.2"
+  },
+  {
+    "num": 150,
+    "topics": ["Playwright 사용 예", "연동형 테스트", "문제 해결 가이드"],
+    "terms": ["Navigate to URL", "스크린샷", "이메일 텍스트 폼", "샌드박스 테스트"],
+    "summary": "Claude에게 'www.naver.com에 접속해 스크린샷을 찍어줘'를 요청하면 Playwright MCP의 Navigate to URL과 스크린샷 도구를 순차 실행하여 결과 이미지를 저장한다.<br>2단계 연동형 테스트: 'www.naver.com 검색 페이지에서 검색어 입력 후 결과를 스크린샷으로 저장'처럼 여러 단계를 한 번에 요청 가능.<br>로그인 기능 테스트: 회원가입·로그인 폼이 있는 사이트에 'admin/admin1234로 로그인 후 결과를 스크린샷으로 저장' 같은 시나리오 테스트도 가능.<br>웹 페이지의 다양한 요소(이메일 텍스트 폼, 단축 키, 본인인증 플로우 등)에 대해 자연어로 시나리오를 요청해 자동화할 수 있다.",
+    "points": [
+      "Navigate to URL → 스크린샷 → 결과 이미지 저장의 자동 순차 실행",
+      "검색·폼 입력·결과 캡처를 한 번에 요청 가능",
+      "로그인 기능 테스트: 자격 증명 입력 → 리다이렉트 확인 → 결과 캡처",
+      "다양한 UI 요소(텍스트 폼, 본인인증, 외부 OAuth)도 시나리오로 자동화",
+      "디버깅 시에는 단계별 스크린샷이 큰 도움"
+    ],
+    "section_id": "5.2.1"
+  },
+  {
+    "num": 151,
+    "topics": ["Playwright 문제 해결", "5.2.2 GitHub MCP 시작"],
+    "terms": ["Disconnected", "Browser is not installed", "headless", "Chromium", "GitHub MCP"],
+    "summary": "Playwright MCP 사용 시 흔히 발생하는 문제와 해결법을 정리한다.<br>문제 1 — 'Disconnected' 표시: Claude Code 재시작 또는 <code>claude mcp restart playwright</code>.<br>문제 2 — 'Browser is not installed': <code>npx playwright install chromium</code>으로 브라우저 다운로드.<br>문제 3 — 일부 ARM/리눅스 환경에서 GUI 표시 문제: <code>npx @playwright/mcp@latest -- --headless</code>로 헤드리스 실행.<br>· 5.2.2 GitHub MCP: 저장소 관리와 코드 리뷰 자동화 — Claude Code에서 PR 생성·이슈 등록·코드 리뷰 같은 GitHub 작업을 자연어로 수행할 수 있게 해준다.",
+    "points": [
+      "Disconnected → Claude Code 재시작 / <code>claude mcp restart playwright</code>",
+      "Browser is not installed → <code>npx playwright install chromium</code>",
+      "ARM/리눅스 GUI 문제 → <code>--headless</code> 옵션 추가",
+      "<strong>GitHub MCP 기능</strong>: PR 생성·머지, 이슈 작성, 코드 검색, GitHub Actions 조회",
+      "공식 저장소: <code>github.com/github/github-mcp-server</code>"
+    ],
+    "section_id": "5.2.1"
+  },
+  {
+    "num": 152,
+    "topics": ["GitHub PAT 발급 단계", "Settings → Developer settings"],
+    "terms": ["PAT", "Personal access tokens (classic)", "Generate new token", "Claude Code MCP"],
+    "summary": "GitHub MCP를 사용하려면 PAT(Personal Access Token)가 필요하다.<br>발급 단계 1: GitHub 우측 상단 프로필 → Settings.<br>2: 좌측 사이드바 하단 Developer settings 선택.<br>3: Personal access tokens → Tokens (classic) → Generate new token (classic).<br>각 단계는 캡처 화면으로 안내된다.",
+    "points": [
+      "1단계: GitHub 우측 상단 프로필 메뉴 → Settings",
+      "2단계: 좌측 사이드바에서 Developer settings 선택",
+      "3단계: Personal access tokens → Tokens (classic) 클릭",
+      "4단계: Generate new token (classic) 버튼 클릭",
+      "캡처 그림으로 단계별 위치를 안내"
+    ],
+    "section_id": "5.2.2"
+  },
+  {
+    "num": 153,
+    "topics": ["PAT 생성", "스코프 지정", "GitHub MCP 등록"],
+    "terms": ["Note", "Expiration", "Scopes", "repo", "workflow", "mcpServers", "Authorization"],
+    "summary": "5단계: New personal access token 화면에서 Note(예: Claude Code MCP)·Expiration·Scopes(repo, workflow 등 5-2 표 참고) 선택 후 Generate token으로 생성. 토큰은 한 번만 표시되므로 즉시 안전한 곳에 보관해야 한다.<br>GitHub MCP 등록하기: 발급한 토큰을 <code>YOUR_GITHUB_PAT</code> 자리에 넣어 등록한다.<br>stdio 등록 예: <code>claude mcp add --transport http github https://api.githubcopilot.com/mcp -- --header \"Authorization: Bearer YOUR_GITHUB_PAT\"</code>.<br>등록 결과 settings.json의 mcpServers 블록에 \"type\": \"http\", \"url\": \"https://api.githubcopilot.com/mcp\", \"headers\": { \"Authorization\": \"Bearer ...\" } 형태로 저장된다.",
+    "points": [
+      "Note: 토큰 식별용 이름 (예: Claude Code MCP)",
+      "Expiration: 30/60/90일 또는 No expiration (보안상 만료 권장)",
+      "Scopes: repo(필수), workflow(워크플로 작업 시) — 5-2 표 참고",
+      "토큰은 <strong>한 번만 표시</strong> — 즉시 안전 보관",
+      "등록 명령: <code>claude mcp add --transport http github https://api.githubcopilot.com/mcp --header \"Authorization: Bearer YOUR_GITHUB_PAT\"</code>",
+      "settings.json mcpServers에 type/url/headers 형태로 저장"
+    ],
+    "section_id": "5.2.2"
+  },
+  {
+    "num": 154,
+    "topics": ["GitHub MCP 사용", "저장소 정보·이슈·PR 생성·코드 리뷰"],
+    "terms": ["mcp github authentication", "이슈 생성", "PR 생성", "코드 리뷰", "코드 검색"],
+    "summary": "정상 등록 후 연결 목록에 github 항목이 connected로 표시된다.<br>GitHub MCP 사용 예: 1) 저장소 정보 확인 — '내 GitHub 저장소 목록을 보여줘' / 2) 이슈 목록 보기 — 'Claude Code의 issue 제목·상태·담당자 등을 보기 쉽게 정리해줘' / 3) 코드 검색하기 — 'react.js 코드에서 useState 사용 패턴을 찾아줘' / 4) 이슈 생성하기 — '저장소에 자세한 설명과 코드 블록을 포함한 이슈를 만들어줘' / 5) PR 생성하기 — '코드 변경 완료된 작업을 PR로 만들어줘' / 6) 코드 리뷰 자동화 — 'PR의 코드 리뷰를 작성하고 보안·성능 관점에서 코멘트로 남겨줘'.",
+    "points": [
+      "<strong>저장소 정보</strong>: 'GitHub 저장소 목록 보여줘'",
+      "<strong>이슈 관리</strong>: 이슈 검색·생성·상태 확인을 자연어로",
+      "<strong>코드 검색</strong>: 특정 패턴(useState 등)을 저장소 단위로 검색",
+      "<strong>PR 생성</strong>: 변경 완료된 작업을 자연어 요청으로 PR 생성",
+      "<strong>코드 리뷰 자동화</strong>: PR 본문·보안·성능 관점 코멘트 자동 작성"
+    ],
+    "section_id": "5.2.2"
+  },
+  {
+    "num": 155,
+    "topics": ["5.2.3 Supabase MCP", "DB·인증 연동"],
+    "terms": ["Supabase MCP", "@supabase/mcp-server", "PostgreSQL", "RLS", "REST/GraphQL"],
+    "summary": "· 5.2.3 Supabase MCP: 데이터베이스와 인증 서비스 연동.<br>웹 서비스 개발에 필수인 데이터베이스, 인증, 파일 저장소까지 거의 모든 프로젝트에 필요한 핵심 기능을 한 번에 제공하는 BaaS(Backend-as-a-Service)이다.<br>Supabase는 PostgreSQL 기반의 오픈소스 BaaS로, 데이터베이스, 인증, 실시간 데이터, 파일 저장소, RLS 보안, REST/GraphQL API 등을 통합 제공한다.<br>· 1) Supabase 회원가입 — supabase.com에서 'Sign in' 버튼 또는 GitHub 계정으로 로그인.<br>2) 새 조직(Organization) 생성 → 정보 입력 후 'Create' — 보통 GitHub 사용자명을 그대로 사용한다.",
+    "points": [
+      "Supabase = PostgreSQL 기반 오픈소스 BaaS",
+      "기능: DB, 인증, 실시간 동기화, 파일 저장소, RLS, REST/GraphQL API",
+      "1단계: supabase.com 회원가입 (이메일 또는 GitHub)",
+      "2단계: 조직(Organization) 생성 — Name(보통 GitHub username), Type, Plan 입력",
+      "조직은 여러 프로젝트의 묶음 단위 역할"
+    ],
+    "section_id": "5.2.3"
+  }
+]

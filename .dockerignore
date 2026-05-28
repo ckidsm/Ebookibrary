@@ -1,0 +1,31 @@
+# rsync --exclude-from 으로 사용. 단순 파일명도 매칭되도록 leading slash 명시.
+
+# Git·메타
+/.git
+/.gitignore
+/.editorconfig
+/.dockerignore
+/CLAUDE.md
+/README.md
+
+# 배포·헬퍼 스크립트 (NAS에서 실행 안 함)
+/deploy.sh
+/add_book.sh
+
+# 옛 가이드·구버전 스크립트 (보존만, NAS에 안 보냄)
+/_archive/
+
+# 빌드 도구·캐시 (모든 books/ 하위에서)
+**/ocr_text/
+**/verification_report.json
+**/verification_report.md
+**/batch_*.json
+**/*.py
+**/__pycache__/
+**/thumbs/
+
+# 시스템·임시
+.DS_Store
+*.swp
+.vscode/
+.idea/

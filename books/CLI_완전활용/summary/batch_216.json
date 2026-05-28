@@ -1,0 +1,538 @@
+[
+  {
+    "num": 216,
+    "topics": ["MCP 서버 연결", "config.toml", "Playwright MCP"],
+    "terms": ["MCP 서버", "config.toml", "mcp_servers", "Cursor"],
+    "summary": "· 8.1절에서는 MCP 서버 연결하기를 다루며, config.toml 파일의 위치를 확인하는 방법을 설명한다.<br>· Codex가 MCP 서버를 인식하고 사용할 수 있도록 config.toml에 설정을 추가하는 과정을 안내한다.<br>· Playwright, GitHub, Context7 등 대표적인 MCP 서버를 연결하는 실습을 소개한다.<br>",
+    "points": [
+      "· 8.1 MCP 서버 연결하기 시작",
+      "· config.toml 파일 위치: macOS/Linux는 /Users/사용자/.codex, Windows는 C:\\Users\\사용자\\.codex",
+      "· mcp_servers 섹션에 MCP 서버 이름과 명령어를 등록",
+      "· MCP 서버 연결 후 /mcp tools 명령으로 확인 가능",
+      "· Playwright, GitHub, Context7 MCP 서버 연결 실습 제공"
+    ],
+    "section_id": "8.1",
+    "chapter_intro": {
+      "title": "8.1 MCP 서버 연결하기",
+      "desc": "Codex에서 MCP 서버를 연결하고 활용하는 방법을 다룬다. config.toml 파일에 MCP 서버를 등록하고 Playwright, GitHub, Context7 등의 서버를 실제로 연결하는 과정을 실습한다."
+    }
+  },
+  {
+    "num": 217,
+    "topics": ["Playwright MCP", "GitHub MCP", "MCP 설정"],
+    "terms": ["Playwright MCP", "GitHub MCP", "npx", "GITHUB_PERSONAL_TOKEN"],
+    "summary": "· Playwright MCP 서버를 config.toml에 추가하고 headless 모드로 설정하는 방법을 설명한다.<br>· macOS(Apple Silicon), macOS(Intel), Windows에서의 npx 실행 경로 차이를 안내한다.<br>· GitHub MCP를 설정하려면 GitHub PAT를 발급받아 환경 변수로 설정해야 한다.<br>",
+    "points": [
+      "· Playwright MCP: command는 npx, args는 <code>-y, @playwright/mcp@latest</code> 형식",
+      "· macOS Apple Silicon 경로: /opt/homebrew/bin/npx, macOS Intel: /usr/local/bin/npx",
+      "· GitHub MCP 설정 시 GITHUB_PERSONAL_TOKEN 환경 변수 필요",
+      "· GitHub MCP args: <code>-y, @modelcontextprotocol/server-github@latest</code>",
+      "· 환경 변수는 config.toml의 env 항목에 지정하거나 시스템 환경 변수로 설정 가능"
+    ],
+    "section_id": "8.1"
+  },
+  {
+    "num": 218,
+    "topics": ["GitHub MCP 인증", "Context7 MCP", "인증 관리"],
+    "terms": ["Context7 MCP", "Credential Manager", "Keychain", "context7-mcp"],
+    "summary": "· GitHub MCP의 인증 토큰을 운영체제 별 자격 증명 관리자(Windows Credential Manager, macOS Keychain, Linux gnome-keyring 등)에 안전하게 저장하는 방법을 설명한다.<br>· Codex는 현재 Supabase MCP를 지원하지 않으므로, 공식 목록에 있는 Context7 MCP로 React, Next.js, TypeScript, Python 등 주요 프레임워크의 최신 문서를 참조한다.<br>· config.toml에 Context7 설정을 추가하고 실행하여 /mcp tools로 연결 상태를 확인한다.<br>",
+    "points": [
+      "· 운영체제별 인증 토큰 저장: macOS는 Keychain, Windows는 Credential Manager 사용",
+      "· Codex는 Supabase MCP를 직접 지원하지 않아 Context7 MCP를 대안으로 소개",
+      "· Context7 MCP 등록: npx 기반으로 <code>@upstash/context7-mcp@latest</code> 실행",
+      "· 파일을 저장하고 Codex를 재시작한 뒤 /mcp tools로 확인",
+      "· Playwright, GitHub, Context7 세 가지 MCP를 모두 연결하여 활용 가능"
+    ],
+    "section_id": "8.1"
+  },
+  {
+    "num": 219,
+    "topics": ["config.toml 심화", "설정 항목", "사고 강도"],
+    "terms": ["config.toml", "model", "model_reasoning_effort", "approval_policy"],
+    "summary": "· 8.2절에서는 config.toml의 심화 설정 가이드를 다루며, 전체 구조와 자주 사용하는 핵심 설정 항목을 설명한다.<br>· config.toml은 AI 모델 선택, 사고 강도, 승인 정책, 샌드박스 모드, MCP 서버 설정, 환경 변수 관리 등을 지원한다.<br>· model과 model_reasoning_effort 항목의 사용법과 설정값을 구체적으로 안내한다.<br>",
+    "points": [
+      "· 8.2 config.toml 심화 설정 가이드 시작",
+      "· config.toml 주요 설정: model, model_reasoning_effort, approval_policy, sandbox_mode, mcp_servers, shell_environment_policy 등",
+      "· model: Codex가 사용할 AI 모델 지정 (예: <code>model = \"gpt-5-codex\"</code>)",
+      "· model_reasoning_effort: low/medium/high 세 단계로 사고 강도 조절 (기본값 medium)",
+      "· 높은 사고 강도는 복잡한 작업에 적합하나 토큰 소모 증가"
+    ],
+    "section_id": "8.2",
+    "chapter_intro": {
+      "title": "8.2 config.toml 심화 설정 가이드",
+      "desc": "config.toml의 전체 구조를 이해하고 자주 사용하는 핵심 설정 항목들을 상세히 다룬다. AI 모델, 사고 강도, 승인 정책, 샌드박스 모드, 환경 변수 등을 설정하는 방법을 안내한다."
+    }
+  },
+  {
+    "num": 220,
+    "topics": ["승인 정책", "샌드박스 모드", "환경 변수"],
+    "terms": ["approval_policy", "sandbox_mode", "shell_environment_policy", "workspace-write"],
+    "summary": "· approval_policy는 Codex가 파일을 수정하거나 명령을 실행하기 전에 사용자의 승인을 요청하는 방식을 설정한다.<br>· sandbox_mode는 Codex가 시스템에서 어디까지 접근할 수 있는지를 제한하며, read-only/workspace-write/full-access 세 단계로 권한을 조정한다.<br>· shell_environment_policy는 Codex가 셸 환경 변수에 접근할 수 있는 범위를 제어한다.<br>",
+    "points": [
+      "· approval_policy 옵션: always(모든 명령 승인), on-request(기본값, 중요 작업만 승인), never(자동 실행)",
+      "· sandbox_mode 옵션: read-only(읽기 전용), workspace-write(작업 폴더만 쓰기), full-access(전체 접근)",
+      "· 권장 조합: 얕은 제한은 read-only+always, 일반 개발은 workspace-write+on-request, 자동화는 workspace-write+never",
+      "· shell_environment_policy: include_only(허용 변수만 노출), exclude(특정 변수 제외) 등 지정 가능",
+      "· 8.2.3 Codex의 설정 우선순위와 환경 변수 활용 시작"
+    ],
+    "section_id": "8.2"
+  },
+  {
+    "num": 221,
+    "topics": ["설정 우선순위", "환경 변수", "명령줄 플래그"],
+    "terms": ["CODEX_SANDBOX_MODE", "명령줄 플래그", "환경 변수", "config.toml"],
+    "summary": "· Codex는 설정 적용 시 명령줄 플래그 > 환경 변수 > config.toml 순서로 우선순위를 적용한다.<br>· 환경 변수를 사용하면 config.toml을 수정하지 않고도 일시적으로 설정을 변경할 수 있다.<br>· 명령줄 플래그는 한 번만 다른 설정을 쓰고 싶을 때 가장 빠르고 안전한 방법이다.<br>",
+    "points": [
+      "· 설정 우선순위: 명령줄 플래그(1순위) > 환경 변수(2순위) > config.toml(3순위)",
+      "· 환경 변수 예: CODEX_SANDBOX_MODE=read-only codex",
+      "· 파이프라인에서는 config.toml 대신 환경 변수 사용 권장",
+      "· 임시로 변경 → 환경 변수, 영구적 변경 → config.toml",
+      "· Codex의 설정은 CLI 도구 특성에 맞게 버전별로 관리하는 것이 중요"
+    ],
+    "section_id": "8.2"
+  },
+  {
+    "num": 222,
+    "topics": ["세션 로그", "자동 기록", "로그 분석"],
+    "terms": ["세션 로그", "rollover", "JSONL", "UUID"],
+    "summary": "· 8.3절에서는 세션 로그의 자동 기록 구조와 분석 방법을 설명한다.<br>· Codex는 모든 세션을 자동으로 기록하며, 로그 파일은 JSONL 형식으로 ~/.codex/sessions/YYYY/MM/DD/ 디렉토리에 날짜별로 저장된다.<br>· 로그 파일의 주요 필드로 timestamp, type, payload가 있으며, 세션 시작 기록, 사용자 입력 기록, AI 작업 진행 로그, 최종 응답 기록 등을 확인할 수 있다.<br>",
+    "points": [
+      "· 8.3 세션 로그 이해하기 - 자동 기록 구조와 분석 방법",
+      "· 세션 로그 저장 위치: ~/.codex/sessions/YYYY/MM/DD/ (연/월/일 하위 디렉토리)",
+      "· 파일명 형식: <code>rollout-YYYY-MM-DDTHH-MM-SS-{UUID}.jsonl</code>",
+      "· 로그 주요 필드: timestamp(발생 시각), type(로그 유형), payload(상세 데이터)",
+      "· 세션 시작, 사용자 입력, AI 작업 진행, 최종 응답 등 4가지 주요 기록 유형"
+    ],
+    "section_id": "8.3",
+    "chapter_intro": {
+      "title": "8.3 세션 로그 이해하기 - 자동 기록 구조와 분석 방법",
+      "desc": "Codex의 세션 로그가 자동으로 기록되는 구조를 이해하고, JSONL 형식의 로그 파일을 분석하여 작업 내역을 추적하는 방법을 학습한다."
+    }
+  },
+  {
+    "num": 223,
+    "topics": ["로그 분석", "세션 복원", "resume 기능"],
+    "terms": ["session_meta", "agent_reasoning", "resume", "approval_policy"],
+    "summary": "· 사용자 입력 기록, AI 작업 진행 로그, 최종 응답 기록의 구체적인 JSON 구조와 주요 필드를 설명한다.<br>· 세션 복원(resume) 원리와 자동 요약 구조를 다루며, JSONL 파일을 기반으로 작업을 이어갈 수 있도록 Codex가 재구성한다.<br>· 정리하면, resume은 단순히 로그 파일을 읽어 불러오는 기능이 아니라 JSON 로그를 순차 파싱해 최근 작업 흐름을 참고하며 이어가는 방식이다.<br>",
+    "points": [
+      "· 로그의 주요 필드: session_meta(세션 시작 정보), response_item(사용자 입력/AI 응답), event_msg(AI 작업 진행), turn_context(작업 조건과 설정)",
+      "· agent_reasoning 등 AI 내부 추론도 response_item 형태로 기록",
+      "· resume 기능으로 이전 세션의 대화와 파일 변경을 복원 가능",
+      "· 세션 복원 시 approval_policy, sandbox_mode 등 turn_context 설정이 함께 유지",
+      "· 최근 파일 또는 지정된 세션을 불러와 작업 흐름 이어가기 가능"
+    ],
+    "section_id": "8.3"
+  },
+  {
+    "num": 224,
+    "topics": ["Part 4", "Gemini CLI", "차세대 개발 환경"],
+    "terms": ["Gemini CLI", "Google", "초대형 컨텍스트", "확장성"],
+    "summary": "· Part 4는 'Gemini CLI 완전 정복: 초대형 컨텍스트와 확장성으로 여는 차세대 개발 환경'을 주제로 한다.<br>· Google의 Gemini 모델을 기반으로 한 터미널 도구인 Gemini CLI를 학습한다.<br>· Claude Code, Codex와 마찬가지로 프로젝트 컨텍스트 파일을 기반으로 대화하고 명령을 실행하는 구조이면서 무료로도 강력한 기능을 사용할 수 있다.<br>",
+    "points": [
+      "· Part 4: Gemini CLI 완전 정복 시작",
+      "· Gemini CLI는 초대형 컨텍스트 윈도우를 지원하는 점에서 차별화된 강점 보유",
+      "· 설치와 인증, 기본 명령어 사용법, GEMINI.md 기반 프로젝트 관리 학습",
+      "· 셸에서 명령어와 실행 옵션을 단계적으로 익히는 구성",
+      "· AI 멀티-도구 개발 환경 구축을 위한 세 번째 도구"
+    ],
+    "section_id": "Part 4",
+    "chapter_intro": {
+      "title": "Part 4 Gemini CLI 완전 정복",
+      "desc": "Google의 Gemini 모델 기반 터미널 도구인 Gemini CLI를 학습한다. 초대형 컨텍스트와 확장성을 활용한 차세대 개발 환경을 구축하는 방법을 다룬다."
+    }
+  },
+  {
+    "num": 225,
+    "topics": ["9장", "Gemini CLI 시작하기", "설치와 인증"],
+    "terms": ["Gemini CLI", "Google 생태계", "컨텍스트", "AI 터미널"],
+    "summary": "· 9장 'Gemini CLI 시작하기'는 Claude Code와 Codex에 이어 세 번째 AI 터미널 도구를 소개한다.<br>· Gemini CLI는 프로젝트 폴더를 직접 읽고 수정하며 필요할 경우 셸 명령을 실행할 수 있다.<br>· 설치 → 인증 → 기본 실행 → 명령 옵션의 순서로 단계적으로 학습한다.<br>",
+    "points": [
+      "· 9장 Gemini CLI 시작하기 도입",
+      "· Google 계정 로그인만으로 인증 절차가 완료되어 로컬 환경에서 바로 실행 가능",
+      "· Google 생태계와 연동된 실무형 워크플로 구축 가능",
+      "· 대규모 컨텍스트를 활용한 분석 및 생성 작업도 자연스럽게 경험 가능"
+    ],
+    "section_id": "9",
+    "chapter_intro": {
+      "title": "9장 Gemini CLI 시작하기",
+      "desc": "Gemini CLI의 설치, 인증, 기본 실행, 명령 옵션을 단계적으로 학습한다. Google 계정만으로 인증이 완료되고 로컬 환경에서 바로 실행할 수 있는 AI 터미널 도구이다."
+    }
+  },
+  {
+    "num": 226,
+    "topics": ["Gemini CLI 설치", "Node.js 확인", "인증 방법"],
+    "terms": ["npm", "Node.js", "npx", "Google 인증"],
+    "summary": "· Gemini CLI를 설치하려면 Node.js 20 이상이 필요하며, npm install -g @google/gemini-cli로 전역 설치한다.<br>· macOS 또는 Linux에서는 Homebrew를 사용하여 설치할 수도 있다.<br>· 설치 후 gemini 명령으로 실행하면 세 가지 인증 방식(Login with Google, API Key, Vertex AI) 중 하나를 선택할 수 있다.<br>",
+    "points": [
+      "· Node.js 20 이상 필수, npm으로 전역 설치 가능",
+      "· Homebrew로도 설치 가능 (brew install gemini-cli)",
+      "· 인증 방식 3가지: Login with Google, Use Gemini API Key, Vertex AI",
+      "· Google 계정으로 로그인 시 무료 계정은 하루 1,000회, 분당 60회 요청 가능",
+      "· Gemini Advanced 구독 시 더 높은 한도 제공"
+    ],
+    "section_id": "9.1",
+    "chapter_intro": {
+      "title": "9.1 Gemini CLI 설치하고 인증하기",
+      "desc": "Gemini CLI의 설치 과정과 세 가지 인증 방법(Google 로그인, API Key, Vertex AI)을 단계적으로 설명한다."
+    }
+  },
+  {
+    "num": 227,
+    "topics": ["인증 방식", "API Key", "Vertex AI"],
+    "terms": ["Login with Google", "Gemini API Key", "Vertex AI", "gcloud"],
+    "summary": "· Login with Google은 가장 간단한 인증 방식으로, Google 계정으로 로그인하면 자동으로 인증이 완료되며 무료 계정 기준 하루 1,000회, 분당 60회 요청이 가능하다.<br>· Use Gemini API Key는 Google AI Studio에서 발급받은 API 키를 사용하며, CI/CD 환경에서 유용하다.<br>· Vertex AI는 Google Cloud 프로젝트 및 IAM 권한 기반 인증으로, 기업 환경에서 적합하다.<br>",
+    "points": [
+      "· Login with Google: 개인 사용자 적합, 무료 계정 하루 1,000회 / 분당 60회 요청 가능",
+      "· Gemini Advanced 구독자는 더 넓은 한도 제공",
+      "· API Key: Google AI Studio에서 발급, 환경 변수 GEMINI_API_KEY로 설정",
+      "· Vertex AI: Google Cloud 프로젝트와 IAM 권한 필요, 기업 환경용",
+      "· 인증 완료 시 Gemini Code Assist / Gemini Code Assist(개인 Cloud Code) / Gemini CLI 세 가지 계정 종류 중 선택"
+    ],
+    "section_id": "9.1"
+  },
+  {
+    "num": 228,
+    "topics": ["API 키 설정", "Vertex AI 인증", "설치 문제 해결"],
+    "terms": ["GEMINI_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "gcloud", "Cloud Shell"],
+    "summary": "· API 키를 환경 변수나 설정 파일(gemini/settings.json)에 저장하여 사용할 수 있다.<br>· Vertex AI 인증은 gcloud CLI 설치 후 로그인하고, 프로젝트와 리전을 설정하여 사용한다.<br>· 9.1.4에서는 설치 문제 해결 가이드를 제공하며, command not found, 로그인 창 미열림, 권한 오류 등을 다룬다.<br>",
+    "points": [
+      "· 환경 변수 설정: export GEMINI_API_KEY='발급받은_키'",
+      "· 설정 파일 사용: gemini/settings.json에 apiKey 항목 저장",
+      "· Vertex AI: gcloud auth login → 프로젝트/리전 설정 → gemini 실행",
+      "· Cloud Shell에서도 Gemini CLI 사용 가능",
+      "· 문제 1: command not found → npm 전역 설치 경로 확인 필요"
+    ],
+    "section_id": "9.1"
+  },
+  {
+    "num": 229,
+    "topics": ["설치 문제 해결", "권한 오류", "경로 확인"],
+    "terms": ["EACCES", "Permission denied", "npm 경로", "sudo"],
+    "summary": "· Windows, macOS(homebrew), macOS(nvm) 등 플랫폼별 npm 설치 경로를 안내한다.<br>· Google 로그인 창이 열리지 않는 경우 CLI에 표시된 URL을 직접 브라우저에 입력하면 해결된다.<br>· 권한 오류(EACCES)는 sudo npm install로 해결하거나 Windows에서는 관리자 권한으로 실행한다.<br>",
+    "points": [
+      "· Windows npm 경로: %AppData%\\npm",
+      "· macOS homebrew 경로: /usr/local/bin 또는 /opt/homebrew/bin",
+      "· macOS nvm 경로: ~/.nvm/versions/node/버전/bin",
+      "· 로그인 창 미열림 시 CLI URL을 복사하여 브라우저에 직접 입력",
+      "· 권한 오류 시 macOS는 sudo npm install, Windows는 관리자 권한 실행"
+    ],
+    "section_id": "9.1"
+  },
+  {
+    "num": 230,
+    "topics": ["Gemini CLI 사용법", "대화형 실행", "기본 명령"],
+    "terms": ["gemini", "대화형 모드", "단발성 실행", "프롬프트"],
+    "summary": "· 9.2절에서는 Gemini CLI의 기본 사용법을 다루며, 단발성 실행과 대화형 실행 두 가지 모드를 설명한다.<br>· 단발성 실행은 gemini -p 옵션으로 프롬프트를 전달하여 한 번만 실행하고, 대화형 실행은 gemini 명령 후 여러 차례 대화를 이어간다.<br>· Claude Code와 Codex처럼 프로젝트 파일을 직접 읽고 수정하는 기능을 제공한다.<br>",
+    "points": [
+      "· 9.2 Gemini CLI 사용하기 시작",
+      "· 단발성 실행: gemini -p '프롬프트' 형태로 한 번 실행 후 종료",
+      "· 대화형 실행: gemini --interactive로 여러 차례 대화 가능",
+      "· 종료 명령: /quit 또는 Ctrl+C",
+      "· 기본 실행 화면에서 Auto-Complete 기능 제공"
+    ],
+    "section_id": "9.2",
+    "chapter_intro": {
+      "title": "9.2 Gemini CLI 사용하기",
+      "desc": "Gemini CLI의 기본 사용법으로 단발성 실행과 대화형 실행 모드를 익히고, 세션 관리와 슬래시 명령어 등 핵심 기능을 학습한다."
+    }
+  },
+  {
+    "num": 231,
+    "topics": ["단축키", "세션 관리", "폴더 추가"],
+    "terms": ["--include-directories", "~/.gemini/sessions/", "/resume", "Ctrl 단축키"],
+    "summary": "· 입력 상태에서 자주 쓰는 단축키를 표로 정리하며, Ctrl+C, Ctrl+L, Shift+Tab 등 Gemini CLI에서 활용할 수 있는 조합을 설명한다.<br>· 기본적으로 현재 디렉토리만 참조되며, --include-directories 옵션으로 다른 폴더를 추가 컨텍스트로 포함할 수 있다.<br>· 9.2.2 세션 관리하기에서는 ~/.gemini/sessions/ 폴더에 JSONL 형식으로 저장된 세션을 /resume 명령으로 다시 불러오는 방법을 다룬다.<br>",
+    "points": [
+      "· 단축키 표: Ctrl+C(실행 중단), Ctrl+L(화면 정리), Shift+Tab(옵션 토글) 등 제공",
+      "· --include-directories /경로 옵션으로 외부 폴더도 컨텍스트에 포함",
+      "· 세션 저장 위치: ~/.gemini/sessions/ 디렉토리에 JSONL 파일로 자동 보관",
+      "· <code>/resume session-2023-11-30</code> 형식으로 특정 세션 복원",
+      "· 세션 불러오기 단계: Ctrl+A 한 번/두 번, Ctrl+D, 타이핑 후 Enter 등"
+    ],
+    "section_id": "9.2"
+  },
+  {
+    "num": 232,
+    "topics": ["미디어 분석", "출력 형식", "Gemini CLI 문제 해결"],
+    "terms": ["--output-format", "JSONL", "이미지 분석", "인증 오류"],
+    "summary": "· Gemini CLI는 프롬프트에 이미지 파일 경로를 전달해 화면 구성과 UI를 분석하게 할 수 있으며, Gemini 2.5 Pro 이상 모델에서 안정적으로 지원된다.<br>· 비대화형 모드로 동작시키려면 --output-format json/text 옵션으로 출력 형식을 지정해 스크립트 연동을 지원한다.<br>· 9.2.3에서는 인증 오류, 무료 할당량 초과, 응답 지연 등 자주 발생하는 문제의 해결 방법을 안내한다.<br>",
+    "points": [
+      "· 이미지 분석: 프롬프트에 이미지 파일 경로를 전달하여 화면 구성과 UI 분석 가능",
+      "· Gemini 2.5 Pro 이상 모델에서 이미지 인식이 안정적으로 동작",
+      "· --output-format json / text로 출력 형식 지정 가능, 파이프라인 연동에 유용",
+      "· 비대화형 모드는 \"Authentication required\" 같은 오류 해결 실습을 포함해 소개",
+      "· 9.2.3 Gemini CLI 사용 문제 해결 가이드로 연결"
+    ],
+    "section_id": "9.2"
+  },
+  {
+    "num": 233,
+    "topics": ["문제 해결", "할당량 초과", "출력 형식 오류"],
+    "terms": ["Rate limit", "Quota exhausted", "/status", "UTF-8"],
+    "summary": "· Google 로그인 세션 만료 시 <code>gemini /auth</code>로 재인증하며, API 키 방식은 .gemini/settings.json의 설정을 함께 점검해야 한다.<br>· 무료 할당량 초과 시 'Rate limit exceeded' 또는 'Quota exhausted' 메시지가 표시되므로, 요청 속도를 조절하거나 API 키 방식으로 전환한다.<br>· 응답이 중간에 끊기거나 출력 형식 오류가 발생하면 네트워크 환경 점검과 UTF-8 인코딩 설정 확인이 필요하다.<br>",
+    "points": [
+      "· 로그인 세션 만료: <code>gemini /auth</code>로 재인증 실행",
+      "· 무료 할당량: 로그인 기반 계정은 하루 약 1,000회, 분당 30~60회",
+      "· API 키 무료 티어: 하루 50회(모델별 차이 있음)",
+      "· 응답 지연 시 /status 등으로 잔여 할당량 확인",
+      "· Windows Power Shell에서는 UTF-8 인코딩 설정 필요"
+    ],
+    "section_id": "9.2"
+  },
+  {
+    "num": 234,
+    "topics": ["명령과 실행 옵션", "CLI 실행 옵션", "진입 명령"],
+    "terms": ["gemini -p", "--prompt-interactive", "slash command", "CLI 진입"],
+    "summary": "· 9.3절에서는 Gemini CLI의 명령과 실행 옵션을 상세히 살펴보며, CLI 실행 옵션과 슬래시 명령어를 구분하여 설명한다.<br>· 기본 대화형 모드는 gemini 명령으로 진입하며, gemini -p로 단발성 실행도 가능하다.<br>· --prompt-interactive 옵션은 초기 프롬프트 전달 후 대화형 모드로 전환한다.<br>",
+    "points": [
+      "· 9.3 명령과 실행 옵션 살펴보기 시작",
+      "· gemini: 기본 대화형 모드 진입",
+      "· gemini -p '프롬프트': 단발성 실행 후 종료",
+      "· --prompt-interactive: 초기 프롬프트 후 대화 모드 계속",
+      "· CLI 진입 명령과 슬래시 명령어(/ 접두사)를 구분하여 사용"
+    ],
+    "section_id": "9.3",
+    "chapter_intro": {
+      "title": "9.3 명령과 실행 옵션 살펴보기",
+      "desc": "Gemini CLI의 진입 명령과 실행 옵션을 상세히 살펴본다. CLI 실행 옵션, 슬래시 명령어, 자주 사용하는 실행 옵션, 도구 관련 옵션 등을 학습한다."
+    }
+  },
+  {
+    "num": 235,
+    "topics": ["실행 옵션", "디버그", "샌드박스", "승인 모드"],
+    "terms": ["--debug", "--sandbox", "--yolo", "--approved-mode", "--allow-tools"],
+    "summary": "· 자주 사용하는 실행 옵션으로 --help, --debug, --sandbox, --yolo 등을 설명한다.<br>· --debug 옵션은 내부 동작을 추적하고, --sandbox는 시스템 변경 없이 안전하게 실행할 수 있다.<br>· 승인 모드(--approved-mode)는 default, auto_edit, yolo 세 단계가 있으며, YOLO 모드는 모든 도구를 자동 실행한다.<br>",
+    "points": [
+      "· --debug: 디버그 모드로 내부 동작 추적",
+      "· --sandbox: 시스템 변경 없이 읽기 전용 실행",
+      "· --yolo: 모든 도구를 자동 실행하는 YOLO 모드",
+      "· --approved-mode: default(기본), auto_edit(파일 자동 편집), yolo(전체 자동)",
+      "· 9.3.2 도구 관련 옵션 - --allow-tools로 특정 도구만 허용 가능"
+    ],
+    "section_id": "9.3"
+  },
+  {
+    "num": 236,
+    "topics": ["도구 관련 옵션", "환경 관련 옵션", "/tools 명령"],
+    "terms": ["--allow-tools", "--tool-instructions", "--screen-reader", "--output-format"],
+    "summary": "· /tools 명령으로 Gemini CLI가 지원하는 전체 도구 목록을 확인할 수 있다.<br>· 주요 도구로 read_file, write_file, edit_file, search_files, grep, bash, web_search 등이 있으며 각각 파일 읽기, 쓰기, 편집, 검색, 텍스트 검색, 셸 실행, 웹 검색 기능을 담당한다.<br>· 9.3.3 환경 관련 옵션에서는 --bar-extensions(버전 확인), --screen-reader(스크린 리더 모드), --output-format(출력 형식) 등이 제공된다.<br>",
+    "points": [
+      "· /tools: CLI가 지원하는 전체 도구 목록 확인 명령어",
+      "· 주요 도구: read_file, write_file, edit_file, search_files, grep, bash, web_search",
+      "· bash 도구는 임의 명령 실행 위험이 있으므로 필요 시에만 허용",
+      "· --screen-reader: 스크린 리더 최적화 출력",
+      "· --output-format: text(기본)/json 등 출력 형식 지정"
+    ],
+    "section_id": "9.3"
+  },
+  {
+    "num": 237,
+    "topics": ["버전 확인", "도움말", "주요 슬래시 명령어"],
+    "terms": ["--version", "--help", "/directory", "/memory"],
+    "summary": "· --version으로 현재 Gemini CLI 버전을 확인하고, --help로 전체 옵션과 사용법을 조회한다.<br>· 9.3.4 주요 슬래시 명령어에서는 /chat, /memory, /stats, /compress, /theme, /editor, /tools 등 세션·상태·도구 관련 명령을 정리한다.<br>· /directory 명령으로는 현재 프로젝트와 --include-directories로 추가된 워크스페이스 폴더를 확인할 수 있다.<br>",
+    "points": [
+      "· --version: 현재 설치된 Gemini CLI 버전 확인",
+      "· --help: 전체 옵션과 사용법 조회, <code>gemini extensions --help</code>로 확장 기능 옵션 확인",
+      "· 유용한 옵션 조합: <code>--approved-mode auto_edit</code>로 자동 파일 수정",
+      "· 9.3.4 주요 슬래시 명령어 정리 (/chat, /memory, /stats 등)",
+      "· /directory: 현재 작업 폴더와 추가된 디렉토리 목록 확인"
+    ],
+    "section_id": "9.3"
+  },
+  {
+    "num": 238,
+    "topics": ["/memory 명령", "/stats 명령", "/compress", "히스토리 파일"],
+    "terms": ["/memory", "/stats", "/compress", "settings.json"],
+    "summary": "· /memory 명령은 개인 스타일이나 반복되는 조정을 AI가 장기적으로 기억하도록 메모리를 관리하는 기능이다.<br>· /stats는 세션 진단 명령으로 모델명과 토큰 소모량, 도구 호출 횟수 등 세션 상태를 확인하며, /compress는 누적된 대화 내역을 요약·압축해 컨텍스트를 절약한다.<br>· Gemini CLI는 /settings, /theme, /editor, /vim 등의 환경 커스터마이즈 명령도 제공한다.<br>",
+    "points": [
+      "· /memory show / add: 개인 스타일·규칙을 저장하고 세션 간 기억",
+      "· /stats: 모델명, 토큰 소모량, 도구 호출 횟수 등 세션 상태 진단",
+      "· /compress: 누적된 대화를 요약해 컨텍스트 한도 초과를 방지",
+      "· /settings, /theme, /editor(VSCode·Vim 등), /vim 등 환경 커스터마이즈 명령 제공",
+      "· 설정 파일 저장 경로: ~/.gemini/settings.json (11.3절에서 상세 안내)"
+    ],
+    "section_id": "9.3"
+  },
+  {
+    "num": 239,
+    "topics": ["10장", "프로젝트 운영", "GEMINI.md"],
+    "terms": ["GEMINI.md", "memory", ".gemini/commands/", "Gemini CLI"],
+    "summary": "· 10장 'Gemini CLI로 프로젝트 운영하기'는 GEMINI.md 파일을 기반으로 프로젝트 규칙과 맥락을 관리하는 방법을 다룬다.<br>· memory 명령으로 세션 기억을 조정하고 작업 흐름을 안정화하는 방법을 살펴본다.<br>· .gemini/commands/ 폴더를 활용해 반복되는 명령을 자동화하고, 실제 개발 환경에서 Gemini CLI를 효율적으로 운영하는 전략을 제시한다.<br>",
+    "points": [
+      "· 10장 Gemini CLI로 프로젝트 운영하기 시작",
+      "· GEMINI.md 파일로 프로젝트 규칙과 맥락 관리",
+      "· memory 명령으로 세션 기억 조정 및 작업 흐름 안정화",
+      "· .gemini/commands/ 폴더로 반복 명령 자동화",
+      "· 실전형 AI 개발 파트너로 활용하는 방법 익히기"
+    ],
+    "section_id": "10",
+    "chapter_intro": {
+      "title": "10장 Gemini CLI로 프로젝트 운영하기",
+      "desc": "Gemini CLI가 GEMINI.md 파일을 기반으로 프로젝트 규칙과 맥락을 관리하는 방법, memory 명령과 .gemini/commands/ 폴더를 활용한 효율적인 프로젝트 운영 전략을 학습한다."
+    }
+  },
+  {
+    "num": 240,
+    "topics": ["GEMINI.md 파일", "프로젝트 컨텍스트", "작성 방식"],
+    "terms": ["GEMINI.md", "CLAUDE.md", "AGENTS.md", "settings.json"],
+    "summary": "· GEMINI.md는 Claude Code의 CLAUDE.md, Codex의 AGENTS.md와 같은 역할을 하는 프로젝트 컨텍스트 파일이다.<br>· 프로젝트 루트의 GEMINI.md는 전체 프로젝트 컨텍스트를 관리하고, 서브폴더의 GEMINI.md는 해당 영역의 선택적 참조 문서이다.<br>· GEMINI.md 작성 시 프로젝트 개요, 주요 의존성, 규칙과 기본 명령을 포함하여 AI가 맥락을 이해하도록 돕는다.<br>",
+    "points": [
+      "· GEMINI.md: 프로젝트 루트에 위치하는 전체 컨텍스트 관리 파일",
+      "· 서브폴더 GEMINI.md: 해당 디렉토리의 선택적 컨텍스트 제공",
+      "· settings.json에 정의된 CLI 동작 설정과 연계 가능",
+      "· GEMINI.md 작성 구조: 프로젝트 개요, 주요 의존성, 규칙, 기본 명령 등",
+      "· Gemini CLI는 세션 시작 시 자동으로 GEMINI.md를 읽어 컨텍스트 로드"
+    ],
+    "section_id": "10.1",
+    "chapter_intro": {
+      "title": "10.1 GEMINI.md 파일 관리하기",
+      "desc": "GEMINI.md 파일의 역할과 위치, 작성 방식을 학습한다. 프로젝트 루트와 서브폴더에서의 활용법, 기본 구조와 작성 팁을 다룬다."
+    }
+  },
+  {
+    "num": 241,
+    "topics": ["GEMINI.md 작성 팁", "문서 다듬기", "실전 대화 활용"],
+    "terms": ["GEMINI.md", "문서 다듬기", "컨텍스트 관리", "작업 요청"],
+    "summary": "· GEMINI.md 작성 시 프로젝트 개요, 주요 의존성, 규칙과 기본 명령, 주의 사항 등을 포함하면 효과적이다.<br>· 문서 다듬기 요청을 활용하여 GEMINI.md를 Gemini CLI에 최적화된 구조로 정리할 수 있다.<br>· 실전 대화에서 GEMINI.md를 활용하여 코드 리뷰, 테스트 수정, 일관된 대화 맥락 유지 등이 가능하다.<br>",
+    "points": [
+      "· GEMINI.md 작성 항목: 프로젝트 개요, 주요 의존성, 규칙, 주의 사항",
+      "· 10.1.3 GEMINI.md 작성 팁: 기본 문서부터 시작하여 점진적으로 개선",
+      "· 문서 다듬기: Gemini CLI에 GEMINI.md 검토 및 수정 요청 가능",
+      "· 사용자 검토 후 직접 수정하는 프로세스 권장",
+      "· 실전 대화에서 GEMINI.md를 활용한 일관된 맥락 유지"
+    ],
+    "section_id": "10.1"
+  },
+  {
+    "num": 242,
+    "topics": ["GEMINI.md 반영 상태", "컨텍스트 관리", "문서 변경"],
+    "terms": ["GEMINI.md 반영", "컨텍스트 전달", "문서 변경", "작업 검증"],
+    "summary": "· Gemini CLI에서 GEMINI.md가 변경된 시점에 어떻게 반영되는지를 설명하며, 작업 요청마다 GEMINI.md를 자동으로 참조한다.<br>· GEMINI.md 반영 여부를 작업 결과로 확인하는 방법과, 변경 후 검증 질문을 통해 올바르게 반영되었는지 점검하는 과정을 안내한다.<br>· 문서 변경 시 자동 제안을 기억하지 않는 특성이 있으므로 변경 사항은 직접 GEMINI.md에 기록해야 한다.<br>",
+    "points": [
+      "· GEMINI.md 변경 시 Gemini CLI는 자동으로 새 내용을 참조하여 반영",
+      "· 변경 후 검증: 질문을 통해 올바르게 반영되었는지 확인",
+      "· 자동 제안은 기억되지 않으므로 GEMINI.md에 직접 기록 필요",
+      "· 4가지 컨텍스트 추가 방법: 세션 내 설명, 파일 참조, @파일명, GEMINI.md 업데이트",
+      "· 문서 변경 시 이전 세션에서는 반영되지 않을 수 있으므로 재시작 권장"
+    ],
+    "section_id": "10.1"
+  },
+  {
+    "num": 243,
+    "topics": ["세션 관리", "/chat save", "세션 복원"],
+    "terms": ["/chat save", "/chat resume", "/chat list", "체크포인트"],
+    "summary": "· 10.2절에서는 세션 관리하기를 다루며, /chat save로 현재 대화·모델 설정·토큰 상태를 체크포인트 파일로 저장하는 방법을 설명한다.<br>· 10.2.2 세션 저장하고 복원하기에서는 /chat list로 목록을 확인하고, /chat resume으로 저장된 세션을 이어 작업하는 절차를 소개한다.<br>· 저장 경로는 Windows는 C:\\Users\\사용자명\\.gemini\\tmp\\프로젝트_해시, macOS/Linux는 ~/.gemini/tmp/프로젝트_해시이다.<br>",
+    "points": [
+      "· 10.2 세션 관리하기 시작",
+      "· /chat save <이름>: 대화·모델·설정·토큰을 체크포인트로 저장",
+      "· /chat list: 저장된 세션 목록 확인",
+      "· /chat resume <이름>: 저장된 세션 복원",
+      "· /chat rename으로 세션 이름 변경 가능"
+    ],
+    "section_id": "10.2",
+    "chapter_intro": {
+      "title": "10.2 세션 관리하기",
+      "desc": "Gemini CLI에서 세션을 저장하고 복원하는 방법을 학습한다. /chat save, /chat resume, /chat list 명령어를 사용하여 작업 흐름을 효율적으로 관리하는 전략을 다룬다."
+    }
+  },
+  {
+    "num": 244,
+    "topics": ["세션 삭제", "세션 공유", "실전 활용 시나리오"],
+    "terms": ["/chat delete", "/chat share", "/restore", "branching"],
+    "summary": "· /chat delete로 불필요한 세션을 삭제하고, /chat share로 세션 내용을 마크다운(.md) 또는 JSON(.json) 파일로 내보낼 수 있다.<br>· /restore 명령은 시스템 파일 복원에 사용하며, /chat resume(대화 맥락 복원)과 역할을 분리해 관리한다.<br>· 10.2.2 실전 활용 시나리오에서는 안전한 대규모 리팩터링, 여러 접근 방식 비교(A/B 테스트) 등을 제시한다.<br>",
+    "points": [
+      "· /chat delete <이름>: 불필요한 세션 삭제",
+      "· /chat share <이름>: 세션을 마크다운(.md) 또는 JSON(.json)으로 내보내기",
+      "· /restore: 시스템 파일 복원 명령, /chat resume과 분리 사용",
+      "· 시나리오 1: 코드 구조를 크게 변경할 때 /chat save로 안전한 분기점 생성 후 /restore로 회귀",
+      "· 시나리오 2: 여러 접근 방식을 비교해 최적 아키텍처 결정(branching 패턴)"
+    ],
+    "section_id": "10.2"
+  },
+  {
+    "num": 245,
+    "topics": ["세션 분기", "branching", "작업 비교"],
+    "terms": ["/chat save", "branching", "approach-readability", "approach-performance"],
+    "summary": "· /chat save를 활용한 branching 방식으로 두 세션을 비교해 최종 결정하는 실전 패턴을 보여준다.<br>· 이 방식은 AI와 함께 다양한 아키텍처를 실험할 때, 작업 내용이 섞이지 않도록 안전하게 분기하는 효과를 준다.<br>",
+    "points": [
+      "· /chat save approach-readability: 가독성 중심 접근 방식 세션 저장",
+      "· /chat save approach-performance: 성능 중심 접근 방식 세션 저장",
+      "· 두 세션을 비교해 최종 결정하는 A/B 테스트 패턴",
+      "· branching으로 작업 내용이 섞이지 않도록 안전한 분기 가능"
+    ],
+    "section_id": "10.2"
+  },
+  {
+    "num": 246,
+    "topics": ["사용자 정의 명령어", ".gemini/commands/", "TOML 형식"],
+    "terms": [".gemini/commands/", "사용자 정의 명령어", "TOML", "프로젝트 명령어"],
+    "summary": "· 10.3절에서는 사용자 정의 명령어 사용하기를 다루며, .gemini/commands/ 폴더에 명령어 파일을 저장하여 반복 작업을 자동화한다.<br>· 전역 명령어(~/.gemini/commands/)와 프로젝트 명령어(.gemini/commands/)로 구분되며, 프로젝트 명령어가 우선 적용된다.<br>· 사용자 정의 명령어 파일은 TOML 형식으로 작성하며, description, prompt, {{args}} 등의 요소로 구성된다.<br>",
+    "points": [
+      "· 10.3 사용자 정의 명령어 사용하기 시작",
+      "· 전역 명령어: ~/.gemini/commands/ 폴더에 저장",
+      "· 프로젝트 명령어: .gemini/commands/ 폴더에 저장, 전역보다 우선",
+      "· 파일 형식: TOML로 작성, description과 prompt 필수",
+      "· {{args}}로 사용자 입력을 동적으로 명령어에 전달 가능"
+    ],
+    "section_id": "10.3",
+    "chapter_intro": {
+      "title": "10.3 사용자 정의 명령어 사용하기",
+      "desc": "Gemini CLI에서 반복되는 작업을 자동화하기 위해 .gemini/commands/ 폴더에 사용자 정의 명령어를 작성하고 활용하는 방법을 학습한다."
+    }
+  },
+  {
+    "num": 247,
+    "topics": ["명령어 파일 작성", "TOML 구조", "{{args}} 활용"],
+    "terms": ["description", "prompt", "{{args}}", "review_file"],
+    "summary": "· 사용자 정의 명령어 파일의 TOML 구조를 상세히 설명하며, description은 /help에서 표시되고 prompt는 실행할 프롬프트 내용을 담는다.<br>· {{args}}를 사용하면 사용자가 명령어 뒤에 입력한 전체 텍스트나 인자를 프롬프트에 동적으로 치환할 수 있다.<br>· TOML 파일명은 실제 슬래시 명령어 이름이 되며, 하위 폴더 구조는 콜론(:) 네임스페이스로 변환된다(예: refactor/pure.toml → /refactor:pure).<br>",
+    "points": [
+      "· description: /help에서 명령어 설명 표시",
+      "· prompt: 실행할 프롬프트 내용, 줄바꿈과 마크다운 지원",
+      "· {{args}}: 사용자 입력을 동적으로 프롬프트에 삽입",
+      "· 파일명 = 명령어 이름, 하위 폴더는 콜론(:)으로 네임스페이스 구성",
+      "· 예시: review.toml → /review, refactor/pure.toml → /refactor:pure"
+    ],
+    "section_id": "10.3"
+  },
+  {
+    "num": 248,
+    "topics": ["인자형 프롬프트", "테스트 생성 명령어", "리팩터링 명령어 묶음"],
+    "terms": ["{{args}}", "/review", "/test", "네임스페이스"],
+    "summary": "· 인자형 기반 프롬프트({{args}}) 활용으로 파일 경로나 코드를 인자로 전달해 특정 맥락에 맞는 명령을 실행할 수 있다.<br>· 예시 2: 테스트 코드 생성 명령어 /test는 대상 코드를 입력받아 자동으로 테스트 케이스를 생성한다.<br>· 예시 3: 리팩터링 명령어 묶음은 하위 폴더(네임스페이스)로 관련 명령을 정리해 /refactor:pure, /refactor:extract처럼 호출한다.<br>",
+    "points": [
+      "· {{args}} 활용: 파일 경로·코드 블록을 인자로 전달하여 맞춤형 명령 실행",
+      "· /review: {{args}}로 받은 코드를 분석하는 리뷰 명령 예시",
+      "· /test: 대상 코드를 입력받아 자동으로 테스트 코드 생성",
+      "· 리팩터링 묶음: ~/.gemini/commands/refactor/pure.toml, extract.toml 등 하위 폴더 구성",
+      "· 네임스페이스로 /refactor:pure(순수 함수 추출), /refactor:extract 등 관련 명령 그룹화"
+    ],
+    "section_id": "10.3"
+  },
+  {
+    "num": 249,
+    "topics": ["명령어 문제 해결", "파일 확장자 확인", "명령 이름 충돌"],
+    "terms": ["TOML", "ParseError", "전역 명령어", "로컬 명령어"],
+    "summary": "· 함수 추출 명령어 예시(refactor/extract.toml → /refactor:extract)를 통해 폴더 구조가 콜론 네임스페이스로 변환되는 방식을 보여준다.<br>· 10.3.3 사용자 정의 명령어 문제 해결 가이드에서는 명령이 인식되지 않는 경우, 실행되지만 결과가 부정확한 경우의 해결책을 제시한다.<br>· 문제 1은 파일 확장자(.toml) 확인, 저장 경로(전역/로컬) 점검, CLI 재시작으로 대부분 해결된다.<br>",
+    "points": [
+      "· /refactor:extract 같은 네임스페이스 명령어는 하위 폴더로 구성",
+      "· /test:unit, /test:integration, /docs:api, /docs:readme 형식으로 그룹화 가능",
+      "· 문제 1: 명령어 인식 안됨 → 파일 확장자 .toml, 저장 경로, CLI 재시작 확인",
+      "· 저장 경로: 전역 ~/.gemini/commands/, 로컬 ./.gemini/commands/",
+      "· 문제 2: 실행은 되나 결과가 원치 않게 나옴 → prompt 내용과 TOML 작성 점검"
+    ],
+    "section_id": "10.3"
+  },
+  {
+    "num": 250,
+    "topics": ["TOML 문법", "명령 이름 충돌", "이름 규칙"],
+    "terms": ["TOML 문법", "ParseError", "전역/로컬 충돌", "명령어 이름 규칙"],
+    "summary": "· TOML 문법에서 prompt는 삼중 따옴표로 감싸야 하며, 줄바꿈 누락이나 공백 오류가 있으면 CLI가 파일을 읽지 못한다.<br>· 전역(~/.gemini/commands/)과 로컬(.gemini/commands/)에 동일한 이름의 명령이 존재할 수 있으며, 로컬이 우선 실행된다.<br>· 명령어 이름 규칙을 일관성 있게 관리하면 충돌을 최소화하고, 팀원 모두가 명령 이름만 보고도 기능을 이해할 수 있다.<br>",
+    "points": [
+      "· prompt = \"\"\" ... \"\"\" 형식으로 삼중 따옴표 필수",
+      "· ParseError, Invalid format 메시지는 대부분 TOML 문법 문제",
+      "· 전역 /test: Jest 테스트 생성 vs 로컬 /test: Pytest 기반 테스트 생성 등 충돌 가능",
+      "· 로컬 명령어가 우선 실행되므로 의도된 동작이면 문제 없음",
+      "· 명령어 이름 규칙을 일관성 있게 관리하여 팀 협업 효율 향상"
+    ],
+    "section_id": "10.3"
+  }
+]

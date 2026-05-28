@@ -1,0 +1,27 @@
+# OCR 캐시·검증 산출물 (재생성 가능, 용량 큼)
+**/ocr_text/
+**/verification_report.json
+**/verification_report.md
+
+# 원본 페이지 이미지 (저작권·용량)
+*.png
+*.jpg
+*.jpeg
+**/thumbs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 에디터·시스템
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# 로컬 임시
+/tmp/
+*.tmp
