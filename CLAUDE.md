@@ -339,3 +339,29 @@ DSM의 docker가 PATH 밖이라 `/usr/local/bin/docker` 절대경로 사용
 - README.md 새로 작성 (Phase A의 옛 README 대체)
 - sync 인증 (지금은 LAN 누구나 호출 가능, secret token 추가 가능)
 - 페이지 검색·다크 모드·즐겨찾기 등 정적 라이브러리 To-Do
+
+---
+
+### 2026-05-28: Phase B-2.1 — Tampermonkey + Userscript 설치 가이드 페이지
+
+**추가**
+- `install.html` — 별도 가이드 페이지 (14.5KB). 4단계 + 트러블슈팅 1섹션
+  - 번호 박스 디자인 (시안 배경 + 검정 테두리 + 3px 그림자 — 강한 시각 표식)
+  - 각 단계마다 캡처 슬롯 (`shot-placeholder` 점선 박스 + 줄무늬 배경)
+  - 단계 1: tampermonkey.net → Chrome Web Store 추가
+  - 단계 2: chrome://extensions/ 개발자 모드 ON
+  - 단계 3: Userscript URL 클릭 → Tampermonkey 자동 인식 → [설치] + `chrome-extension://...ask.html` 권한 허용
+  - 단계 4: 교보 e-Library 로그인 → 다크 패널 [동기화]
+- `install-img/` 폴더 + 캡처 받을 자리 안내 README (NAS에는 안 감)
+- 메인 페이지에 `📖 자세한 설치 가이드` 버튼 추가 (sync-card 안)
+- `.gitignore` 에 `!install-img/*.png` 예외 (캡처는 git 추적)
+- `.dockerignore` 에 `/install-img/README.md` 추가
+
+**사용자에게 받을 캡처 5장 (`install-img/0X-...png`)**
+1. tampermonkey.net 홈에서 본인 브라우저 아이콘 클릭 화면
+2. chrome://extensions/ 우상단 [개발자 모드] 토글
+3. Tampermonkey 자동 인식 → [설치] 버튼 화면
+4. `chrome-extension://...ask.html` 권한 요청 화면
+5. 교보 e-Library 페이지 우측 하단 다크 동기화 패널
+
+캡처에 ①②③ 번호 박스는 사용자가 미리 그려서 보내거나, 그대로 보내도 install.html 의 step-num 박스로 단계 식별 가능.

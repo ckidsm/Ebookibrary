@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>설치 가이드 · Tampermonkey + Userscript · Kyobo Library</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem 1rem;
+            color: #2d3748;
+        }
+
+        .container {
+            max-width: 880px;
+            margin: 0 auto;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            color: white;
+        }
+        .topbar a {
+            color: white;
+            opacity: 0.85;
+            text-decoration: none;
+            font-size: 0.92rem;
+        }
+        .topbar a:hover { opacity: 1; text-decoration: underline; }
+
+        h1 {
+            color: white;
+            font-size: 2.1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            margin-bottom: 0.4rem;
+        }
+        .subtitle {
+            color: rgba(255,255,255,0.9);
+            font-size: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.75rem 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+            margin-bottom: 1.25rem;
+        }
+
+        .step-head {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+            margin-bottom: 0.9rem;
+        }
+
+        /* 번호 네모 — 강한 시각 표식 */
+        .step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            background: #22d3ee;
+            color: #0a0c10;
+            font-weight: 800;
+            font-size: 1.1rem;
+            border: 2px solid #0a0c10;
+            border-radius: 6px;
+            font-family: 'IBM Plex Mono', ui-monospace, monospace;
+            box-shadow: 3px 3px 0 #0a0c10;
+            flex-shrink: 0;
+        }
+
+        .step-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #1a202c;
+            line-height: 1.3;
+        }
+
+        .step-body {
+            font-size: 0.96rem;
+            line-height: 1.7;
+            color: #4a5568;
+            padding-left: calc(38px + 0.9rem);
+        }
+        .step-body ul, .step-body ol { padding-left: 1.2rem; margin: 0.4rem 0; }
+        .step-body li { margin-bottom: 0.3rem; }
+        .step-body code {
+            background: #f1f5f9;
+            color: #1e293b;
+            padding: 0.1rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.88em;
+            word-break: break-all;
+        }
+        .step-body a {
+            color: #4f46e5;
+            font-weight: 600;
+        }
+        .step-body strong { color: #1a202c; }
+
+        .callout {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 0.7rem 1rem;
+            border-radius: 4px;
+            margin: 0.8rem 0;
+            font-size: 0.9rem;
+            color: #78350f;
+        }
+        .callout.is-info {
+            background: #dbeafe;
+            border-color: #3b82f6;
+            color: #1e3a8a;
+        }
+        .callout.is-ok {
+            background: #d1fae5;
+            border-color: #10b981;
+            color: #064e3b;
+        }
+
+        /* 스크린샷 슬롯 */
+        .shot {
+            margin: 1rem 0 0;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            position: relative;
+        }
+        .shot img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+        .shot-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 180px;
+            color: #94a3b8;
+            font-size: 0.86rem;
+            text-align: center;
+            padding: 1.5rem;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            background: repeating-linear-gradient(
+                45deg,
+                #f8fafc, #f8fafc 8px,
+                #f1f5f9 8px, #f1f5f9 16px
+            );
+        }
+        .shot-placeholder .ph-icon {
+            font-size: 1.8rem;
+            margin-bottom: 0.4rem;
+            opacity: 0.5;
+        }
+        .shot-placeholder code {
+            background: rgba(0,0,0,0.06);
+            padding: 0.1rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+
+        .keys {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
+        }
+        kbd {
+            display: inline-block;
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 0.1rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.82em;
+            font-family: 'IBM Plex Mono', ui-monospace, monospace;
+            box-shadow: 1px 1px 0 #0f172a;
+            border-bottom: 2px solid #0f172a;
+        }
+
+        .footer {
+            text-align: center;
+            color: rgba(255,255,255,0.75);
+            font-size: 0.85rem;
+            margin-top: 2rem;
+        }
+
+        @media (max-width: 640px) {
+            h1 { font-size: 1.6rem; }
+            .step-body { padding-left: 0; margin-top: 0.6rem; }
+            .card { padding: 1.25rem 1.1rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="topbar">
+        <a href="./">← 홈으로</a>
+        <a href="userscript/sync-kyobo-library.user.js" target="_blank">📜 Userscript URL</a>
+    </div>
+
+    <h1>📚 설치 가이드</h1>
+    <p class="subtitle">Tampermonkey 확장 + 교보 e-Library 동기화 Userscript 설치 — 한 번이면 끝.</p>
+
+    <!-- 사전 안내 -->
+    <div class="card">
+        <p style="font-size: 0.95rem; color:#4a5568; line-height:1.7;">
+            교보문고 사이트는 SPA(Single Page App)라 일반적인 백엔드 자동 로그인이 어렵습니다.
+            대신 본인 브라우저의 로그인 세션을 그대로 활용하는 <strong>Tampermonkey 확장 + Userscript</strong>
+            방식을 사용합니다. 처음 한 번만 설치하면 이후로는 클릭 한 번으로 동기화 가능합니다.
+        </p>
+        <div class="callout is-info">
+            <strong>지원 브라우저</strong>: Chrome, Edge, Safari (각각 Tampermonkey 공식 지원).
+            Firefox는 Greasemonkey가 일반적이지만 Tampermonkey도 가능합니다.
+        </div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="card">
+        <div class="step-head">
+            <span class="step-num">1</span>
+            <span class="step-title">Tampermonkey 확장 설치</span>
+        </div>
+        <div class="step-body">
+            <ol>
+                <li><a href="https://www.tampermonkey.net/" target="_blank" rel="noopener noreferrer">tampermonkey.net</a> 접속</li>
+                <li>본인 브라우저 아이콘(예: <strong>Chrome</strong>) 클릭 → Chrome Web Store 이동</li>
+                <li><strong>[Chrome에 추가]</strong> 버튼 → 권한 확인 팝업의 <strong>[확장 프로그램 추가]</strong> 클릭</li>
+                <li>브라우저 우상단 퍼즐 조각 아이콘에서 Tampermonkey 검은 아이콘 보이면 설치 완료</li>
+            </ol>
+            <div class="shot">
+                <div class="shot-placeholder">
+                    <div class="ph-icon">📷</div>
+                    <div>스크린샷 자리 — <code>install-img/01-tampermonkey-net.png</code></div>
+                    <div style="margin-top:0.4rem;font-size:0.78rem;">tampermonkey.net 홈에서 브라우저 아이콘 클릭 화면</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="card">
+        <div class="step-head">
+            <span class="step-num">2</span>
+            <span class="step-title">개발자 모드 켜기 (한 번만)</span>
+        </div>
+        <div class="step-body">
+            <p>Tampermonkey가 외부 URL의 Userscript를 설치하려면 Chrome의 개발자 모드가 필요합니다.</p>
+            <ol>
+                <li>주소창에 <code>chrome://extensions/</code> 입력 → Enter</li>
+                <li>우상단 <strong>[개발자 모드]</strong> 토글 켜기</li>
+            </ol>
+            <div class="callout">
+                Edge는 <code>edge://extensions/</code>, 좌측 하단 [개발자 모드] 토글입니다.
+            </div>
+            <div class="shot">
+                <div class="shot-placeholder">
+                    <div class="ph-icon">📷</div>
+                    <div>스크린샷 자리 — <code>install-img/02-dev-mode.png</code></div>
+                    <div style="margin-top:0.4rem;font-size:0.78rem;">chrome://extensions/ 화면 우상단 [개발자 모드] 토글</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="card">
+        <div class="step-head">
+            <span class="step-num">3</span>
+            <span class="step-title">Userscript 설치</span>
+        </div>
+        <div class="step-body">
+            <p>아래 링크를 새 탭에서 열면 Tampermonkey가 자동으로 인식해 설치 페이지를 띄웁니다.</p>
+            <p style="margin: 0.6rem 0;">
+                <a href="userscript/sync-kyobo-library.user.js" target="_blank" rel="noopener noreferrer"
+                   style="display:inline-block;background:#22d3ee;color:#0a0c10;padding:0.5rem 1rem;border-radius:6px;font-weight:700;text-decoration:none;">
+                    📜 sync-kyobo-library.user.js 설치
+                </a>
+            </p>
+            <ol>
+                <li>위 버튼 클릭 → Tampermonkey 설치 화면 자동 표시</li>
+                <li>좌상단 <strong>[설치]</strong> 버튼 클릭</li>
+                <li>설치 완료 후 탭 자동 닫힘</li>
+            </ol>
+            <div class="callout">
+                만약 권한 요청 페이지(<code>chrome-extension://...ask.html?aid=...</code>)가 뜨면
+                <strong>[항상 허용]</strong> 또는 <strong>[허용]</strong> 클릭.
+            </div>
+            <div class="shot">
+                <div class="shot-placeholder">
+                    <div class="ph-icon">📷</div>
+                    <div>스크린샷 자리 — <code>install-img/03-userscript-install.png</code></div>
+                    <div style="margin-top:0.4rem;font-size:0.78rem;">Tampermonkey 설치 화면 [설치] 버튼</div>
+                </div>
+            </div>
+            <div class="shot">
+                <div class="shot-placeholder">
+                    <div class="ph-icon">📷</div>
+                    <div>스크린샷 자리 — <code>install-img/04-permission-ask.png</code></div>
+                    <div style="margin-top:0.4rem;font-size:0.78rem;">chrome-extension://...ask.html (권한 요청) 화면</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="card">
+        <div class="step-head">
+            <span class="step-num">4</span>
+            <span class="step-title">교보 e-Library 로그인 + 동기화</span>
+        </div>
+        <div class="step-body">
+            <ol>
+                <li><a href="./">홈</a>으로 돌아가 <strong>[📖 내 e-Library]</strong> 카드 클릭 → 새 탭에서 교보 로그인</li>
+                <li>로그인 완료 후 도서함 페이지가 보이면 우측 하단에 <strong>📚 NAS Sync</strong> 다크 패널 자동 등장</li>
+                <li><strong>[미리보기]</strong> 클릭 → <span class="keys"><kbd>F12</kbd></span> → Console 탭에서 추출된 도서 확인</li>
+                <li>잘 추출됐으면 <strong>[동기화]</strong> 클릭 → "신규 N건 · 갱신 M건" 메시지 표시</li>
+                <li>홈으로 돌아와 새로고침 — <strong>[내 e-Library 도서함]</strong> 섹션에 카드 등장 ✨</li>
+            </ol>
+            <div class="callout is-ok">
+                <strong>한 번 설치하면 끝</strong>입니다. 이후로는 도서함 페이지 방문 → [동기화] 클릭으로 최신화.
+            </div>
+            <div class="shot">
+                <div class="shot-placeholder">
+                    <div class="ph-icon">📷</div>
+                    <div>스크린샷 자리 — <code>install-img/05-sync-panel.png</code></div>
+                    <div style="margin-top:0.4rem;font-size:0.78rem;">교보 e-Library 페이지 우측 하단 동기화 패널</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 트러블슈팅 -->
+    <div class="card">
+        <div class="step-head">
+            <span class="step-num">!</span>
+            <span class="step-title">잘 안 될 때</span>
+        </div>
+        <div class="step-body">
+            <ul>
+                <li><strong>다크 패널이 안 보임</strong> — 페이지 로드 완전히 끝나길 기다리고 새로고침.
+                    Tampermonkey 우상단 아이콘 클릭해서 스크립트가 "활성화됨" 인지 확인.</li>
+                <li><strong>⚠ 카드 추출 실패</strong> 메시지 — 교보 페이지 DOM 구조 차이.
+                    <span class="keys"><kbd>F12</kbd></span> → Console 의 <code>[NVK] 진단용</code> 로그 캡처 후
+                    개발자에게 알려주면 셀렉터 보정 가능.</li>
+                <li><strong>✗ 네트워크 오류</strong> — NAS Kyobo Bridge(9000) 컨테이너 다운.
+                    <code>http://192.168.10.205:9000/health</code> 직접 호출해 응답 확인.</li>
+                <li><strong>로그인이 자꾸 풀림</strong> — 교보 세션 만료. 다시 로그인 후 [동기화] 재시도.</li>
+            </ul>
+        </div>
+    </div>
+
+    <p class="footer">
+        Kyobo Library · 설치 가이드 v1 · <a href="./" style="color:white;">← 메인으로</a>
+    </p>
+</div>
+</body>
+</html>

@@ -17,6 +17,7 @@
 
 # 설계·기획 문서 (NAS에 안 보냄)
 /docs/
+/install-img/README.md
 
 # 백엔드는 별도 컨테이너로 빌드·배포 — 정적 rsync에는 안 보냄
 /kyobo-bridge/

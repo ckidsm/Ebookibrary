@@ -9,6 +9,10 @@
 *.jpeg
 **/thumbs/
 
+# 단, 설치 가이드 캡처는 git에 포함
+!install-img/*.png
+!install-img/*.jpg
+
 # Python
 __pycache__/
 *.py[cod]
