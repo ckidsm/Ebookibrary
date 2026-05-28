@@ -93,6 +93,39 @@ def get_books() -> dict:
     return {"books": list_books(), "version": __version__}
 
 
+# Phase C-4: 분석 완료된 도서(슬러그) 목록 — 정적 라이브러리 폴더 스캔
+import os as _os
+from pathlib import Path as _Path
+
+@app.get("/api/books/analyzed")
+def list_analyzed_books() -> dict:
+    """books/<slug>/summary/index.html 이 존재하는 슬러그 반환.
+    프론트가 카드 클릭 시 분석 상태 판정에 사용."""
+    root = _Path(_os.environ.get("LIBRARY_BOOKS_DIR", "/mnt/library/books"))
+    out: list[dict] = []
+    if not root.exists():
+        return {"analyzed": [], "books_dir": str(root), "exists": False}
+    for d in sorted(root.iterdir()):
+        if not d.is_dir(): continue
+        index = d / "summary" / "index.html"
+        if index.exists():
+            try:
+                pages = 0
+                pages_data = d / "summary" / "pages_data.json"
+                if pages_data.exists():
+                    import json as _j
+                    pd = _j.loads(pages_data.read_text(encoding="utf-8"))
+                    pages = len(pd.get("pages", []))
+            except Exception:
+                pages = 0
+            out.append({
+                "slug": d.name,
+                "pages": pages,
+                "url": f"books/{d.name}/summary/index.html",
+            })
+    return {"analyzed": out, "books_dir": str(root), "exists": True}
+
+
 @app.delete("/api/library/books", status_code=200)
 def reset_books() -> dict:
     removed = clear_books()

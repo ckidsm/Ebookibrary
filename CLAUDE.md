@@ -531,6 +531,48 @@ python -m bookcapture build    --slug "그림으로 이해하는 알고리즘"
 
 ---
 
+### 2026-05-29: Phase C-4 — 도서 카드 클릭 모달 + 분석 상태 배지
+
+**추가/수정**
+- `docker-compose.yml` — kyobo-bridge 에 `/volume1/docker/web-apps/kyobo-library:/mnt/library:ro` 마운트, `LIBRARY_BOOKS_DIR=/mnt/library/books` 환경변수 추가
+- `kyobo-bridge/app/main.py` — `GET /api/books/analyzed` 추가
+  - `<LIBRARY_BOOKS_DIR>/<slug>/summary/index.html` 존재 폴더 스캔
+  - `pages_data.json` 있으면 페이지 수도 응답에 포함
+  - `[{slug, pages, url}]` 배열 반환
+- `index.html` — 도서 카드 + 모달 전면 개편
+  - 카드: `<a>` → `<div>` (클릭 시 모달), 우상단 분석 상태 배지(`✓ 분석됨` / `미분석`)
+  - 모달: 표지 + 슬러그 + 메타 + 3버튼 (`📊 분석 시작` / `📖 보기` / `↗ 원본`)
+  - `📖 보기`는 분석 완료 시만 활성, 클릭 시 `books/<slug>/summary/index.html` 새 탭
+  - `📊 분석 시작` 누르면 CLI 명령 박스 표시 (복사 버튼 포함) — Phase C-3 Part3 백엔드 큐 완성 전 임시 UX
+  - `slugify(title)` — 선행 `[epub3.0]` prefix 제거 + 공백→_
+- 카드 카운트 라벨: `280권 · 분석 N권` 로 갱신
+
+**검증**
+- 컨테이너 마운트: `/mnt/library/books/` 에 `CLI_완전활용` 폴더 인식
+- `GET /api/books/analyzed` → `{ analyzed: [{slug:"CLI_완전활용", pages:185, url:"books/CLI_완전활용/summary/index.html"}], ... }`
+- 메인 페이지 JS·CSS 모두 정상 (kyobo-badge, bmodal-bd, openBookModal, slugify, loadAnalyzed 모두 마크업에 포함)
+
+**사용자 흐름 (브라우저)**
+1. 카드에 호버 → 우상단 `미분석` 또는 `✓ 분석됨` 배지
+2. 카드 클릭 → 다크 모달
+3. 슬러그 자동 표시 (예: `IT_엔지니어를_위한_네트워크_입문`) — 복사 가능
+4. **[📊 분석 시작]** 클릭 → CLI 명령 박스 등장:
+   ```
+   cd KyoboLibrary/book-capture && python -m bookcapture run --slug "IT_엔지니어를_위한_네트워크_입문" --mode 3
+   ```
+5. 사용자가 터미널에서 실행 → 결과는 Mac 로컬 `book-capture/books/<slug>/` 에 생성
+6. NAS 반영: `./deploy.sh --static` → 메인 새로고침 → 배지 `✓ 분석됨` 으로 변경 → **[📖 보기]** 활성
+
+**Phase C 진행 상황**
+- ✅ C-1: 톱니바퀴 + 설정 모달 + `/api/settings`
+- ✅ C-2: book-capture 패키지 + 기존 캡처 이식
+- ✅ C-3 Part1: AI 요약(`summarize.py`) + `/api/secrets/ai`
+- ✅ C-3 Part2: merge + build_html 본격 (사이드바·페이지 카드·scroll spy)
+- ✅ **C-4: 도서 카드 모달 + 분석 상태 배지**
+- ⏳ C-3 Part3 (선택): 백엔드 `/api/jobs` 큐 + `worker.py` polling — 현재는 CLI 직접 호출. 자동 트리거 원하면 추가
+
+---
+
 ### 2026-05-28: Phase B-2.1 — Tampermonkey + Userscript 설치 가이드 페이지
 
 **추가**

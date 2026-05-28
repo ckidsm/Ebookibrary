@@ -25,9 +25,12 @@ services:
       - "9000:8000"
     volumes:
       - /volume1/docker/web-apps/kyobo-bridge/data:/data
+      # 정적 라이브러리 폴더 read-only 마운트 — /api/books/analyzed 스캔용
+      - /volume1/docker/web-apps/kyobo-library:/mnt/library:ro
     environment:
       TZ: Asia/Seoul
       KYOBO_BRIDGE_DB: /data/library.db
+      LIBRARY_BOOKS_DIR: /mnt/library/books
     # 헬스체크는 이미지 안에도 있지만 compose에도 명시 (재시작 트리거)
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]

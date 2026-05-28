@@ -416,6 +416,178 @@
             font-size: 0.95rem;
         }
 
+        /* ── Phase C-4: 분석 상태 배지 + 카드 클릭 모달 ── */
+        .kyobo-card { position: relative; cursor: pointer; }
+        .kyobo-badge {
+            position: absolute;
+            top: 0.55rem; right: 0.55rem;
+            padding: 0.18rem 0.55rem;
+            border-radius: 12px;
+            font-size: 0.66rem;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .kyobo-badge.is-analyzed {
+            background: rgba(16, 185, 129, 0.92);
+            color: white;
+        }
+        .kyobo-badge.is-none {
+            background: rgba(0, 0, 0, 0.45);
+            color: rgba(255,255,255,0.85);
+        }
+
+        /* 도서 분석 모달 */
+        .bmodal-bd {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 920;
+            display: none;
+        }
+        .bmodal-bd.open { display: block; }
+        .bmodal {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(620px, 94vw);
+            background: #11151c;
+            color: #e6ecf2;
+            border: 1px solid #2f3a4d;
+            border-radius: 12px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.65);
+            z-index: 921;
+            display: none;
+            overflow: hidden;
+            font-size: 14px;
+        }
+        .bmodal.open { display: block; }
+        .bmodal-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 18px;
+            border-bottom: 1px solid #2f3a4d;
+            background: #161b24;
+        }
+        .bmodal-head h2 { font-size: 1rem; margin: 0; color: #22d3ee; font-weight: 600; }
+        .bmodal-close {
+            cursor: pointer; opacity: 0.6; font-size: 20px;
+            background: transparent; border: 0; color: white;
+        }
+        .bmodal-body { padding: 18px 22px; }
+        .bmodal-cover {
+            float: left;
+            width: 110px; height: 165px;
+            object-fit: cover;
+            margin: 0 18px 12px 0;
+            border-radius: 6px;
+            background: #1c2230;
+        }
+        .bmodal-cover-ph {
+            float: left;
+            width: 110px; height: 165px;
+            margin: 0 18px 12px 0;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #1c2230, #11151c);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem;
+        }
+        .bmodal-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; line-height: 1.4; }
+        .bmodal-author { font-size: 0.85rem; color: #8b96a8; margin-bottom: 12px; }
+        .bmodal-meta {
+            font-family: 'IBM Plex Mono', ui-monospace, monospace;
+            font-size: 0.78rem;
+            color: #8b96a8;
+            margin-bottom: 14px;
+            line-height: 1.7;
+        }
+        .bmodal-meta code {
+            background: #0a0c10;
+            color: #22d3ee;
+            padding: 0.1rem 0.5rem;
+            border-radius: 4px;
+            word-break: break-all;
+        }
+        .bmodal-status {
+            display: inline-block;
+            padding: 0.25rem 0.7rem;
+            border-radius: 4px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        .bmodal-status.is-analyzed { background: rgba(16,185,129,0.18); color: #6ee7b7; border: 1px solid #10b981; }
+        .bmodal-status.is-none { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid #f59e0b; }
+
+        .bmodal-foot {
+            display: flex; flex-wrap: wrap; gap: 8px;
+            padding: 14px 18px;
+            background: #0e1218;
+            border-top: 1px solid #2f3a4d;
+            clear: both;
+        }
+        .bmodal-foot .bbtn {
+            flex: 1;
+            min-width: 130px;
+            padding: 9px 12px;
+            border-radius: 6px;
+            border: 1px solid #2f3a4d;
+            background: #1c2230;
+            color: #e6ecf2;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+            text-align: center;
+            transition: border-color 0.12s, color 0.12s, background 0.12s;
+        }
+        .bbtn:hover { border-color: #22d3ee; color: #22d3ee; }
+        .bbtn.is-primary {
+            background: rgba(34,211,238,0.18);
+            border-color: #22d3ee;
+            color: #22d3ee;
+        }
+        .bbtn.is-go {
+            background: rgba(16,185,129,0.2);
+            border-color: #10b981;
+            color: #6ee7b7;
+        }
+        .bbtn.is-go:hover { background: rgba(16,185,129,0.3); }
+        .bbtn[disabled] {
+            opacity: 0.45;
+            cursor: not-allowed;
+            border-color: #2f3a4d !important;
+            color: #6b7382 !important;
+        }
+
+        /* CLI 명령 박스 (분석 시작 모달) */
+        .cmd-box {
+            display: flex; align-items: center; gap: 8px;
+            background: #0a0c10;
+            border: 1px solid #2f3a4d;
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-top: 8px;
+        }
+        .cmd-box code {
+            flex: 1;
+            color: #22d3ee;
+            font-family: 'IBM Plex Mono', ui-monospace, monospace;
+            font-size: 0.78rem;
+            word-break: break-all;
+            user-select: all;
+        }
+        .cmd-box button {
+            padding: 4px 10px;
+            background: #1c2230;
+            border: 1px solid #2f3a4d;
+            color: #e6ecf2;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+        .cmd-box button:hover { border-color: #22d3ee; color: #22d3ee; }
+
         @media (max-width: 768px) {
             .books-grid,
             .quick-grid,
@@ -502,6 +674,17 @@
             <div class="kyobo-empty">백엔드를 확인하는 중...</div>
         </section>
 
+        <!-- 도서 분석 모달 -->
+        <div class="bmodal-bd" id="bmodal-bd"></div>
+        <div class="bmodal" id="bmodal">
+            <div class="bmodal-head">
+                <h2>📚 도서 분석</h2>
+                <button class="bmodal-close" id="bmodal-close">×</button>
+            </div>
+            <div class="bmodal-body" id="bmodal-body"></div>
+            <div class="bmodal-foot" id="bmodal-foot"></div>
+        </div>
+
         <div class="section-label">내 도서 라이브러리</div>
         <div id="books-container" class="books-grid">
             <div class="loading">도서 목록을 불러오는 중...</div>
@@ -567,10 +750,37 @@
             }
         }
 
+        // ── Phase C-4: slugify + 분석 상태 캐시 + 카드 클릭 모달 ──
+        let _kyoboBooks = [];          // 동기화된 책 목록
+        let _analyzedMap = new Map();  // slug → {pages, url}
+
+        function slugify(title) {
+            // book-capture 폴더명 규칙과 일치 (공백→_, prefix [..] 제거, 양끝 trim)
+            return String(title || '')
+                .replace(/^\s*\[[^\]]+\]\s*/, '')   // 선행 [epub3.0] 같은 prefix
+                .trim()
+                .replace(/\s+/g, '_');
+        }
+
+        async function loadAnalyzed() {
+            try {
+                const r = await fetch(`${BRIDGE_URL}/api/books/analyzed`, { cache: 'no-store' });
+                if (!r.ok) return;
+                const j = await r.json();
+                _analyzedMap = new Map((j.analyzed || []).map(a => [a.slug, a]));
+            } catch (e) {
+                console.warn('analyzed fetch fail:', e);
+            }
+        }
+
         function renderKyoboBooks(list) {
+            _kyoboBooks = list;
             const container = document.getElementById('kyobo-books-container');
             const countEl = document.getElementById('kyobo-count');
-            countEl.textContent = list.length ? `(${list.length}권)` : '';
+            const doneCount = list.filter(b => _analyzedMap.has(slugify(b.title))).length;
+            countEl.textContent = list.length
+                ? `(${list.length}권 · 분석 ${doneCount}권)`
+                : '';
 
             if (list.length === 0) {
                 container.innerHTML = `
@@ -581,25 +791,38 @@
                 return;
             }
 
-            container.innerHTML = list.map(b => {
-                const link = (b.meta_json && tryParseJson(b.meta_json)?.link)
-                          || (b.kyobo_id ? `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(b.title)}` : '#');
+            container.innerHTML = list.map((b, idx) => {
+                const slug = slugify(b.title);
+                const isDone = _analyzedMap.has(slug);
                 const cover = b.cover_url
                     ? `<img class="kyobo-cover" src="${escapeAttr(b.cover_url)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;kyobo-cover-placeholder&quot;>📕</div>'">`
                     : `<div class="kyobo-cover-placeholder">📘</div>`;
+                const badge = isDone
+                    ? `<span class="kyobo-badge is-analyzed">✓ 분석됨</span>`
+                    : `<span class="kyobo-badge is-none">미분석</span>`;
                 return `
-                    <a href="${escapeAttr(link)}" target="_blank" rel="noopener noreferrer" class="kyobo-card">
+                    <div class="kyobo-card" data-idx="${idx}" title="${escapeAttr(b.title)} · 클릭하여 분석 메뉴">
+                        ${badge}
                         ${cover}
-                        <div class="kyobo-title" title="${escapeAttr(b.title)}">${escapeHtml(b.title)}</div>
+                        <div class="kyobo-title">${escapeHtml(b.title)}</div>
                         <div class="kyobo-author">${escapeHtml(b.author || '저자 미상')}</div>
                         ${b.synced_at ? `<div class="kyobo-meta">sync ${b.synced_at.slice(0,16).replace('T',' ')}</div>` : ''}
-                    </a>
+                    </div>
                 `;
             }).join('');
+
+            // 클릭 위임
+            container.querySelectorAll('.kyobo-card').forEach(el => {
+                el.addEventListener('click', () => {
+                    const idx = +el.dataset.idx;
+                    openBookModal(_kyoboBooks[idx]);
+                });
+            });
         }
 
         async function loadKyoboBooks() {
             try {
+                await loadAnalyzed();
                 const r = await fetch(`${BRIDGE_URL}/api/library/books`, { cache: 'no-store' });
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 const j = await r.json();
@@ -608,6 +831,77 @@
                 document.getElementById('kyobo-books-container').innerHTML =
                     `<div class="kyobo-empty">백엔드에 도달할 수 없어 도서함을 불러오지 못했습니다.<br><small>${escapeHtml(String(e))}</small></div>`;
             }
+        }
+
+        // ── 도서 분석 모달 ──
+        function openBookModal(book) {
+            if (!book) return;
+            const slug = slugify(book.title);
+            const analyzed = _analyzedMap.get(slug);
+            const origLink = (book.meta_json && tryParseJson(book.meta_json)?.link)
+                          || (book.kyobo_id ? `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.title)}` : '');
+
+            const cover = book.cover_url
+                ? `<img class="bmodal-cover" src="${escapeAttr(book.cover_url)}" alt="" onerror="this.outerHTML='<div class=&quot;bmodal-cover-ph&quot;>📕</div>'">`
+                : `<div class="bmodal-cover-ph">📘</div>`;
+
+            const statusHtml = analyzed
+                ? `<span class="bmodal-status is-analyzed">✓ 분석 완료 · ${analyzed.pages}페이지</span>`
+                : `<span class="bmodal-status is-none">⏳ 미분석</span>`;
+
+            document.getElementById('bmodal-body').innerHTML = `
+                ${cover}
+                <div class="bmodal-title">${escapeHtml(book.title)}</div>
+                <div class="bmodal-author">${escapeHtml(book.author || '저자 미상')}${book.publisher ? ' · ' + escapeHtml(book.publisher) : ''}</div>
+                ${statusHtml}
+                <div class="bmodal-meta">
+                    slug: <code>${escapeHtml(slug)}</code><br>
+                    ${book.kyobo_id ? `kyobo_id: <code>${escapeHtml(book.kyobo_id)}</code><br>` : ''}
+                    sync: ${book.synced_at || '-'}
+                </div>
+                <div id="bmodal-extra"></div>
+            `;
+
+            const goUrl = analyzed ? analyzed.url : null;
+            document.getElementById('bmodal-foot').innerHTML = `
+                <button class="bbtn is-primary" id="bb-analyze">${analyzed ? '📊 다시 분석' : '📊 분석 시작'}</button>
+                ${goUrl
+                    ? `<a class="bbtn is-go" href="${escapeAttr(goUrl)}" target="_blank" rel="noopener noreferrer">📖 보기</a>`
+                    : `<button class="bbtn" disabled title="분석 완료 후 활성화">📖 보기</button>`
+                }
+                ${origLink
+                    ? `<a class="bbtn" href="${escapeAttr(origLink)}" target="_blank" rel="noopener noreferrer">↗ 원본</a>`
+                    : ''
+                }
+            `;
+
+            document.getElementById('bb-analyze').onclick = () => showAnalyzeCmd(book, slug);
+            document.getElementById('bmodal-bd').classList.add('open');
+            document.getElementById('bmodal').classList.add('open');
+        }
+
+        function closeBookModal() {
+            document.getElementById('bmodal-bd').classList.remove('open');
+            document.getElementById('bmodal').classList.remove('open');
+        }
+
+        function showAnalyzeCmd(book, slug) {
+            // Phase C-4 단계: 백엔드 큐(C-3 Part3) 없으니 CLI 명령 안내
+            const cmd = `cd KyoboLibrary/book-capture && python -m bookcapture run --slug "${slug}" --mode 3`;
+            const extra = document.getElementById('bmodal-extra');
+            extra.innerHTML = `
+                <div style="margin-top:14px;padding:12px;background:rgba(245,158,11,0.1);border:1px solid #f59e0b;border-radius:6px;color:#fbbf24;font-size:0.82rem;line-height:1.6;">
+                    ⓘ <strong>현재 분석은 사용자 Mac에서 직접 실행</strong> (백엔드 자동 큐는 Phase C-3 Part3 예정).<br>
+                    아래 명령을 터미널에서 실행하면 캡처 → OCR → AI 요약 → HTML 빌드까지 진행됩니다.
+                </div>
+                <div class="cmd-box">
+                    <code id="cmd-text">${escapeHtml(cmd)}</code>
+                    <button onclick="navigator.clipboard.writeText(document.getElementById('cmd-text').textContent).then(()=>this.textContent='✓ 복사됨');">복사</button>
+                </div>
+                <div style="margin-top:8px;font-size:0.74rem;color:#8b96a8;font-family:monospace;">
+                    완료 후 NAS 배포: <code style="color:#22d3ee;">cd ../ && ./deploy.sh --static</code> → 새로고침
+                </div>
+            `;
         }
 
         function tryParseJson(s) {
@@ -790,8 +1084,13 @@
             document.getElementById('smodal-cancel').onclick = closeSettings;
             document.getElementById('smodal-bd').onclick = closeSettings;
             document.getElementById('smodal-save').onclick = saveSettings;
+
+            // 도서 분석 모달 (C-4)
+            document.getElementById('bmodal-close').onclick = closeBookModal;
+            document.getElementById('bmodal-bd').onclick = closeBookModal;
+
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') closeSettings();
+                if (e.key === 'Escape') { closeSettings(); closeBookModal(); }
             });
         });
     </script>
