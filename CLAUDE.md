@@ -303,3 +303,39 @@ DSM의 docker가 PATH 밖이라 `/usr/local/bin/docker` 절대경로 사용
 - `POST /api/library/sync` → 저장된 세션으로 e-Library 도서 메타 페이지 가져와 파싱·SQLite 적재
 - `GET /api/library/books` 가 sync된 책 반환
 - 메인 페이지에 도서함 뷰 추가 (정적 라이브러리 + sync된 e-Library 둘 다 표시)
+
+---
+
+### 2026-05-28: Phase B-2 — sync receiver + Userscript + 도서함 뷰
+
+**큰 결정 변경 (분석 후)**
+- 교보의 두 페이지(`mmbr.kyobobook.co.kr/login`, `elibrary.kyobobook.co.kr`) 모두 **SPA**.
+  HTML 정적 분석에서 `<form>`·`<input type="password">`·로그인 endpoint 모두 발견 불가.
+- 백엔드 자동 로그인 프록시(원래 옵션 C 본격)는 JS 번들 reverse engineering 없이는 불가능.
+- 변경된 접근: **Userscript(옵션 B)를 주축**으로 진행. cURL 캡처가 있으면 향후 프록시 추가.
+
+**추가/수정된 파일**
+- `kyobo-bridge/app/db.py` — `upsert_books()`/`clear_books()` 추가. kyobo_id 우선 / 없으면 (title,author) 키로 upsert. 미정의 필드는 `meta_json` 으로 보존.
+- `kyobo-bridge/app/main.py` — `/api/library/sync` 활성화(pydantic 모델), `/api/library/books DELETE` 추가, CORS에 교보 도메인 포함, `/api/auth/kyobo/login` 은 SPA 안내 메시지로 501.
+- `userscript/sync-kyobo-library.user.js` (신규) — Tampermonkey Userscript. `elibrary.kyobobook.co.kr` 페이지에 우측 하단 floating 패널 주입 → [미리보기]/[동기화] 버튼 → `GM_xmlhttpRequest` 로 9000으로 POST. 셀렉터 후보 8종 자동 시도 + 가장 많이 매치되는 것 선택.
+- `index.html` — `📥 내 e-Library 동기화` 안내 카드 + `내 e-Library 도서함` 섹션. 페이지 로드 시 백엔드 `/health` + `/api/library/books` 자동 호출. 표지 깨지면 placeholder.
+
+**검증 (end-to-end)**
+- ✅ `http://192.168.10.205:8080/userscript/sync-kyobo-library.user.js` — 10KB, MIME `application/javascript` (Tampermonkey 자동 인식 OK)
+- ✅ `POST /api/library/sync` 가짜 2건 → `{ok:true, inserted:2, updated:0, total:2}`
+- ✅ `GET /api/library/books` JSON 정상 (id, kyobo_id, title, author, cover_url, synced_at)
+- ✅ `DELETE /api/library/books` → 2건 비우기
+
+**사용자가 실제로 시도하는 방법**
+1. Tampermonkey 확장 설치(한 번)
+2. http://192.168.10.205:8080/userscript/sync-kyobo-library.user.js 열기 → 설치
+3. 메인의 `[📖 내 e-Library]` 카드 클릭 → 교보 로그인 → 도서함 페이지
+4. 우측 하단 패널의 [미리보기] → F12 콘솔에서 잘 추출됐는지 확인
+5. [동기화] 클릭 → 메인 페이지의 `[내 e-Library 도서함]` 섹션에 도서 카드 표시
+
+**다음 (Phase B-3 후보)**
+- 사용자 첫 시도 결과 받고 **셀렉터 조정** (실제 DOM 보면 더 정확한 selector·필드 매핑)
+- 백엔드 프록시 옵션: 사용자가 본인 브라우저 devtools에서 로그인 XHR `Copy as cURL` → 그 cURL 우리에게 → httpx 로 그대로 흉내
+- README.md 새로 작성 (Phase A의 옛 README 대체)
+- sync 인증 (지금은 LAN 누구나 호출 가능, secret token 추가 가능)
+- 페이지 검색·다크 모드·즐겨찾기 등 정적 라이브러리 To-Do

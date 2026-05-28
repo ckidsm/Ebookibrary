@@ -194,9 +194,111 @@
             opacity: 0.9;
         }
 
+        /* ── Phase B-2: e-Library 동기화 카드 + 동기화된 도서 그리드 ── */
+        .sync-card {
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px dashed rgba(255, 255, 255, 0.35);
+        }
+        .sync-card .quick-title { color: white; }
+        .sync-steps {
+            margin: 0.8rem 0 0;
+            padding-left: 1.1rem;
+            font-size: 0.86rem;
+            line-height: 1.7;
+            opacity: 0.92;
+        }
+        .sync-steps code {
+            background: rgba(0, 0, 0, 0.35);
+            padding: 0.05rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.82rem;
+            word-break: break-all;
+        }
+        .sync-status {
+            font-family: monospace;
+            font-size: 0.78rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 0.6rem;
+        }
+        .sync-status.is-ok    { color: #b6f5cb; }
+        .sync-status.is-error { color: #ffb4b4; }
+
+        .kyobo-books-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2.5rem;
+        }
+        .kyobo-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1rem;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+            color: inherit;
+            text-decoration: none;
+            display: block;
+        }
+        .kyobo-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 28px rgba(0,0,0,0.28);
+        }
+        .kyobo-cover {
+            width: 100%;
+            aspect-ratio: 2 / 3;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #f0f1f5;
+            display: block;
+            margin-bottom: 0.6rem;
+        }
+        .kyobo-cover-placeholder {
+            width: 100%;
+            aspect-ratio: 2 / 3;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; color: #94a3b8;
+            margin-bottom: 0.6rem;
+        }
+        .kyobo-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #2d3748;
+            line-height: 1.35;
+            margin-bottom: 0.2rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .kyobo-author {
+            font-size: 0.82rem;
+            color: #718096;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .kyobo-meta {
+            font-size: 0.72rem;
+            color: #94a3b8;
+            margin-top: 0.5rem;
+            font-family: monospace;
+        }
+        .kyobo-empty {
+            background: rgba(255,255,255,0.08);
+            border: 1px dashed rgba(255,255,255,0.25);
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            color: rgba(255,255,255,0.75);
+            font-size: 0.95rem;
+        }
+
         @media (max-width: 768px) {
             .books-grid,
-            .quick-grid {
+            .quick-grid,
+            .kyobo-books-grid {
                 grid-template-columns: 1fr;
             }
 
@@ -233,6 +335,27 @@
                     (로그인이 안 되어 있으면 로그인 페이지로 이동합니다.)
                 </div>
             </a>
+            <div class="quick-card sync-card">
+                <div class="quick-icon">📥</div>
+                <div class="quick-title">내 e-Library 동기화 <span class="ext">Userscript</span></div>
+                <div class="quick-desc">
+                    교보 사이트는 SPA라 백엔드 자동 로그인이 어렵습니다.
+                    Tampermonkey 확장으로 본인 브라우저 세션을 활용해 도서함을 동기화합니다.
+                </div>
+                <ol class="sync-steps">
+                    <li><a href="https://www.tampermonkey.net/" target="_blank" rel="noopener noreferrer" style="color:#a5b4fc;">Tampermonkey</a> 확장 설치 (한 번)</li>
+                    <li><a href="userscript/sync-kyobo-library.user.js" target="_blank" style="color:#a5b4fc;">이 Userscript 설치</a> (Tampermonkey가 자동 인식)</li>
+                    <li>위 [내 e-Library] 새 탭에서 로그인 → 우측 하단 패널의 [동기화] 클릭</li>
+                </ol>
+                <div id="sync-status" class="sync-status">
+                    백엔드 상태 확인 중...
+                </div>
+            </div>
+        </section>
+
+        <div class="section-label">내 e-Library 도서함 <small id="kyobo-count" style="opacity:0.6;font-weight:normal;text-transform:none;letter-spacing:0;"></small></div>
+        <section id="kyobo-books-container" class="kyobo-books-grid">
+            <div class="kyobo-empty">백엔드를 확인하는 중...</div>
         </section>
 
         <div class="section-label">내 도서 라이브러리</div>
@@ -283,27 +406,82 @@
             `).join('');
         }
 
-        // 페이지 로드 시 실행
-        document.addEventListener('DOMContentLoaded', () => {
-            renderBooks();
-        });
+        // ── Phase B-2: kyobo-bridge(9000) 백엔드와 통신 ──
+        const BRIDGE_URL = `http://${location.hostname}:9000`;
 
-        // 동적 도서 목록 로드 (향후 확장)
-        async function loadBooksFromServer() {
+        async function pingBackend() {
+            const el = document.getElementById('sync-status');
             try {
-                const response = await fetch('api/books.json');
-                if (response.ok) {
-                    const serverBooks = await response.json();
-                    books.push(...serverBooks);
-                    renderBooks();
-                }
-            } catch (error) {
-                // 서버 데이터가 없으면 기본 목록 사용
-                console.log('Using default book list');
+                const r = await fetch(`${BRIDGE_URL}/health`, { cache: 'no-store' });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const j = await r.json();
+                el.textContent = `✓ 백엔드 ${j.version} · 동기화된 도서 ${j.books}권`;
+                el.className = 'sync-status is-ok';
+            } catch (e) {
+                el.textContent = `✗ 백엔드 미응답 (${BRIDGE_URL}) — 컨테이너 점검 필요`;
+                el.className = 'sync-status is-error';
             }
         }
 
-        // loadBooksFromServer(); // 필요시 활성화
+        function renderKyoboBooks(list) {
+            const container = document.getElementById('kyobo-books-container');
+            const countEl = document.getElementById('kyobo-count');
+            countEl.textContent = list.length ? `(${list.length}권)` : '';
+
+            if (list.length === 0) {
+                container.innerHTML = `
+                    <div class="kyobo-empty">
+                        아직 동기화된 도서가 없습니다. 위의 [📥 내 e-Library 동기화] 안내를 따라
+                        Userscript로 한 번 동기화하면 여기에 나타납니다.
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = list.map(b => {
+                const link = (b.meta_json && tryParseJson(b.meta_json)?.link)
+                          || (b.kyobo_id ? `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(b.title)}` : '#');
+                const cover = b.cover_url
+                    ? `<img class="kyobo-cover" src="${escapeAttr(b.cover_url)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;kyobo-cover-placeholder&quot;>📕</div>'">`
+                    : `<div class="kyobo-cover-placeholder">📘</div>`;
+                return `
+                    <a href="${escapeAttr(link)}" target="_blank" rel="noopener noreferrer" class="kyobo-card">
+                        ${cover}
+                        <div class="kyobo-title" title="${escapeAttr(b.title)}">${escapeHtml(b.title)}</div>
+                        <div class="kyobo-author">${escapeHtml(b.author || '저자 미상')}</div>
+                        ${b.synced_at ? `<div class="kyobo-meta">sync ${b.synced_at.slice(0,16).replace('T',' ')}</div>` : ''}
+                    </a>
+                `;
+            }).join('');
+        }
+
+        async function loadKyoboBooks() {
+            try {
+                const r = await fetch(`${BRIDGE_URL}/api/library/books`, { cache: 'no-store' });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const j = await r.json();
+                renderKyoboBooks(j.books || []);
+            } catch (e) {
+                document.getElementById('kyobo-books-container').innerHTML =
+                    `<div class="kyobo-empty">백엔드에 도달할 수 없어 도서함을 불러오지 못했습니다.<br><small>${escapeHtml(String(e))}</small></div>`;
+            }
+        }
+
+        function tryParseJson(s) {
+            try { return JSON.parse(s); } catch (_) { return null; }
+        }
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => (
+                {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+            ));
+        }
+        function escapeAttr(s) { return escapeHtml(s); }
+
+        // 페이지 로드 시 실행
+        document.addEventListener('DOMContentLoaded', () => {
+            renderBooks();
+            pingBackend();
+            loadKyoboBooks();
+        });
     </script>
 </body>
 </html>
