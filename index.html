@@ -1093,6 +1093,46 @@
             } catch { return { alive: false }; }
         }
 
+        // HTTP 페이지에서도 동작하는 클립보드 복사 (navigator.clipboard 는 secure context 만)
+        function copyText(text, btn) {
+            const restore = btn.textContent;
+            const done = (ok, msg) => {
+                btn.textContent = ok ? '✓ 복사됨' : ('✗ ' + (msg || '실패'));
+                btn.style.color = ok ? '#10b981' : '#ef4444';
+                setTimeout(() => { btn.textContent = restore; btn.style.color = ''; }, 1800);
+            };
+            // 1) modern (HTTPS / localhost 에서만 동작)
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(
+                    () => done(true),
+                    () => fallbackCopy(text, done)
+                );
+                return;
+            }
+            // 2) HTTP 페이지 fallback
+            fallbackCopy(text, done);
+        }
+        function fallbackCopy(text, done) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            // 화면 밖으로 빼되 키보드 포커스 가능하게
+            ta.style.position = 'fixed';
+            ta.style.top = '0';
+            ta.style.left = '0';
+            ta.style.width = '1px';
+            ta.style.height = '1px';
+            ta.style.opacity = '0';
+            ta.setAttribute('readonly', '');
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            ta.setSelectionRange(0, text.length);
+            let ok = false;
+            try { ok = document.execCommand('copy'); } catch (e) {}
+            document.body.removeChild(ta);
+            done(ok, ok ? '' : 'execCommand 실패');
+        }
+
         function detectOS() {
             // userAgentData (modern) → fallback userAgent
             const p = (navigator.userAgentData?.platform || navigator.platform || navigator.userAgent || '').toLowerCase();
@@ -1129,7 +1169,7 @@
                         </div>
                         <div class="cmd-box">
                             <code id="mac-cmd">${escapeHtml(macCmd)}</code>
-                            <button onclick="navigator.clipboard.writeText(document.getElementById('mac-cmd').textContent).then(()=>this.textContent='✓ 복사됨');">복사</button>
+                            <button onclick="copyText(document.getElementById('mac-cmd').textContent, this)">복사</button>
                         </div>
                         <div style="margin-top:6px;font-size:0.72rem;color:#8b96a8;line-height:1.6;">
                             자동: venv · Pillow/pytesseract · tesseract(brew) · launchd 등록 + 즉시 시작<br>
@@ -1152,7 +1192,7 @@
                         </div>
                         <div class="cmd-box">
                             <code id="win-cmd">${escapeHtml(winCmd)}</code>
-                            <button onclick="navigator.clipboard.writeText(document.getElementById('win-cmd').textContent).then(()=>this.textContent='✓ 복사됨');">복사</button>
+                            <button onclick="copyText(document.getElementById('win-cmd').textContent, this)">복사</button>
                         </div>
                         <div style="margin-top:6px;font-size:0.72rem;color:#8b96a8;line-height:1.6;">
                             자동: venv · Pillow/pytesseract/pyautogui · tesseract(winget) · Task Scheduler 등록 + 즉시 시작<br>
