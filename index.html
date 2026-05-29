@@ -594,6 +594,20 @@
         }
         .cmd-box button:hover { border-color: #22d3ee; color: #22d3ee; }
 
+        /* OS 탭 (Mac/Windows 워커 설치) */
+        .os-tab {
+            padding: 5px 12px;
+            background: #1c2230;
+            border: 1px solid #2f3a4d;
+            border-radius: 5px;
+            color: #8b96a8;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .os-tab:hover { border-color: #22d3ee; color: #e6ecf2; }
+        .os-tab.is-active { background: rgba(34,211,238,0.18); border-color: #22d3ee; color: #22d3ee; }
+
         /* 진행 시각화 (job 박스) */
         .pjob {
             margin-top: 14px;
@@ -1065,6 +1079,84 @@
             } catch { return { alive: false }; }
         }
 
+        function detectOS() {
+            // userAgentData (modern) → fallback userAgent
+            const p = (navigator.userAgentData?.platform || navigator.platform || navigator.userAgent || '').toLowerCase();
+            if (p.includes('mac')) return 'mac';
+            if (p.includes('win')) return 'win';
+            if (p.includes('linux')) return 'linux';
+            return 'unknown';
+        }
+
+        function buildWorkerInstallHint() {
+            const os = detectOS();
+            const base = location.origin;  // http://192.168.10.205:8080
+
+            // OS 별 원클릭 명령
+            const macCmd = `curl -fsSL ${base}/install/install-worker.sh | bash`;
+            const winCmd = `irm ${base}/install/install-worker.ps1 | iex`;
+
+            const isMacDefault = (os !== 'win');  // mac/linux/unknown 은 mac 탭 우선
+
+            return `
+                <div style="margin-top:10px;padding:14px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:6px;color:#fca5a5;font-size:0.82rem;line-height:1.6;">
+                    🛑 <strong>Worker 미실행</strong> — 작업이 영원히 대기합니다.<br>
+                    <strong style="color:#fff;">한 번만 설치</strong>하면 부팅·로그온 시 자동·영구.<br>
+
+                    <div style="margin-top:10px;display:flex;gap:6px;">
+                        <button class="os-tab ${isMacDefault?'is-active':''}" data-os="mac" onclick="switchOsTab('mac')">🍎 macOS</button>
+                        <button class="os-tab ${!isMacDefault?'is-active':''}" data-os="win" onclick="switchOsTab('win')">🪟 Windows</button>
+                        <span style="margin-left:auto;font-size:0.7rem;color:#8b96a8;align-self:center;">감지된 OS: ${os}</span>
+                    </div>
+
+                    <div id="os-panel-mac" style="margin-top:10px;display:${isMacDefault?'block':'none'};">
+                        <div style="font-size:0.78rem;color:#fff;margin-bottom:4px;">
+                            <strong>① Terminal 열고 아래 한 줄 붙여넣기</strong> (cmd+space → terminal):
+                        </div>
+                        <div class="cmd-box">
+                            <code id="mac-cmd">${escapeHtml(macCmd)}</code>
+                            <button onclick="navigator.clipboard.writeText(document.getElementById('mac-cmd').textContent).then(()=>this.textContent='✓ 복사됨');">복사</button>
+                        </div>
+                        <div style="margin-top:6px;font-size:0.72rem;color:#8b96a8;line-height:1.6;">
+                            자동: venv · Pillow/pytesseract · tesseract(brew) · launchd 등록 + 즉시 시작<br>
+                            제거: <code style="color:#fca5a5;">~/Library/CloudStorage/OneDrive-개인/Claude/NAS/KyoboLibrary/book-capture/scripts/uninstall-worker-macos.sh</code>
+                        </div>
+                        <details style="margin-top:6px;font-size:0.72rem;color:#8b96a8;">
+                            <summary style="cursor:pointer;color:#a5b4fc;">또는: GUI 다운로드 + 더블클릭 (Gatekeeper 경고 → 우클릭 → 열기)</summary>
+                            <div style="margin-top:6px;text-align:center;">
+                                <a href="install/install-worker.command" download="install-worker.command"
+                                   style="display:inline-block;padding:8px 18px;background:#10b981;color:#0a0c10;border-radius:6px;text-decoration:none;font-weight:700;font-size:0.85rem;">
+                                    ⬇ install-worker.command
+                                </a>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div id="os-panel-win" style="margin-top:10px;display:${!isMacDefault?'block':'none'};">
+                        <div style="font-size:0.78rem;color:#fff;margin-bottom:4px;">
+                            <strong>① PowerShell 열고 아래 한 줄 붙여넣기</strong> (Win+R → powershell):
+                        </div>
+                        <div class="cmd-box">
+                            <code id="win-cmd">${escapeHtml(winCmd)}</code>
+                            <button onclick="navigator.clipboard.writeText(document.getElementById('win-cmd').textContent).then(()=>this.textContent='✓ 복사됨');">복사</button>
+                        </div>
+                        <div style="margin-top:6px;font-size:0.72rem;color:#8b96a8;line-height:1.6;">
+                            자동: venv · Pillow/pytesseract/pyautogui · tesseract(winget) · Task Scheduler 등록 + 즉시 시작<br>
+                            ※ 실행 정책 차단되면: <code style="color:#fca5a5;">Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass</code> 후 다시<br>
+                            제거: <code style="color:#fca5a5;">…\\book-capture\\scripts\\uninstall-worker-windows.ps1</code>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function switchOsTab(os) {
+            document.querySelectorAll('.os-tab').forEach(t => {
+                t.classList.toggle('is-active', t.dataset.os === os);
+            });
+            document.getElementById('os-panel-mac').style.display = (os === 'mac') ? 'block' : 'none';
+            document.getElementById('os-panel-win').style.display = (os === 'win') ? 'block' : 'none';
+        }
+
         function parseProgress(s) {
             if (!s) return null;
             try { return JSON.parse(s); } catch { return { msg: String(s) }; }
@@ -1076,20 +1168,7 @@
 
             // worker heartbeat 즉시 확인
             const ws = await fetchWorkerStatus();
-            const workerHint = isPending && !ws.alive ? `
-                <div style="margin-top:10px;padding:12px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:6px;color:#fca5a5;font-size:0.78rem;line-height:1.6;">
-                    🛑 <strong>Worker 미실행</strong> — 작업이 영원히 대기합니다.<br>
-                    <strong style="color:#fff;">macOS</strong> 에서 <strong>한 번만 설치</strong>하면 부팅 시 자동 시작·영구:
-                    <div class="cmd-box" style="margin-top:6px;">
-                        <code id="worker-cmd-install">cd ~/Library/CloudStorage/OneDrive-개인/Claude/NAS/KyoboLibrary/book-capture && ./scripts/install-worker-macos.sh</code>
-                        <button onclick="navigator.clipboard.writeText(document.getElementById('worker-cmd-install').textContent).then(()=>this.textContent='✓ 복사됨');">복사</button>
-                    </div>
-                    <div style="margin-top:8px;font-size:0.72rem;color:#8b96a8;line-height:1.6;">
-                        • 자동: venv 생성 · Pillow/pytesseract 설치 · tesseract(brew) · launchd 등록<br>
-                        • 정지·제거: <code style="color:#fca5a5;">./scripts/uninstall-worker-macos.sh</code><br>
-                        • 일시 실행만 (재부팅 시 종료): <code style="color:#fca5a5;">python -m bookcapture worker</code>
-                    </div>
-                </div>` : '';
+            const workerHint = isPending && !ws.alive ? buildWorkerInstallHint() : '';
             const workerOk = ws.alive ? `
                 <div style="margin-top:6px;font-size:0.72rem;color:#10b981;font-family:monospace;">
                     ✓ worker 살아있음 (${ws.worker_ip}, ${ws.last_ping_ago_sec}s 전)
