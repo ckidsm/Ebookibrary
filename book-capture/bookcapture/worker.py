@@ -25,6 +25,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import time
@@ -34,6 +35,24 @@ import urllib.request
 from pathlib import Path
 
 from .settings import DEFAULT_BRIDGE_URL, load as load_settings
+
+
+# stdout 한 줄에서 "현재/전체" 추출하기 위한 패턴 (각 단계 출력 형식)
+#   ocr:        "[ocr]   12/185 완료 (page_127)"
+#   summarize:  "[summarize] 47/185 (25%) p.173 ..."
+#   merge/build: 단일 줄
+_PROGRESS_PATTERNS = [
+    re.compile(r"\[ocr\]\s+(\d+)/(\d+)\s+\S+"),
+    re.compile(r"\[summarize\]\s+(\d+)/(\d+)"),
+]
+
+
+def parse_subprogress(line: str) -> tuple[int, int] | None:
+    for pat in _PROGRESS_PATTERNS:
+        m = pat.search(line)
+        if m:
+            return int(m.group(1)), int(m.group(2))
+    return None
 
 
 def _http(method: str, url: str, body: dict | None = None, timeout: float = 10.0) -> dict:
@@ -63,6 +82,25 @@ def report(bridge: str, jid: int, **fields) -> None:
         _http("PATCH", f"{bridge}/api/jobs/{jid}", body=fields)
     except Exception as e:
         print(f"[worker] report 실패 ({jid}): {e}")
+
+
+def progress_payload(
+    stage: int, stage_total: int, stage_name: str,
+    current: int = 0, total: int = 0, msg: str = "",
+) -> str:
+    """프론트 프로그레스바용 JSON 문자열. db.jobs.progress 에 그대로 저장."""
+    # 전체 pct = (완료된 stage + 현재 stage 내 비율) / stage_total
+    sub_pct = (current / total) if total > 0 else 0.0
+    pct = ((stage - 1) + sub_pct) / stage_total * 100
+    return json.dumps({
+        "stage": stage,
+        "stage_total": stage_total,
+        "stage_name": stage_name,
+        "current": current,
+        "total": total,
+        "pct": round(pct, 1),
+        "msg": msg[:200],
+    }, ensure_ascii=False)
 
 
 def run_one(bridge: str, job: dict) -> None:
@@ -107,10 +145,16 @@ def run_one(bridge: str, job: dict) -> None:
         ]
 
     stdout_buf: list[str] = []
+    n = len(steps)
+    last_report_ts = 0.0
+    REPORT_MIN_INTERVAL = 0.6  # 너무 잦은 PATCH 방지
+
     for i, args in enumerate(steps, 1):
         step_name = args[0]
-        report(bridge, jid, progress=f"[{i}/{len(steps)}] {step_name} 실행 중...")
-        print(f"\n[worker] [{i}/{len(steps)}] {step_name} ...")
+        # 단계 시작 신호
+        report(bridge, jid,
+               progress=progress_payload(i, n, step_name, 0, 0, "시작..."))
+        print(f"\n[worker] [{i}/{n}] {step_name} ...")
         try:
             proc = subprocess.Popen(
                 [sys.executable, "-m", "bookcapture", *args],
@@ -120,15 +164,32 @@ def run_one(bridge: str, job: dict) -> None:
                 bufsize=1,
             )
             assert proc.stdout
+            sub_current = sub_total = 0
             for line in proc.stdout:
                 print(line, end="")
                 stdout_buf.append(line)
                 if len(stdout_buf) > 200:
                     stdout_buf = stdout_buf[-200:]
-                # 진행률에 자주 갱신
-                if any(k in line for k in ("OCR", "summarize", "page", "[merge]", "[build")):
-                    report(bridge, jid, progress=f"[{i}/{len(steps)}] " + line.strip()[:120])
+
+                # 현재/전체 추출 시도 (페이지 진행)
+                parsed = parse_subprogress(line)
+                if parsed:
+                    sub_current, sub_total = parsed
+
+                now = time.monotonic()
+                if (now - last_report_ts) >= REPORT_MIN_INTERVAL:
+                    last_report_ts = now
+                    report(bridge, jid,
+                           progress=progress_payload(
+                               i, n, step_name, sub_current, sub_total,
+                               line.strip()[:140] or step_name,
+                           ))
             rc = proc.wait()
+            # 단계 종료 신호 (100%)
+            report(bridge, jid,
+                   progress=progress_payload(i, n, step_name,
+                                             sub_total or 1, sub_total or 1,
+                                             f"{step_name} 완료"))
             if rc != 0:
                 msg = f"step '{step_name}' exit {rc}"
                 report(bridge, jid, status="failed", error=msg,
@@ -142,7 +203,9 @@ def run_one(bridge: str, job: dict) -> None:
             print(f"[worker] ✗ exception in {step_name}: {e}")
             return
 
-    report(bridge, jid, status="done", progress="완료",
+    # 최종 완료
+    report(bridge, jid, status="done",
+           progress=progress_payload(n, n, "done", 1, 1, "전체 완료"),
            stdout_tail="".join(stdout_buf[-30:]))
     print(f"[worker] ✓ job #{jid} 완료")
 

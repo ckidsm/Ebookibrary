@@ -594,6 +594,111 @@
         }
         .cmd-box button:hover { border-color: #22d3ee; color: #22d3ee; }
 
+        /* 진행 시각화 (job 박스) */
+        .pjob {
+            margin-top: 14px;
+            padding: 12px;
+            background: #0e1218;
+            border: 1px solid #2f3a4d;
+            border-radius: 8px;
+        }
+        .pjob-head {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 10px;
+        }
+        .pjob-id {
+            font-family: 'IBM Plex Mono', ui-monospace, monospace;
+            font-size: 0.75rem;
+            color: #8b96a8;
+        }
+        .pjob-status {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 10px;
+            background: rgba(0,0,0,0.4);
+            font-size: 0.74rem;
+            font-weight: 700;
+            border: 1px solid;
+        }
+        .pjob-status[data-s="pending"]   { color: #f59e0b; border-color: #f59e0b; }
+        .pjob-status[data-s="running"]   { color: #22d3ee; border-color: #22d3ee; }
+        .pjob-status[data-s="done"]      { color: #10b981; border-color: #10b981; }
+        .pjob-status[data-s="failed"]    { color: #ef4444; border-color: #ef4444; }
+        .pjob-status[data-s="cancelled"] { color: #8b96a8; border-color: #8b96a8; }
+
+        .pjob-pct {
+            margin-left: auto;
+            font-family: 'IBM Plex Mono', ui-monospace, monospace;
+            font-size: 0.85rem;
+            color: #22d3ee;
+            font-weight: 700;
+        }
+
+        /* 프로그레스바 */
+        .pbar {
+            height: 8px;
+            background: #1c2230;
+            border: 1px solid #2f3a4d;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+        .pbar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22d3ee 0%, #06b6d4 100%);
+            transition: width 0.4s ease;
+            box-shadow: 0 0 8px rgba(34,211,238,0.5);
+        }
+        .pbar-fill.is-done { background: linear-gradient(90deg, #10b981, #059669); box-shadow: 0 0 8px rgba(16,185,129,0.5); }
+        .pbar-fill.is-failed { background: linear-gradient(90deg, #ef4444, #dc2626); }
+
+        /* 단계 4박스 */
+        .pstages {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+            margin-top: 8px;
+        }
+        .pstage {
+            padding: 4px 6px;
+            background: #1c2230;
+            border: 1px solid #2f3a4d;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.68rem;
+            color: #6b7382;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .pstage.is-done { background: rgba(16,185,129,0.15); border-color: #10b981; color: #6ee7b7; }
+        .pstage.is-current { background: rgba(34,211,238,0.18); border-color: #22d3ee; color: #22d3ee; font-weight: 700; }
+
+        /* 진행 메시지 */
+        .pjob-msg {
+            margin-top: 8px;
+            color: #e6ecf2;
+            font-size: 0.78rem;
+            font-family: 'IBM Plex Mono', monospace;
+            min-height: 1.2em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .pjob-sub {
+            color: #8b96a8;
+            font-size: 0.72rem;
+            margin-top: 3px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .pjob-err {
+            color: #ef4444;
+            font-size: 0.78rem;
+            margin-top: 6px;
+            font-family: 'IBM Plex Mono', monospace;
+            white-space: pre-wrap;
+        }
+
         @media (max-width: 768px) {
             .books-grid,
             .quick-grid,
@@ -943,16 +1048,15 @@
             }
         }
 
-        function jobStatusBadge(status) {
-            const map = {
-                pending:   ['#f59e0b', '대기 중 (worker 가 잡아야 시작)'],
-                running:   ['#22d3ee', '실행 중'],
-                done:      ['#10b981', '완료'],
-                failed:    ['#ef4444', '실패'],
-                cancelled: ['#8b96a8', '취소됨'],
-            };
-            const [color, label] = map[status] || ['#8b96a8', status];
-            return `<span style="display:inline-block;padding:2px 10px;border-radius:10px;background:rgba(0,0,0,0.4);color:${color};font-size:0.78rem;font-weight:700;border:1px solid ${color};">${label}</span>`;
+        const STATUS_LABEL = {
+            pending: '대기 중', running: '실행 중',
+            done: '완료', failed: '실패', cancelled: '취소됨',
+        };
+        const STAGES_AUTO = ['ocr', 'summarize', 'merge', 'build'];
+
+        function parseProgress(s) {
+            if (!s) return null;
+            try { return JSON.parse(s); } catch { return { msg: String(s) }; }
         }
 
         function renderJobBox(job, slug) {
@@ -967,24 +1071,80 @@
                     </div>
                 </div>` : '';
 
-            const cancelBtn = isPending
-                ? `<button class="bbtn" style="flex:none;padding:4px 10px;font-size:11px;" onclick="cancelCurrentJob(${job.id})">취소</button>`
-                : '';
+            const stageBoxes = STAGES_AUTO.map(s =>
+                `<div class="pstage" data-stage="${s}">${s}</div>`
+            ).join('');
 
             extra.innerHTML = `
-                <div style="margin-top:14px;padding:12px;background:#0e1218;border:1px solid #2f3a4d;border-radius:6px;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-                        <span style="color:#8b96a8;font-size:0.78rem;font-family:monospace;">job #${job.id}</span>
-                        <span id="job-status">${jobStatusBadge(job.status)}</span>
-                        ${cancelBtn}
+                <div class="pjob" id="pjob-${job.id}">
+                    <div class="pjob-head">
+                        <span class="pjob-id">job #${job.id}</span>
+                        <span class="pjob-status" id="pjob-status" data-s="${job.status}">${STATUS_LABEL[job.status] || job.status}</span>
+                        <span class="pjob-pct" id="pjob-pct">0%</span>
+                        ${isPending ? `<button class="bbtn" style="flex:none;padding:4px 10px;font-size:11px;" onclick="cancelCurrentJob(${job.id})">취소</button>` : ''}
                     </div>
-                    <div id="job-progress" style="color:#e6ecf2;font-size:0.82rem;font-family:monospace;min-height:1.2em;">
-                        ${escapeHtml(job.progress || '...')}
-                    </div>
-                    <div id="job-error" style="color:#ef4444;font-size:0.78rem;margin-top:6px;font-family:monospace;white-space:pre-wrap;"></div>
-                    ${cmdHint}
+                    <div class="pbar"><div class="pbar-fill" id="pjob-fill" style="width:0%"></div></div>
+                    <div class="pstages" id="pjob-stages">${stageBoxes}</div>
+                    <div class="pjob-msg" id="pjob-msg">${escapeHtml(job.progress || '대기...')}</div>
+                    <div class="pjob-sub" id="pjob-sub"></div>
+                    <div class="pjob-err" id="pjob-err"></div>
                 </div>
+                ${cmdHint}
             `;
+            applyProgress(job);
+        }
+
+        function applyProgress(job) {
+            const pg = parseProgress(job.progress);
+            const statusEl = document.getElementById('pjob-status');
+            const pctEl = document.getElementById('pjob-pct');
+            const fillEl = document.getElementById('pjob-fill');
+            const msgEl = document.getElementById('pjob-msg');
+            const subEl = document.getElementById('pjob-sub');
+            const errEl = document.getElementById('pjob-err');
+            if (!statusEl) return;
+
+            statusEl.dataset.s = job.status;
+            statusEl.textContent = STATUS_LABEL[job.status] || job.status;
+
+            // 완료/실패 시 100% 확정
+            let pct = pg?.pct ?? 0;
+            if (job.status === 'done') pct = 100;
+            if (job.status === 'failed' || job.status === 'cancelled') {
+                // 진행 그대로 두되 색만 변경
+            }
+
+            pctEl.textContent = `${Math.round(pct)}%`;
+            fillEl.style.width = `${Math.max(2, pct)}%`;
+            fillEl.classList.toggle('is-done', job.status === 'done');
+            fillEl.classList.toggle('is-failed', job.status === 'failed');
+
+            // 단계 박스 강조
+            const stageEls = document.querySelectorAll('#pjob-stages .pstage');
+            const stage = pg?.stage || 0;
+            const stageName = pg?.stage_name;
+            stageEls.forEach((el, idx) => {
+                el.classList.remove('is-done', 'is-current');
+                if (job.status === 'done') {
+                    el.classList.add('is-done');
+                } else if (idx < stage - 1) {
+                    el.classList.add('is-done');
+                } else if (idx === stage - 1) {
+                    el.classList.add('is-current');
+                }
+            });
+
+            // 메시지·서브
+            if (pg) {
+                msgEl.textContent = pg.msg || (stageName ? `[${stage}/${pg.stage_total}] ${stageName}` : '...');
+                subEl.textContent = (pg.total > 0)
+                    ? `${stageName} · ${pg.current}/${pg.total} (${Math.round(pg.current/pg.total*100)}%)`
+                    : '';
+            } else {
+                msgEl.textContent = job.progress || (job.status === 'pending' ? '대기 중...' : '...');
+                subEl.textContent = '';
+            }
+            errEl.textContent = job.error || '';
         }
 
         async function pollJobOnce(jid, slug) {
@@ -993,24 +1153,17 @@
                 if (!r.ok) return false;
                 const j = await r.json();
                 const job = j.job;
-                const statusEl = document.getElementById('job-status');
-                const progEl = document.getElementById('job-progress');
-                const errEl = document.getElementById('job-error');
-                if (statusEl) statusEl.innerHTML = jobStatusBadge(job.status);
-                if (progEl) progEl.textContent = job.progress || '...';
-                if (errEl) errEl.textContent = job.error || '';
+                applyProgress(job);
 
                 if (['done', 'failed', 'cancelled'].includes(job.status)) {
                     stopPolling();
                     if (job.status === 'done') {
-                        // 분석 완료 — 카탈로그 새로고침 + 모달 푸터 갱신
                         await loadAnalyzed();
                         renderKyoboBooks(_kyoboBooks);
-                        // 모달 푸터에 [분석 페이지] 활성화 트리거 — 같은 책 다시 열기
                         setTimeout(() => {
                             const book = _kyoboBooks.find(b => slugify(b.title) === slug);
                             if (book) openBookModal(book);
-                        }, 300);
+                        }, 600);
                     }
                     return true;
                 }
