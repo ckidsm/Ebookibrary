@@ -23,6 +23,7 @@ NAS_DOCKER="/usr/local/bin/docker"
 NAS_COMPOSE="/usr/local/bin/docker-compose"
 
 STATIC_PATH="/volume1/docker/web-apps/kyobo-library"
+WEBSTATION_PATH="/volume1/web/kyobo"   # 외부 도메인 노출용 (Web Station, https://redcodeme.synology.me/kyobo/)
 BRIDGE_DATA_PATH="/volume1/docker/web-apps/kyobo-bridge/data"
 COMPOSE_DIR="/volume1/docker/kyobo-stack"
 
@@ -58,9 +59,9 @@ if [[ "$DO_BACKEND" == "1" && -z "$DRY" ]]; then
     docker buildx version >/dev/null 2>&1 || die "docker buildx 없음"
 fi
 
-# ── 1) 정적: rsync ───────────────────────────────────────────
+# ── 1) 정적: rsync (LAN nginx + Web Station 두 곳 동시) ─────
 if [[ "$DO_STATIC" == "1" ]]; then
-    step "[1] 정적 라이브러리 rsync → $NAS_HOST:$STATIC_PATH"
+    step "[1a] 정적 → LAN nginx ($NAS_HOST:$STATIC_PATH)"
     rsync -avz $DRY --delete \
         --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
         --exclude-from=.dockerignore \
@@ -68,6 +69,16 @@ if [[ "$DO_STATIC" == "1" ]]; then
         --exclude='/docker-compose.yml' \
         -e "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15" \
         ./ "$NAS_HOST:$STATIC_PATH/"
+
+    step "[1b] 정적 → Web Station (외부 노출, $NAS_HOST:$WEBSTATION_PATH)"
+    ssh -o StrictHostKeyChecking=no "$NAS_HOST" "mkdir -p $WEBSTATION_PATH"
+    rsync -avz $DRY --delete \
+        --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
+        --exclude-from=.dockerignore \
+        --exclude='/kyobo-bridge/' \
+        --exclude='/docker-compose.yml' \
+        -e "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15" \
+        ./ "$NAS_HOST:$WEBSTATION_PATH/"
 fi
 
 # DRY-RUN 이면 여기까지만

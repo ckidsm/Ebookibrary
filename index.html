@@ -859,8 +859,12 @@
             `).join('');
         }
 
-        // ── Phase B-2: kyobo-bridge(9000) 백엔드와 통신 ──
-        const BRIDGE_URL = `http://${location.hostname}:9000`;
+        // ── kyobo-bridge 백엔드 URL 자동 분기 ──
+        // LAN (http://192.168.10.205:8080/) → :9000 직접
+        // 외부 (https://redcodeme.synology.me/kyobo/ 등) → reverse proxy /api
+        const BRIDGE_URL = (location.port === '8080' || location.hostname === '192.168.10.205')
+            ? `${location.protocol}//${location.hostname}:9000`
+            : `${location.origin}/api`;
 
         async function pingBackend() {
             const el = document.getElementById('sync-status');
@@ -1144,11 +1148,14 @@
 
         function buildWorkerInstallHint() {
             const os = detectOS();
-            const base = location.origin;  // http://192.168.10.205:8080
+            // base 는 정적 파일이 서빙되는 origin + path
+            //   LAN: http://192.168.10.205:8080
+            //   외부 (Web Station + Reverse Proxy): https://redcodeme.synology.me/kyobo
+            const base = (location.origin + location.pathname.replace(/[^/]*$/, '')).replace(/\/$/, '');
 
-            // OS 별 원클릭 명령
-            const macCmd = `curl -fsSL ${base}/install/install-worker.sh | bash`;
-            const winCmd = `irm ${base}/install/install-worker.ps1 | iex`;
+            // KYOBO_BASE 환경변수로 install 스크립트 안내문도 동적 URL 사용
+            const macCmd = `curl -fsSL ${base}/install/install-worker.sh | KYOBO_BASE="${base}" bash`;
+            const winCmd = `$env:KYOBO_BASE='${base}'; irm ${base}/install/install-worker.ps1 | iex`;
 
             const isMacDefault = (os !== 'win');  // mac/linux/unknown 은 mac 탭 우선
 

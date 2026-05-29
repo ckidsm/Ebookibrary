@@ -49,8 +49,9 @@ Write-Host "▶ 메인 설치 스크립트 실행" -ForegroundColor Green
 Write-Host ""
 & $INSTALLER
 
+$mainUrl = if ($env:KYOBO_BASE) { $env:KYOBO_BASE } else { "http://192.168.10.205:8080" }
 Write-Host ""
 Write-Host "════════════════════════════════════════════════════════"
 Write-Host "✓ 설치 완료. 메인 페이지로 가서 [📊 분석 시작] 누르면 자동 처리됩니다."
-Write-Host "  http://192.168.10.205:8080/"
+Write-Host "  $mainUrl/"
 Write-Host "════════════════════════════════════════════════════════"
