@@ -59,8 +59,25 @@ if [[ "$DO_BACKEND" == "1" && -z "$DRY" ]]; then
     docker buildx version >/dev/null 2>&1 || die "docker buildx 없음"
 fi
 
-# ── 1) 정적: rsync (LAN nginx + Web Station 두 곳 동시) ─────
+# ── 1) 정적: 백엔드 snapshot → rsync (LAN nginx + Web Station 두 곳) ─────
 if [[ "$DO_STATIC" == "1" ]]; then
+    # 1.0) 백엔드 데이터 snapshot → 정적 JSON (Reverse Proxy 미설정 시 fallback)
+    SNAP_DIR="api-cache"
+    if [[ -z "$DRY" ]]; then
+        step "[1] 백엔드 snapshot → $SNAP_DIR/"
+        mkdir -p "$SNAP_DIR/library" "$SNAP_DIR/books"
+        # books (동기화된 도서함)
+        curl -s --max-time 5 "http://192.168.10.205:9000/api/library/books" \
+            -o "$SNAP_DIR/library/books.json" && \
+            echo "   library/books.json ($(wc -c < $SNAP_DIR/library/books.json)B)" || \
+            echo "   ⚠ books snapshot 실패 (백엔드 미응답?)"
+        # analyzed (분석 완료 슬러그)
+        curl -s --max-time 5 "http://192.168.10.205:9000/api/books/analyzed" \
+            -o "$SNAP_DIR/books/analyzed.json" && \
+            echo "   books/analyzed.json ($(wc -c < $SNAP_DIR/books/analyzed.json)B)" || \
+            echo "   ⚠ analyzed snapshot 실패"
+    fi
+
     step "[1a] 정적 → LAN nginx ($NAS_HOST:$STATIC_PATH)"
     rsync -avz $DRY --delete \
         --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \

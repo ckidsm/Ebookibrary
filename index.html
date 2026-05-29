@@ -893,13 +893,16 @@
         }
 
         async function loadAnalyzed() {
-            try {
-                const r = await fetch(`${BRIDGE_URL}/api/books/analyzed`, { cache: 'no-store' });
-                if (!r.ok) return;
-                const j = await r.json();
-                _analyzedMap = new Map((j.analyzed || []).map(a => [a.slug, a]));
-            } catch (e) {
-                console.warn('analyzed fetch fail:', e);
+            // 1) 백엔드 직접 → 2) 정적 snapshot fallback
+            const urls = [`${BRIDGE_URL}/api/books/analyzed`, `api-cache/books/analyzed.json`];
+            for (const u of urls) {
+                try {
+                    const r = await fetch(u, { cache: 'no-store' });
+                    if (!r.ok) continue;
+                    const j = await r.json();
+                    _analyzedMap = new Map((j.analyzed || []).map(a => [a.slug, a]));
+                    return;
+                } catch (e) { /* try next */ }
             }
         }
 
@@ -951,16 +954,26 @@
         }
 
         async function loadKyoboBooks() {
-            try {
-                await loadAnalyzed();
-                const r = await fetch(`${BRIDGE_URL}/api/library/books`, { cache: 'no-store' });
-                if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                const j = await r.json();
-                renderKyoboBooks(j.books || []);
-            } catch (e) {
-                document.getElementById('kyobo-books-container').innerHTML =
-                    `<div class="kyobo-empty">백엔드에 도달할 수 없어 도서함을 불러오지 못했습니다.<br><small>${escapeHtml(String(e))}</small></div>`;
+            await loadAnalyzed();
+            // 1) 백엔드 직접 → 2) 정적 snapshot fallback
+            const urls = [`${BRIDGE_URL}/api/library/books`, `api-cache/library/books.json`];
+            let lastErr = null;
+            for (const u of urls) {
+                try {
+                    const r = await fetch(u, { cache: 'no-store' });
+                    if (!r.ok) { lastErr = `HTTP ${r.status} (${u})`; continue; }
+                    const j = await r.json();
+                    renderKyoboBooks(j.books || []);
+                    // snapshot 으로 동작 중이면 안내 한 줄
+                    if (u.startsWith('api-cache/')) {
+                        const cnt = document.getElementById('kyobo-count');
+                        if (cnt) cnt.textContent += ' · 📦 snapshot';
+                    }
+                    return;
+                } catch (e) { lastErr = String(e); }
             }
+            document.getElementById('kyobo-books-container').innerHTML =
+                `<div class="kyobo-empty">도서함 로드 실패<br><small>${escapeHtml(lastErr || 'unknown')}</small></div>`;
         }
 
         // ── 도서 분석 모달 ──

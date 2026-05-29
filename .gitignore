@@ -31,3 +31,6 @@ venv/
 *.tmp
 *.BAK
 *.bak
+
+# deploy 시 백엔드 snapshot (재생성)
+/api-cache/
