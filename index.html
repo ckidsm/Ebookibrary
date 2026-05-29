@@ -1077,11 +1077,17 @@
             // worker heartbeat 즉시 확인
             const ws = await fetchWorkerStatus();
             const workerHint = isPending && !ws.alive ? `
-                <div style="margin-top:10px;padding:10px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:6px;color:#fca5a5;font-size:0.78rem;line-height:1.6;">
-                    🛑 <strong>Worker 미실행</strong> — 작업이 영원히 대기합니다. Mac 터미널에서 한 번 실행:
+                <div style="margin-top:10px;padding:12px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:6px;color:#fca5a5;font-size:0.78rem;line-height:1.6;">
+                    🛑 <strong>Worker 미실행</strong> — 작업이 영원히 대기합니다.<br>
+                    <strong style="color:#fff;">macOS</strong> 에서 <strong>한 번만 설치</strong>하면 부팅 시 자동 시작·영구:
                     <div class="cmd-box" style="margin-top:6px;">
-                        <code id="worker-cmd">cd KyoboLibrary/book-capture && python -m bookcapture worker</code>
-                        <button onclick="navigator.clipboard.writeText(document.getElementById('worker-cmd').textContent).then(()=>this.textContent='✓ 복사됨');">복사</button>
+                        <code id="worker-cmd-install">cd ~/Library/CloudStorage/OneDrive-개인/Claude/NAS/KyoboLibrary/book-capture && ./scripts/install-worker-macos.sh</code>
+                        <button onclick="navigator.clipboard.writeText(document.getElementById('worker-cmd-install').textContent).then(()=>this.textContent='✓ 복사됨');">복사</button>
+                    </div>
+                    <div style="margin-top:8px;font-size:0.72rem;color:#8b96a8;line-height:1.6;">
+                        • 자동: venv 생성 · Pillow/pytesseract 설치 · tesseract(brew) · launchd 등록<br>
+                        • 정지·제거: <code style="color:#fca5a5;">./scripts/uninstall-worker-macos.sh</code><br>
+                        • 일시 실행만 (재부팅 시 종료): <code style="color:#fca5a5;">python -m bookcapture worker</code>
                     </div>
                 </div>` : '';
             const workerOk = ws.alive ? `
