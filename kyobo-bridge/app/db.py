@@ -192,13 +192,21 @@ def update_job(jid: int, **fields) -> dict | None:
 
 
 def cancel_job(jid: int) -> dict | None:
-    """pending 만 취소 가능. running 은 worker 가 자체 종료해야 함."""
+    """pending → 즉시 cancelled. running → cancelling (worker 가 감지 후 종료)."""
     with cursor() as cur:
+        # pending 이면 즉시 cancelled
         cur.execute(
             "UPDATE jobs SET status = 'cancelled', finished_at = datetime('now') "
             "WHERE id = ? AND status = 'pending'",
             (jid,),
         )
+        if cur.rowcount == 0:
+            # running 이면 cancelling 으로 전이 (worker polling 이 감지)
+            cur.execute(
+                "UPDATE jobs SET status = 'cancelling' "
+                "WHERE id = ? AND status = 'running'",
+                (jid,),
+            )
     return get_job(jid)
 
 

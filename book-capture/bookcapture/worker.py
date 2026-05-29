@@ -85,6 +85,16 @@ def report(bridge: str, jid: int, **fields) -> None:
         print(f"[worker] report 실패 ({jid}): {e}")
 
 
+def is_cancelling(bridge: str, jid: int) -> bool:
+    """job 의 현재 status 가 cancelling/cancelled 인지 확인."""
+    try:
+        r = _http("GET", f"{bridge}/api/jobs/{jid}", timeout=3.0)
+        st = (r.get("job") or {}).get("status")
+        return st in ("cancelling", "cancelled")
+    except Exception:
+        return False
+
+
 def progress_payload(
     stage: int, stage_total: int, stage_name: str,
     current: int = 0, total: int = 0, msg: str = "",
@@ -145,11 +155,19 @@ def run_one(bridge: str, job: dict) -> None:
     stdout_buf: list[str] = []
     n = len(steps)
     last_report_ts = 0.0
-    REPORT_MIN_INTERVAL = 0.6  # 너무 잦은 PATCH 방지
+    last_cancel_check_ts = 0.0
+    REPORT_MIN_INTERVAL = 0.6
+    CANCEL_CHECK_INTERVAL = 1.5   # 1.5s 마다 status 체크 (취소 감지)
 
     for i, args in enumerate(steps, 1):
         step_name = args[0]
-        # 단계 시작 신호
+        # 단계 사이에 cancel 체크
+        if is_cancelling(bridge, jid):
+            print(f"[worker] ⏹ cancel 감지 — 종료")
+            report(bridge, jid, status="cancelled",
+                   progress=progress_payload(i, n, step_name, 0, 0, "사용자가 중단"))
+            return
+
         report(bridge, jid,
                progress=progress_payload(i, n, step_name, 0, 0, "시작..."))
         print(f"\n[worker] [{i}/{n}] {step_name} ...")
@@ -169,7 +187,6 @@ def run_one(bridge: str, job: dict) -> None:
                 if len(stdout_buf) > 200:
                     stdout_buf = stdout_buf[-200:]
 
-                # 현재/전체 추출 시도 (페이지 진행)
                 parsed = parse_subprogress(line)
                 if parsed:
                     sub_current, sub_total = parsed
@@ -182,6 +199,23 @@ def run_one(bridge: str, job: dict) -> None:
                                i, n, step_name, sub_current, sub_total,
                                line.strip()[:140] or step_name,
                            ))
+                # 주기적으로 cancel 체크 → subprocess SIGTERM
+                if (now - last_cancel_check_ts) >= CANCEL_CHECK_INTERVAL:
+                    last_cancel_check_ts = now
+                    if is_cancelling(bridge, jid):
+                        print(f"[worker] ⏹ cancel 감지 — subprocess SIGTERM")
+                        try: proc.terminate()
+                        except Exception: pass
+                        try: proc.wait(timeout=3)
+                        except subprocess.TimeoutExpired:
+                            try: proc.kill()
+                            except Exception: pass
+                        report(bridge, jid, status="cancelled",
+                               progress=progress_payload(i, n, step_name,
+                                                         sub_current, sub_total,
+                                                         "중단됨"),
+                               stdout_tail="".join(stdout_buf[-30:]))
+                        return
             rc = proc.wait()
             # 단계 종료 신호 (100%)
             report(bridge, jid,
@@ -215,7 +249,7 @@ def ping(bridge: str) -> None:
         pass  # silent — heartbeat 실패해도 worker 자체는 계속
 
 
-def run_worker(bridge: str | None = None, interval: float = 5.0) -> int:
+def run_worker(bridge: str | None = None, interval: float = 2.0) -> int:
     bridge = (bridge or DEFAULT_BRIDGE_URL).rstrip("/")
     print(f"[worker] 시작 · bridge={bridge} · {interval}s polling")
     print(f"[worker] Ctrl+C 로 종료")

@@ -222,7 +222,7 @@ def build_parser() -> argparse.ArgumentParser:
     ps.set_defaults(func=cmd_summarize)
 
     pw = sub.add_parser("worker", help="백엔드 jobs 큐 polling (한 번 띄워두면 [분석 시작] 자동 처리)")
-    pw.add_argument("--interval", type=float, default=5.0, help="polling 간격(초, 기본 5)")
+    pw.add_argument("--interval", type=float, default=2.0, help="polling 간격(초, 기본 2)")
     pw.set_defaults(func=cmd_worker)
 
     pr = sub.add_parser("run", help="capture → ocr → summarize → build 일괄")

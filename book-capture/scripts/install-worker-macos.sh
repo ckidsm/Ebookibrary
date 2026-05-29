@@ -71,7 +71,7 @@ cat > "$PLIST_PATH" <<EOF
         <string>bookcapture</string>
         <string>worker</string>
         <string>--interval</string>
-        <string>5</string>
+        <string>2</string>
     </array>
 
     <key>WorkingDirectory</key>
