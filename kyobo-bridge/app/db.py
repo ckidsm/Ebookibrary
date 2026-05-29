@@ -58,6 +58,24 @@ def init_db() -> None:
                 value_json  TEXT,
                 updated_at  TEXT DEFAULT (datetime('now'))
             );
+
+            -- Phase C-3 Part3: 분석 작업 큐
+            CREATE TABLE IF NOT EXISTS jobs (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                slug         TEXT NOT NULL,
+                title        TEXT,
+                mode         TEXT DEFAULT 'auto',          -- auto | capture-only | summarize-only
+                pages        TEXT,                          -- "127-155" 또는 null=전체
+                status       TEXT NOT NULL DEFAULT 'pending',  -- pending|running|done|failed|cancelled
+                created_at   TEXT DEFAULT (datetime('now')),
+                started_at   TEXT,
+                finished_at  TEXT,
+                progress     TEXT,                          -- worker 가 주기적으로 갱신 ("OCR 12/185" 등)
+                stdout_tail  TEXT,                          -- 마지막 출력 일부 (디버그)
+                error        TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_jobs_status_created
+                ON jobs(status, created_at);
             """
         )
 
@@ -95,6 +113,93 @@ def set_all_settings(items: dict) -> int:
         set_setting(k, v)
         n += 1
     return n
+
+
+# ── Phase C-3 Part3: jobs CRUD ──────────────────────────────
+def create_job(slug: str, title: str | None = None, mode: str = "auto",
+               pages: str | None = None) -> dict:
+    with cursor() as cur:
+        cur.execute(
+            "INSERT INTO jobs(slug, title, mode, pages) VALUES(?, ?, ?, ?)",
+            (slug, title, mode, pages),
+        )
+        jid = cur.lastrowid
+        row = cur.execute(
+            "SELECT * FROM jobs WHERE id = ?", (jid,)
+        ).fetchone()
+        return dict(row)
+
+
+def list_jobs(status: str | None = None, limit: int = 50) -> list[dict]:
+    with cursor() as cur:
+        if status:
+            rows = cur.execute(
+                "SELECT * FROM jobs WHERE status = ? ORDER BY created_at DESC LIMIT ?",
+                (status, limit),
+            ).fetchall()
+        else:
+            rows = cur.execute(
+                "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_job(jid: int) -> dict | None:
+    with cursor() as cur:
+        row = cur.execute("SELECT * FROM jobs WHERE id = ?", (jid,)).fetchone()
+        return dict(row) if row else None
+
+
+def claim_next_job() -> dict | None:
+    """가장 오래된 pending 작업을 running 으로 전이 + 반환. 동시성: SQLite 트랜잭션."""
+    with cursor() as cur:
+        cur.execute("BEGIN IMMEDIATE")
+        row = cur.execute(
+            "SELECT * FROM jobs WHERE status = 'pending' ORDER BY created_at LIMIT 1"
+        ).fetchone()
+        if not row:
+            cur.execute("COMMIT")
+            return None
+        jid = row["id"]
+        cur.execute(
+            "UPDATE jobs SET status = 'running', started_at = datetime('now') WHERE id = ?",
+            (jid,),
+        )
+        cur.execute("COMMIT")
+        return dict(row) | {"status": "running"}
+
+
+def update_job(jid: int, **fields) -> dict | None:
+    if not fields:
+        return get_job(jid)
+    cols, vals = [], []
+    for k, v in fields.items():
+        if k not in ("status", "progress", "stdout_tail", "error",
+                     "finished_at", "started_at"):
+            continue
+        cols.append(f"{k} = ?")
+        vals.append(v)
+    # status 가 done/failed/cancelled 면 finished_at 자동 설정
+    if fields.get("status") in ("done", "failed", "cancelled") and "finished_at" not in fields:
+        cols.append("finished_at = datetime('now')")
+    if not cols:
+        return get_job(jid)
+    vals.append(jid)
+    with cursor() as cur:
+        cur.execute(f"UPDATE jobs SET {', '.join(cols)} WHERE id = ?", vals)
+    return get_job(jid)
+
+
+def cancel_job(jid: int) -> dict | None:
+    """pending 만 취소 가능. running 은 worker 가 자체 종료해야 함."""
+    with cursor() as cur:
+        cur.execute(
+            "UPDATE jobs SET status = 'cancelled', finished_at = datetime('now') "
+            "WHERE id = ? AND status = 'pending'",
+            (jid,),
+        )
+    return get_job(jid)
 
 
 def list_books() -> list[dict]:

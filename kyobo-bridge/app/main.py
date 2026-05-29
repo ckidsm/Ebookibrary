@@ -18,6 +18,7 @@ from . import __version__
 from .db import (
     clear_books, count_books, init_db, list_books, upsert_books,
     get_all_settings, get_setting, set_all_settings,
+    create_job, list_jobs, get_job, claim_next_job, update_job, cancel_job,
 )
 
 import ipaddress
@@ -242,6 +243,82 @@ def put_settings(payload: SettingsUpdate) -> dict:
             items["ai"]["api_key"] = prev["api_key"]
     n = set_all_settings(items)
     return {"ok": True, "updated_keys": n}
+
+
+# ── Phase C-3 Part3: 분석 작업 큐 ───────────────────────────
+class JobCreate(BaseModel):
+    slug: str
+    title: str | None = None
+    mode: str = "auto"          # auto | capture-only | summarize-only
+    pages: str | None = None    # "127-155"
+
+class JobPatch(BaseModel):
+    status: str | None = None
+    progress: str | None = None
+    stdout_tail: str | None = None
+    error: str | None = None
+
+
+@app.post("/api/jobs", status_code=status.HTTP_201_CREATED)
+def post_job(payload: JobCreate) -> dict:
+    if not payload.slug.strip():
+        raise HTTPException(400, "slug 필수")
+    job = create_job(
+        slug=payload.slug.strip(),
+        title=payload.title,
+        mode=payload.mode,
+        pages=payload.pages,
+    )
+    log.info("job created: #%s slug=%s mode=%s", job["id"], job["slug"], job["mode"])
+    return {"job": job}
+
+
+@app.get("/api/jobs")
+def get_jobs(status_: str | None = None, limit: int = 50) -> dict:
+    # FastAPI 가 ?status= 으로 받기 위해 query 파라미터 이름 매핑
+    return {"jobs": list_jobs(status=status_, limit=limit)}
+
+
+@app.get("/api/jobs/{jid}")
+def get_one_job(jid: int) -> dict:
+    job = get_job(jid)
+    if not job:
+        raise HTTPException(404, f"job #{jid} 없음")
+    return {"job": job}
+
+
+@app.post("/api/jobs/next/claim")
+def claim_next(request: Request) -> dict:
+    """worker 가 다음 pending 작업을 잡는다. LAN 전용."""
+    client = request.client.host if request.client else ""
+    if not _is_lan(client):
+        raise HTTPException(403, f"LAN 전용 (요청 IP: {client})")
+    job = claim_next_job()
+    if not job:
+        return {"job": None}
+    log.info("job claimed: #%s by %s", job["id"], client)
+    return {"job": job}
+
+
+@app.patch("/api/jobs/{jid}")
+def patch_job(jid: int, payload: JobPatch, request: Request) -> dict:
+    client = request.client.host if request.client else ""
+    if not _is_lan(client):
+        raise HTTPException(403, "LAN 전용")
+    fields = {k: v for k, v in payload.model_dump().items() if v is not None}
+    job = update_job(jid, **fields)
+    if not job:
+        raise HTTPException(404, f"job #{jid} 없음")
+    return {"job": job}
+
+
+@app.delete("/api/jobs/{jid}")
+def delete_job(jid: int) -> dict:
+    """pending 작업만 취소. running 은 worker 가 자체 처리."""
+    job = cancel_job(jid)
+    if not job:
+        raise HTTPException(404, f"job #{jid} 없음")
+    return {"job": job}
 
 
 # ── Phase C-3: LAN 전용 시크릿 (book-capture worker 용) ──────

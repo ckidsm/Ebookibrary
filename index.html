@@ -913,25 +913,127 @@
         function closeBookModal() {
             document.getElementById('bmodal-bd').classList.remove('open');
             document.getElementById('bmodal').classList.remove('open');
+            if (typeof stopPolling === 'function') stopPolling();
         }
 
-        function showAnalyzeCmd(book, slug) {
-            // Phase C-4 단계: 백엔드 큐(C-3 Part3) 없으니 CLI 명령 안내
-            const cmd = `cd KyoboLibrary/book-capture && python -m bookcapture run --slug "${slug}" --mode 3`;
+        // ── Phase C-3 Part3: 백엔드 큐로 작업 등록 + 진행 polling ──
+        let _pollTimer = null;
+
+        async function showAnalyzeCmd(book, slug) {
             const extra = document.getElementById('bmodal-extra');
+            extra.innerHTML = `<div style="margin-top:14px;color:#8b96a8;font-size:0.82rem;">작업 등록 중...</div>`;
+
+            try {
+                const r = await fetch(`${BRIDGE_URL}/api/jobs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ slug, title: book.title, mode: 'auto' }),
+                });
+                if (!r.ok) {
+                    const t = await r.text();
+                    extra.innerHTML = `<div style="color:#ef4444;margin-top:14px;">✗ 작업 등록 실패: ${escapeHtml(t.slice(0,200))}</div>`;
+                    return;
+                }
+                const j = await r.json();
+                const job = j.job;
+                renderJobBox(job, slug);
+                startPolling(job.id, slug);
+            } catch (e) {
+                extra.innerHTML = `<div style="color:#ef4444;margin-top:14px;">✗ ${escapeHtml(String(e))}</div>`;
+            }
+        }
+
+        function jobStatusBadge(status) {
+            const map = {
+                pending:   ['#f59e0b', '대기 중 (worker 가 잡아야 시작)'],
+                running:   ['#22d3ee', '실행 중'],
+                done:      ['#10b981', '완료'],
+                failed:    ['#ef4444', '실패'],
+                cancelled: ['#8b96a8', '취소됨'],
+            };
+            const [color, label] = map[status] || ['#8b96a8', status];
+            return `<span style="display:inline-block;padding:2px 10px;border-radius:10px;background:rgba(0,0,0,0.4);color:${color};font-size:0.78rem;font-weight:700;border:1px solid ${color};">${label}</span>`;
+        }
+
+        function renderJobBox(job, slug) {
+            const extra = document.getElementById('bmodal-extra');
+            const isPending = job.status === 'pending';
+            const cmdHint = isPending ? `
+                <div style="margin-top:10px;padding:10px;background:rgba(245,158,11,0.1);border:1px solid #f59e0b;border-radius:6px;color:#fbbf24;font-size:0.78rem;line-height:1.6;">
+                    ⚠ 워커가 안 떠 있으면 영원히 대기 상태입니다. Mac 터미널에서 한 번 실행:
+                    <div class="cmd-box" style="margin-top:6px;">
+                        <code id="worker-cmd">cd KyoboLibrary/book-capture && python -m bookcapture worker</code>
+                        <button onclick="navigator.clipboard.writeText(document.getElementById('worker-cmd').textContent).then(()=>this.textContent='✓ 복사됨');">복사</button>
+                    </div>
+                </div>` : '';
+
+            const cancelBtn = isPending
+                ? `<button class="bbtn" style="flex:none;padding:4px 10px;font-size:11px;" onclick="cancelCurrentJob(${job.id})">취소</button>`
+                : '';
+
             extra.innerHTML = `
-                <div style="margin-top:14px;padding:12px;background:rgba(245,158,11,0.1);border:1px solid #f59e0b;border-radius:6px;color:#fbbf24;font-size:0.82rem;line-height:1.6;">
-                    ⓘ <strong>현재 분석은 사용자 Mac에서 직접 실행</strong> (백엔드 자동 큐는 Phase C-3 Part3 예정).<br>
-                    아래 명령을 터미널에서 실행하면 캡처 → OCR → AI 요약 → HTML 빌드까지 진행됩니다.
-                </div>
-                <div class="cmd-box">
-                    <code id="cmd-text">${escapeHtml(cmd)}</code>
-                    <button onclick="navigator.clipboard.writeText(document.getElementById('cmd-text').textContent).then(()=>this.textContent='✓ 복사됨');">복사</button>
-                </div>
-                <div style="margin-top:8px;font-size:0.74rem;color:#8b96a8;font-family:monospace;">
-                    완료 후 NAS 배포: <code style="color:#22d3ee;">cd ../ && ./deploy.sh --static</code> → 새로고침
+                <div style="margin-top:14px;padding:12px;background:#0e1218;border:1px solid #2f3a4d;border-radius:6px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+                        <span style="color:#8b96a8;font-size:0.78rem;font-family:monospace;">job #${job.id}</span>
+                        <span id="job-status">${jobStatusBadge(job.status)}</span>
+                        ${cancelBtn}
+                    </div>
+                    <div id="job-progress" style="color:#e6ecf2;font-size:0.82rem;font-family:monospace;min-height:1.2em;">
+                        ${escapeHtml(job.progress || '...')}
+                    </div>
+                    <div id="job-error" style="color:#ef4444;font-size:0.78rem;margin-top:6px;font-family:monospace;white-space:pre-wrap;"></div>
+                    ${cmdHint}
                 </div>
             `;
+        }
+
+        async function pollJobOnce(jid, slug) {
+            try {
+                const r = await fetch(`${BRIDGE_URL}/api/jobs/${jid}`, { cache: 'no-store' });
+                if (!r.ok) return false;
+                const j = await r.json();
+                const job = j.job;
+                const statusEl = document.getElementById('job-status');
+                const progEl = document.getElementById('job-progress');
+                const errEl = document.getElementById('job-error');
+                if (statusEl) statusEl.innerHTML = jobStatusBadge(job.status);
+                if (progEl) progEl.textContent = job.progress || '...';
+                if (errEl) errEl.textContent = job.error || '';
+
+                if (['done', 'failed', 'cancelled'].includes(job.status)) {
+                    stopPolling();
+                    if (job.status === 'done') {
+                        // 분석 완료 — 카탈로그 새로고침 + 모달 푸터 갱신
+                        await loadAnalyzed();
+                        renderKyoboBooks(_kyoboBooks);
+                        // 모달 푸터에 [분석 페이지] 활성화 트리거 — 같은 책 다시 열기
+                        setTimeout(() => {
+                            const book = _kyoboBooks.find(b => slugify(b.title) === slug);
+                            if (book) openBookModal(book);
+                        }, 300);
+                    }
+                    return true;
+                }
+            } catch (e) {
+                console.warn('poll fail:', e);
+            }
+            return false;
+        }
+
+        function startPolling(jid, slug) {
+            stopPolling();
+            _pollTimer = setInterval(() => pollJobOnce(jid, slug), 3000);
+            pollJobOnce(jid, slug);
+        }
+        function stopPolling() {
+            if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+        }
+
+        async function cancelCurrentJob(jid) {
+            try {
+                await fetch(`${BRIDGE_URL}/api/jobs/${jid}`, { method: 'DELETE' });
+                await pollJobOnce(jid, '');
+            } catch (e) {}
         }
 
         function tryParseJson(s) {

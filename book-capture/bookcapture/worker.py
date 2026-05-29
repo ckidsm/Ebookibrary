@@ -1,0 +1,166 @@
+"""백엔드 jobs 큐를 polling 하는 worker.
+
+흐름:
+  ┌────────────────┐                   ┌────────────────┐
+  │  Web (8080)    │ POST /api/jobs    │   Bridge       │
+  │  [분석 시작]   │ ────────────────▶ │   (SQLite)     │
+  └────────────────┘                   │   jobs.status  │
+                                       │   = 'pending'  │
+                                       └───────┬────────┘
+                                               │ POST /api/jobs/next/claim
+                                               ▼
+                                       ┌────────────────┐
+                                       │ Mac worker     │
+                                       │  ./bookcapture │
+                                       │   ocr+sum+...  │
+                                       └───┬────────────┘
+                                           │ PATCH progress, status
+                                           ▼ done/failed
+
+캡처 단계는 인터랙티브 + 책 열기가 필요해 워커가 자동 못 함.
+=> mode='auto' 일 때는 OCR + 요약 + merge + build 만 자동.
+   capture 는 사용자가 별도 `bookcapture capture --mode 3` 으로 미리 진행.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import time
+import traceback
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+from .settings import DEFAULT_BRIDGE_URL, load as load_settings
+
+
+def _http(method: str, url: str, body: dict | None = None, timeout: float = 10.0) -> dict:
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    headers = {"Accept": "application/json"}
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        body_txt = resp.read().decode("utf-8") or "{}"
+        return json.loads(body_txt) if body_txt.strip().startswith("{") else {}
+
+
+def claim_one(bridge: str) -> dict | None:
+    try:
+        r = _http("POST", f"{bridge}/api/jobs/next/claim")
+        return r.get("job")
+    except urllib.error.HTTPError as e:
+        print(f"[worker] claim 실패: HTTP {e.code} {e.read().decode()[:200]}")
+    except Exception as e:
+        print(f"[worker] claim 실패: {e}")
+    return None
+
+
+def report(bridge: str, jid: int, **fields) -> None:
+    try:
+        _http("PATCH", f"{bridge}/api/jobs/{jid}", body=fields)
+    except Exception as e:
+        print(f"[worker] report 실패 ({jid}): {e}")
+
+
+def run_one(bridge: str, job: dict) -> None:
+    jid = job["id"]
+    slug = job["slug"]
+    mode = job.get("mode") or "auto"
+    pages = job.get("pages")
+    print(f"\n[worker] === job #{jid} 시작 (slug={slug}, mode={mode}) ===")
+
+    s = load_settings(bridge_url=bridge)
+    books_dir = Path(s.output.books_dir).expanduser().resolve()
+    book_dir = books_dir / slug
+
+    # 사전 점검: 책 폴더에 *.png 있어야 OCR 가능
+    if mode != "capture-only" and not list(book_dir.glob("*.png")):
+        msg = (
+            f"책 폴더에 캡처 PNG 없음: {book_dir}\n"
+            f"먼저 터미널에서:  python -m bookcapture capture --mode 3\n"
+            f"  (또는 --slug {slug!r})"
+        )
+        print(f"[worker] {msg}")
+        report(bridge, jid, status="failed", error=msg)
+        return
+
+    # CLI 서브커맨드 결정
+    steps: list[list[str]] = []
+    if mode == "summarize-only":
+        steps = [
+            ["ocr", "--book-dir", str(book_dir)],
+            ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
+            ["merge", "--book-dir", str(book_dir)],
+            ["build", "--book-dir", str(book_dir)],
+        ]
+    elif mode == "capture-only":
+        steps = [["capture", "--mode", "3"]]
+    else:  # auto = OCR + summarize + merge + build
+        steps = [
+            ["ocr", "--book-dir", str(book_dir)],
+            ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
+            ["merge", "--book-dir", str(book_dir)],
+            ["build", "--book-dir", str(book_dir)],
+        ]
+
+    stdout_buf: list[str] = []
+    for i, args in enumerate(steps, 1):
+        step_name = args[0]
+        report(bridge, jid, progress=f"[{i}/{len(steps)}] {step_name} 실행 중...")
+        print(f"\n[worker] [{i}/{len(steps)}] {step_name} ...")
+        try:
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "bookcapture", *args],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+            assert proc.stdout
+            for line in proc.stdout:
+                print(line, end="")
+                stdout_buf.append(line)
+                if len(stdout_buf) > 200:
+                    stdout_buf = stdout_buf[-200:]
+                # 진행률에 자주 갱신
+                if any(k in line for k in ("OCR", "summarize", "page", "[merge]", "[build")):
+                    report(bridge, jid, progress=f"[{i}/{len(steps)}] " + line.strip()[:120])
+            rc = proc.wait()
+            if rc != 0:
+                msg = f"step '{step_name}' exit {rc}"
+                report(bridge, jid, status="failed", error=msg,
+                       stdout_tail="".join(stdout_buf[-30:]))
+                print(f"[worker] ✗ {msg}")
+                return
+        except Exception as e:
+            tb = traceback.format_exc()
+            report(bridge, jid, status="failed", error=f"{type(e).__name__}: {e}",
+                   stdout_tail="".join(stdout_buf[-20:]) + "\n" + tb[-500:])
+            print(f"[worker] ✗ exception in {step_name}: {e}")
+            return
+
+    report(bridge, jid, status="done", progress="완료",
+           stdout_tail="".join(stdout_buf[-30:]))
+    print(f"[worker] ✓ job #{jid} 완료")
+
+
+def run_worker(bridge: str | None = None, interval: float = 5.0) -> int:
+    bridge = (bridge or DEFAULT_BRIDGE_URL).rstrip("/")
+    print(f"[worker] 시작 · bridge={bridge} · {interval}s polling")
+    print(f"[worker] Ctrl+C 로 종료")
+    while True:
+        try:
+            job = claim_one(bridge)
+            if job:
+                run_one(bridge, job)
+            else:
+                time.sleep(interval)
+        except KeyboardInterrupt:
+            print("\n[worker] 사용자 종료")
+            return 0
+        except Exception as e:
+            print(f"[worker] loop 오류: {e}")
+            time.sleep(interval)

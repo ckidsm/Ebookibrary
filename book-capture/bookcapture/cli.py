@@ -25,6 +25,7 @@ from . import ocr as ocr_mod
 from . import build_html
 from . import merge as merge_mod
 from . import summarize as summarize_mod
+from . import worker as worker_mod
 
 
 def cmd_settings(args) -> int:
@@ -129,6 +130,11 @@ def cmd_summarize(args) -> int:
     return 0 if not res["errors"] else 1
 
 
+def cmd_worker(args) -> int:
+    """백엔드 jobs 큐 polling — 한 번 띄워두면 [분석 시작] 클릭마다 자동 처리."""
+    return worker_mod.run_worker(bridge=args.bridge, interval=args.interval)
+
+
 def cmd_run(args) -> int:
     """capture → ocr → (summarize) → merge → build 일괄 (대화형)."""
     rc = cmd_capture(args)
@@ -177,6 +183,10 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--pages", help="페이지 범위 (예: 127-155)")
     ps.add_argument("--out", help="출력 파일명 (기본: batch_<첫페이지>.json)")
     ps.set_defaults(func=cmd_summarize)
+
+    pw = sub.add_parser("worker", help="백엔드 jobs 큐 polling (한 번 띄워두면 [분석 시작] 자동 처리)")
+    pw.add_argument("--interval", type=float, default=5.0, help="polling 간격(초, 기본 5)")
+    pw.set_defaults(func=cmd_worker)
 
     pr = sub.add_parser("run", help="capture → ocr → summarize → build 일괄")
     pr.add_argument("--slug")
