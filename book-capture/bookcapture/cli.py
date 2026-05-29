@@ -52,6 +52,34 @@ def cmd_capture(args) -> int:
     return 0
 
 
+def cmd_capture_auto(args) -> int:
+    """비대화형 자동 캡처 — worker 가 호출하는 진입점.
+    교보 앱이 띄워져 있고 책의 첫 페이지가 보이는 상태 가정."""
+    from . import kyobo_app
+    s = cfg.load(bridge_url=args.bridge)
+    if not args.slug:
+        print("✗ --slug 필수 (도서 폴더명)", file=sys.stderr); return 2
+    out_dir = Path(s.output.books_dir).expanduser().resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    print(f"[capture-auto] 출력: {out_dir}/{args.slug}")
+    print(f"[capture-auto] count={args.count} interval={args.interval}s use_ocr={not args.no_ocr}")
+
+    bot = kyobo_app.KyoboAppScreenshot(output_dir=str(out_dir), book_folder=args.slug)
+    if not bot.is_app_running():
+        print("[capture-auto] 교보eBook.app 실행 시도...")
+        bot.launch_app()
+    bot.take_multiple_screenshots(
+        count=args.count,
+        interval=args.interval,
+        auto_page_turn=True,
+        start_page=args.start_page,
+        continue_from_last=args.continue_from_last,
+        use_ocr=not args.no_ocr,
+        noninteractive=True,
+    )
+    return 0
+
+
 def _resolve_book_dir(args) -> Path:
     s = cfg.load(bridge_url=args.bridge)
     base = Path(s.output.books_dir).expanduser().resolve()
@@ -160,6 +188,15 @@ def build_parser() -> argparse.ArgumentParser:
     pc = sub.add_parser("capture", help="기존 kyobo_app 캡처 인터랙티브")
     pc.add_argument("--mode", choices=["1", "2", "3"], help="1=전체 / 2=윈도우 / 3=연속")
     pc.set_defaults(func=cmd_capture)
+
+    pca = sub.add_parser("capture-auto", help="비대화형 자동 캡처 (worker용, 도서 열려있어야 함)")
+    pca.add_argument("--slug", required=True)
+    pca.add_argument("--count", type=int, default=300)
+    pca.add_argument("--interval", type=float, default=2.0)
+    pca.add_argument("--start-page", type=int, default=1)
+    pca.add_argument("--no-ocr", action="store_true")
+    pca.add_argument("--continue-from-last", action="store_true")
+    pca.set_defaults(func=cmd_capture_auto)
 
     po = sub.add_parser("ocr", help="책 폴더 OCR")
     po.add_argument("--slug")

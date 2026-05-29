@@ -539,7 +539,7 @@ class KyoboAppScreenshot:
 
     def take_multiple_screenshots(self, count=1, interval=3, custom_prefix=None,
                                   auto_page_turn=True, start_page=1, continue_from_last=False,
-                                  use_ocr=True):
+                                  use_ocr=True, noninteractive=False):
         """
         여러 장의 스크린샷을 간격을 두고 캡처 (자동 페이지 넘김 포함)
 
@@ -551,6 +551,7 @@ class KyoboAppScreenshot:
             start_page: 시작 페이지 번호
             continue_from_last: True면 폴더의 마지막 페이지 다음부터 계속
             use_ocr: True면 OCR로 실제 페이지 번호를 추출하여 파일명 지정
+            noninteractive: True면 input() 프롬프트 모두 스킵 (worker 호출용)
 
         Returns:
             저장된 파일 경로 리스트
@@ -586,7 +587,11 @@ class KyoboAppScreenshot:
                 print("📖 OCR 모드: 캡처 후 자동으로 페이지 번호를 추출합니다.")
                 print("   전체 화면 모드에서 좌하단 페이지 정보가 보여야 합니다!")
 
-            input(f"📚 도서를 열고 시작 페이지로 이동한 후 엔터를 누르세요...")
+            if noninteractive:
+                print("📚 비대화형 모드: 도서가 이미 열려있다고 가정. 3초 후 시작...")
+                time.sleep(3)
+            else:
+                input(f"📚 도서를 열고 시작 페이지로 이동한 후 엔터를 누르세요...")
             print("\n⏳ 앱을 활성화하는 중...")
 
             # 앱 활성화
@@ -600,15 +605,21 @@ class KyoboAppScreenshot:
                     print("      OCR 모드에서는 전체 화면 필수입니다!")
                 else:
                     print("      윈도우 창 자체가 캡처될 수 있습니다.")
-                user_input = input("전체 화면으로 전환하시겠습니까? (y/n, 기본값=y): ").strip().lower()
-
-                if user_input != 'n':
-                    print("🖥️  전체 화면으로 전환 중...")
+                if noninteractive:
+                    print("🖥️  비대화형 모드: 자동으로 전체 화면 전환 시도...")
                     if self.set_fullscreen(True):
                         print("✅ 전체 화면으로 전환되었습니다.")
                     else:
-                        print("❌ 전체 화면 전환에 실패했습니다. 수동으로 전환해주세요.")
-                        input("전체 화면으로 전환 후 엔터를 누르세요...")
+                        print("⚠️  전체 화면 전환 실패 — 현재 상태로 계속 진행")
+                else:
+                    user_input = input("전체 화면으로 전환하시겠습니까? (y/n, 기본값=y): ").strip().lower()
+                    if user_input != 'n':
+                        print("🖥️  전체 화면으로 전환 중...")
+                        if self.set_fullscreen(True):
+                            print("✅ 전체 화면으로 전환되었습니다.")
+                        else:
+                            print("❌ 전체 화면 전환에 실패했습니다. 수동으로 전환해주세요.")
+                            input("전체 화면으로 전환 후 엔터를 누르세요...")
             else:
                 print("✅ 전체 화면 모드 확인 완료")
 

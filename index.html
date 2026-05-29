@@ -1041,7 +1041,7 @@
                 }
                 const j = await r.json();
                 const job = j.job;
-                renderJobBox(job, slug);
+                await renderJobBox(job, slug);
                 startPolling(job.id, slug);
             } catch (e) {
                 extra.innerHTML = `<div style="color:#ef4444;margin-top:14px;">✗ ${escapeHtml(String(e))}</div>`;
@@ -1052,27 +1052,51 @@
             pending: '대기 중', running: '실행 중',
             done: '완료', failed: '실패', cancelled: '취소됨',
         };
-        const STAGES_AUTO = ['ocr', 'summarize', 'merge', 'build'];
+        const STAGES_AUTO = ['capture-auto', 'ocr', 'summarize', 'merge', 'build'];
+        const STAGE_LABEL = {
+            'capture-auto': '캡처', ocr: 'OCR', summarize: '요약', merge: '병합', build: 'HTML',
+        };
+
+        async function fetchWorkerStatus() {
+            try {
+                const r = await fetch(`${BRIDGE_URL}/api/worker/status`, { cache: 'no-store' });
+                if (!r.ok) return { alive: false };
+                return await r.json();
+            } catch { return { alive: false }; }
+        }
 
         function parseProgress(s) {
             if (!s) return null;
             try { return JSON.parse(s); } catch { return { msg: String(s) }; }
         }
 
-        function renderJobBox(job, slug) {
+        async function renderJobBox(job, slug) {
             const extra = document.getElementById('bmodal-extra');
             const isPending = job.status === 'pending';
-            const cmdHint = isPending ? `
-                <div style="margin-top:10px;padding:10px;background:rgba(245,158,11,0.1);border:1px solid #f59e0b;border-radius:6px;color:#fbbf24;font-size:0.78rem;line-height:1.6;">
-                    ⚠ 워커가 안 떠 있으면 영원히 대기 상태입니다. Mac 터미널에서 한 번 실행:
+
+            // worker heartbeat 즉시 확인
+            const ws = await fetchWorkerStatus();
+            const workerHint = isPending && !ws.alive ? `
+                <div style="margin-top:10px;padding:10px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:6px;color:#fca5a5;font-size:0.78rem;line-height:1.6;">
+                    🛑 <strong>Worker 미실행</strong> — 작업이 영원히 대기합니다. Mac 터미널에서 한 번 실행:
                     <div class="cmd-box" style="margin-top:6px;">
                         <code id="worker-cmd">cd KyoboLibrary/book-capture && python -m bookcapture worker</code>
                         <button onclick="navigator.clipboard.writeText(document.getElementById('worker-cmd').textContent).then(()=>this.textContent='✓ 복사됨');">복사</button>
                     </div>
                 </div>` : '';
+            const workerOk = ws.alive ? `
+                <div style="margin-top:6px;font-size:0.72rem;color:#10b981;font-family:monospace;">
+                    ✓ worker 살아있음 (${ws.worker_ip}, ${ws.last_ping_ago_sec}s 전)
+                </div>` : '';
+
+            const captureHint = isPending && ws.alive ? `
+                <div style="margin-top:8px;padding:8px 10px;background:rgba(34,211,238,0.08);border:1px solid #22d3ee;border-radius:6px;color:#a5f3fc;font-size:0.78rem;line-height:1.5;">
+                    📖 <strong>교보eBook.app 에서 이 책을 열고 첫 페이지로 가세요</strong> —
+                    그 다음 자동으로 페이지 넘기며 캡처 → OCR → 요약 → HTML 빌드까지 진행됩니다.
+                </div>` : '';
 
             const stageBoxes = STAGES_AUTO.map(s =>
-                `<div class="pstage" data-stage="${s}">${s}</div>`
+                `<div class="pstage" data-stage="${s}">${STAGE_LABEL[s] || s}</div>`
             ).join('');
 
             extra.innerHTML = `
@@ -1085,11 +1109,13 @@
                     </div>
                     <div class="pbar"><div class="pbar-fill" id="pjob-fill" style="width:0%"></div></div>
                     <div class="pstages" id="pjob-stages">${stageBoxes}</div>
-                    <div class="pjob-msg" id="pjob-msg">${escapeHtml(job.progress || '대기...')}</div>
+                    <div class="pjob-msg" id="pjob-msg">${escapeHtml(job.progress || '대기 중...')}</div>
                     <div class="pjob-sub" id="pjob-sub"></div>
                     <div class="pjob-err" id="pjob-err"></div>
+                    ${workerOk}
                 </div>
-                ${cmdHint}
+                ${workerHint}
+                ${captureHint}
             `;
             applyProgress(job);
         }

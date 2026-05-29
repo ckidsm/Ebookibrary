@@ -44,6 +44,7 @@ from .settings import DEFAULT_BRIDGE_URL, load as load_settings
 _PROGRESS_PATTERNS = [
     re.compile(r"\[ocr\]\s+(\d+)/(\d+)\s+\S+"),
     re.compile(r"\[summarize\]\s+(\d+)/(\d+)"),
+    re.compile(r"\[(\d+)/(\d+)\]\s+캡처"),   # capture-auto 의 "[12/300] 캡처 중..."
 ]
 
 
@@ -114,20 +115,16 @@ def run_one(bridge: str, job: dict) -> None:
     books_dir = Path(s.output.books_dir).expanduser().resolve()
     book_dir = books_dir / slug
 
-    # 사전 점검: 책 폴더에 *.png 있어야 OCR 가능
-    if mode != "capture-only" and not list(book_dir.glob("*.png")):
-        msg = (
-            f"책 폴더에 캡처 PNG 없음: {book_dir}\n"
-            f"먼저 터미널에서:  python -m bookcapture capture --mode 3\n"
-            f"  (또는 --slug {slug!r})"
-        )
-        print(f"[worker] {msg}")
-        report(bridge, jid, status="failed", error=msg)
-        return
-
     # CLI 서브커맨드 결정
     steps: list[list[str]] = []
     if mode == "summarize-only":
+        # 캡처 PNG 가 미리 있어야 함
+        if not list(book_dir.glob("*.png")):
+            msg = (f"책 폴더에 캡처 PNG 없음: {book_dir}\n"
+                   f"먼저 capture-only 작업 실행 또는 수동 capture")
+            print(f"[worker] {msg}")
+            report(bridge, jid, status="failed", error=msg)
+            return
         steps = [
             ["ocr", "--book-dir", str(book_dir)],
             ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
@@ -135,9 +132,10 @@ def run_one(bridge: str, job: dict) -> None:
             ["build", "--book-dir", str(book_dir)],
         ]
     elif mode == "capture-only":
-        steps = [["capture", "--mode", "3"]]
-    else:  # auto = OCR + summarize + merge + build
+        steps = [["capture-auto", "--slug", slug, "--count", "300", "--interval", "2"]]
+    else:  # auto = capture + ocr + summarize + merge + build (5단계)
         steps = [
+            ["capture-auto", "--slug", slug, "--count", "300", "--interval", "2"],
             ["ocr", "--book-dir", str(book_dir)],
             ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
             ["merge", "--book-dir", str(book_dir)],
@@ -210,12 +208,20 @@ def run_one(bridge: str, job: dict) -> None:
     print(f"[worker] ✓ job #{jid} 완료")
 
 
+def ping(bridge: str) -> None:
+    try:
+        _http("POST", f"{bridge}/api/worker/ping", body={}, timeout=3.0)
+    except Exception:
+        pass  # silent — heartbeat 실패해도 worker 자체는 계속
+
+
 def run_worker(bridge: str | None = None, interval: float = 5.0) -> int:
     bridge = (bridge or DEFAULT_BRIDGE_URL).rstrip("/")
     print(f"[worker] 시작 · bridge={bridge} · {interval}s polling")
     print(f"[worker] Ctrl+C 로 종료")
     while True:
         try:
+            ping(bridge)
             job = claim_one(bridge)
             if job:
                 run_one(bridge, job)

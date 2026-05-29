@@ -245,6 +245,41 @@ def put_settings(payload: SettingsUpdate) -> dict:
     return {"ok": True, "updated_keys": n}
 
 
+# ── Worker heartbeat (Phase C-3 Part3 보강) ─────────────────
+_worker_last_seen: dict[str, float] = {}  # ip → timestamp
+
+@app.post("/api/worker/ping")
+def worker_ping(request: Request) -> dict:
+    """worker 가 polling 마다 호출. 프론트가 /api/worker/status 로 확인."""
+    client = request.client.host if request.client else "unknown"
+    if not _is_lan(client):
+        raise HTTPException(403, "LAN 전용")
+    import time as _t
+    _worker_last_seen[client] = _t.time()
+    return {"ok": True, "client": client}
+
+
+@app.get("/api/worker/status")
+def worker_status() -> dict:
+    """가장 최근 ping 으로부터 N초 이내면 alive."""
+    import time as _t
+    now = _t.time()
+    alive = False
+    last_ip = None
+    last_ago = None
+    for ip, ts in _worker_last_seen.items():
+        ago = now - ts
+        if ago < 30:  # 30초 이내 ping = alive
+            alive = True
+            if last_ago is None or ago < last_ago:
+                last_ago = ago; last_ip = ip
+    return {
+        "alive": alive,
+        "worker_ip": last_ip,
+        "last_ping_ago_sec": round(last_ago, 1) if last_ago is not None else None,
+    }
+
+
 # ── Phase C-3 Part3: 분석 작업 큐 ───────────────────────────
 class JobCreate(BaseModel):
     slug: str
