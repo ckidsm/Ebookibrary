@@ -1068,6 +1068,29 @@
         // ── Phase C-3 Part3: 백엔드 큐로 작업 등록 + 진행 polling ──
         let _pollTimer = null;
 
+        function backendUnreachableHint() {
+            const isExternal = !(location.port === '8080' || location.hostname === '192.168.10.205');
+            if (isExternal) {
+                return `
+                    <div style="margin-top:14px;padding:14px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:6px;color:#fca5a5;font-size:0.82rem;line-height:1.7;">
+                        🛑 <strong>외부 환경 — 백엔드 API 가 외부 노출 안 됨</strong><br>
+                        쓰기 동작(분석 시작·동기화·설정 저장) 은 LAN 직접 접속이나
+                        <strong>DSM Reverse Proxy</strong> 설정 후 가능합니다.
+                        <div style="margin-top:8px;font-size:0.74rem;color:#8b96a8;line-height:1.6;">
+                            <strong>옵션 1</strong> · LAN 환경에서 접속 → <code style="color:#22d3ee;">http://192.168.10.205:8080/</code><br>
+                            <strong>옵션 2</strong> · DSM 제어판 → 로그인 포털 → 고급 → Reverse Proxy 에서
+                            <code style="color:#22d3ee;">redcodeme.synology.me/api/*</code> → <code style="color:#22d3ee;">localhost:9000/*</code> 매핑 추가
+                            (자세히는 <code style="color:#a5b4fc;">docs/EXTERNAL_ACCESS.md</code>)
+                        </div>
+                    </div>`;
+            }
+            return `
+                <div style="margin-top:14px;padding:14px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:6px;color:#fca5a5;font-size:0.82rem;line-height:1.7;">
+                    🛑 <strong>백엔드 미응답</strong> — kyobo-bridge (port 9000) 컨테이너 점검 필요.<br>
+                    <code style="color:#22d3ee;">ssh RedCode@192.168.10.205 "/usr/local/bin/docker ps | grep kyobo-bridge"</code>
+                </div>`;
+        }
+
         async function showAnalyzeCmd(book, slug) {
             const extra = document.getElementById('bmodal-extra');
             extra.innerHTML = `<div style="margin-top:14px;color:#8b96a8;font-size:0.82rem;">작업 등록 중...</div>`;
@@ -1078,9 +1101,15 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ slug, title: book.title, mode: 'auto' }),
                 });
+                // 응답이 JSON 아니면 백엔드 미응답 (Synology DSM 의 기본 페이지가 답한 경우 등)
+                const ctype = r.headers.get('content-type') || '';
+                if (!ctype.toLowerCase().includes('application/json')) {
+                    extra.innerHTML = backendUnreachableHint();
+                    return;
+                }
                 if (!r.ok) {
-                    const t = await r.text();
-                    extra.innerHTML = `<div style="color:#ef4444;margin-top:14px;">✗ 작업 등록 실패: ${escapeHtml(t.slice(0,200))}</div>`;
+                    const j = await r.json().catch(() => ({}));
+                    extra.innerHTML = `<div style="color:#ef4444;margin-top:14px;">✗ HTTP ${r.status}: ${escapeHtml(j.detail || JSON.stringify(j).slice(0,200))}</div>`;
                     return;
                 }
                 const j = await r.json();
@@ -1088,7 +1117,9 @@
                 await renderJobBox(job, slug);
                 startPolling(job.id, slug);
             } catch (e) {
-                extra.innerHTML = `<div style="color:#ef4444;margin-top:14px;">✗ ${escapeHtml(String(e))}</div>`;
+                // 네트워크 오류 — fetch 자체 실패 (DNS, CORS, 차단 등)
+                extra.innerHTML = backendUnreachableHint();
+                console.warn('analyze POST fail:', e);
             }
         }
 
