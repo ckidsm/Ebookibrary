@@ -37,10 +37,25 @@ if [[ ! -x "$VENV_PY" ]]; then
     step "venv 생성: $VENV_DIR"
     python3 -m venv "$VENV_DIR"
     "$VENV_PY" -m pip install --quiet --upgrade pip
-    step "의존성 설치 (Pillow, pytesseract)"
+    step "의존성 설치 (Pillow, pytesseract, playwright)"
     "$VENV_PY" -m pip install --quiet -r "$BOOK_CAPTURE_DIR/requirements.txt"
 else
     step "venv 이미 존재: $VENV_DIR"
+    # 기존 venv 가 있어도 requirements 변경 대비 한 번 upgrade
+    "$VENV_PY" -m pip install --quiet -r "$BOOK_CAPTURE_DIR/requirements.txt" 2>/dev/null || true
+fi
+
+# 1-b) Playwright Chromium 브라우저 설치 (~120MB, 한 번만)
+if ! "$VENV_PY" -c "import playwright" 2>/dev/null; then
+    warn "playwright 모듈 누락 — requirements 확인 필요"
+else
+    PW_BROWSERS_DIR="$HOME/Library/Caches/ms-playwright"
+    if ! ls "$PW_BROWSERS_DIR"/chromium-* >/dev/null 2>&1; then
+        step "Playwright Chromium 다운로드 (~120MB, 처음만)"
+        "$VENV_PY" -m playwright install chromium 2>&1 | tail -3 || warn "Chromium 설치 실패 — 수동: $VENV_PY -m playwright install chromium"
+    else
+        step "Playwright Chromium 이미 존재"
+    fi
 fi
 
 # 2) tesseract 점검
@@ -92,7 +107,7 @@ cat > "$PLIST_PATH" <<EOF
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
         <key>LANG</key>
         <string>ko_KR.UTF-8</string>
     </dict>
@@ -103,18 +118,22 @@ cat > "$PLIST_PATH" <<EOF
 </plist>
 EOF
 
-# 4) 기존 등록 정리 후 로드
-if launchctl list | grep -q "$LABEL"; then
+# 4) 기존 등록 정리 후 로드 (bootstrap = macOS 10.11+, load = legacy 폴백)
+UID_GUI="gui/$(id -u)"
+if launchctl print "$UID_GUI/$LABEL" >/dev/null 2>&1; then
     step "기존 등록 해제"
-    launchctl unload "$PLIST_PATH" 2>/dev/null || true
+    launchctl bootout "$UID_GUI/$LABEL" 2>/dev/null || launchctl unload "$PLIST_PATH" 2>/dev/null || true
 fi
 step "launchd 등록 + 즉시 시작"
-launchctl load -w "$PLIST_PATH"
+if ! launchctl bootstrap "$UID_GUI" "$PLIST_PATH" 2>/dev/null; then
+    warn "bootstrap 실패 — legacy load 로 폴백"
+    launchctl load -w "$PLIST_PATH"
+fi
 
 sleep 1
 step "상태"
-if launchctl list | grep -q "$LABEL"; then
-    pid=$(launchctl list | awk -v l="$LABEL" '$3==l {print $1}')
+if launchctl print "$UID_GUI/$LABEL" >/dev/null 2>&1; then
+    pid=$(launchctl print "$UID_GUI/$LABEL" 2>/dev/null | awk '/pid =/ {print $3; exit}')
     echo "   PID: ${pid:-unknown}"
     echo "   로그: $LOG_DIR/worker.out.log"
     echo "   plist: $PLIST_PATH"
@@ -122,6 +141,10 @@ if launchctl list | grep -q "$LABEL"; then
     echo -e "${c_g}✓ worker 백그라운드 등록 완료${c_x}"
     echo "   Mac 재부팅 시에도 자동 시작됩니다."
     echo "   정지·제거: $SCRIPT_DIR/uninstall-worker-macos.sh"
+elif launchctl list 2>/dev/null | grep -q "$LABEL"; then
+    pid=$(launchctl list | awk -v l="$LABEL" '$3==l {print $1}')
+    echo "   PID: ${pid:-unknown} (legacy 모드)"
+    echo -e "${c_g}✓ worker 등록 완료 (legacy)${c_x}"
 else
-    die "등록 실패 — launchctl list | grep $LABEL"
+    die "등록 실패 — 진단: launchctl print $UID_GUI/$LABEL"
 fi

@@ -414,6 +414,60 @@
         </div>
     </div>
 
+    <div class="card" id="gatekeeper" style="border-color:#f59e0b;background:rgba(245,158,11,0.06);">
+        <div class="card-head">
+            <span class="step-num">!</span>
+            <h2>워커 인스톨러가 '확인되지 않은 개발자' 로 차단됐어요</h2>
+        </div>
+        <div class="card-body">
+            <p>
+                macOS Gatekeeper 는 Apple 에서 사인하지 않은 파일을 첫 실행 시 차단합니다.
+                <strong>1회만</strong> 시스템 설정에서 허용하면 다음부턴 더블클릭만으로 동작합니다.
+            </p>
+            <ol style="line-height:1.9;">
+                <li>
+                    <strong>차단 알림</strong> 에서 <strong>[완료]</strong> 클릭 (휴지통 이동 X)
+                    <div style="color:#94a3b8;font-size:0.85em;">
+                        ⚠ '휴지통으로 이동' 누르면 파일이 지워지니 절대 누르지 마세요.
+                    </div>
+                </li>
+                <li>
+                    <code style="background:#0a0c10;padding:2px 8px;border-radius:4px;color:#22d3ee;">⌘ + Space</code> →
+                    <strong>'시스템 설정'</strong> 입력 → 엔터
+                </li>
+                <li>왼쪽 메뉴 <strong>개인정보 보호 및 보안</strong> 클릭</li>
+                <li>
+                    아래로 스크롤 → <strong>'보안'</strong> 섹션에 이 메시지가 보입니다:
+                    <div style="margin:6px 0;padding:10px 14px;background:#0a0c10;border-left:3px solid #f59e0b;border-radius:4px;font-size:0.88em;color:#cbd5e1;">
+                        "<strong>restart-worker.command</strong>"이(가) <strong>확인되지 않은 개발자</strong>에 의해 차단되어<br>
+                        사용이 차단되었습니다.&nbsp;&nbsp;&nbsp;<button style="background:#22d3ee;border:none;padding:4px 12px;border-radius:4px;color:#0a0c10;font-weight:700;cursor:default;">그래도 허용</button>
+                    </div>
+                </li>
+                <li>
+                    <strong>[그래도 허용]</strong> 클릭 → Touch ID 또는 비밀번호 인증
+                </li>
+                <li>
+                    Finder 에서 파일 다시 더블클릭 →
+                    <strong>['{파일명}'을(를) 여시겠습니까?]</strong> 창에 이제 <strong>[열기]</strong> 버튼이 보입니다
+                </li>
+                <li>
+                    Terminal 자동 실행 → 설치/재시작 자동 진행
+                </li>
+            </ol>
+            <div style="margin-top:1rem;padding:12px 14px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.4);border-radius:6px;color:#6ee7b7;font-size:0.9em;">
+                💡 <strong>다음부턴 그냥 더블클릭만</strong>으로 동작합니다. 같은 파일을 다시 다운로드하지 않는 한 1회로 끝.
+            </div>
+
+            <details style="margin-top:1rem;">
+                <summary style="cursor:pointer;color:#a5b4fc;font-size:0.9em;">전문가용: Terminal 한 줄로 quarantine 제거</summary>
+                <div style="margin-top:8px;padding:10px;background:#0a0c10;border-radius:6px;font-size:0.85em;line-height:1.6;color:#cbd5e1;">
+                    다운로드 받은 .command 파일에 붙은 quarantine 속성을 한 줄로 제거하면 차단 알림 자체가 안 뜹니다:
+                    <pre style="margin:6px 0 0;color:#22d3ee;font-family:'SF Mono',Menlo,monospace;font-size:0.95em;">xattr -dr com.apple.quarantine ~/Downloads/restart-worker.command</pre>
+                </div>
+            </details>
+        </div>
+    </div>
+
     <p class="footer">
         Kyobo Library · 설치 가이드 v1 · <a href="./" style="color:white;">← 메인으로</a>
     </p>

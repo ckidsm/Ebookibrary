@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>macOS 코드 사인·공증·.pkg 인스톨러 강의록</title>
+<style>
+/* === Palette #87 (material.colorion) ===
+   #26C6DA Cyan 400   · 가장 밝은 강조
+   #00B8D4 Cyan A700  · 메인 강조 (h2, link, primary)
+   #212121 Grey 900   · 본문 텍스트
+   #2196F3 Blue 500   · 보조 강조 (h4, fn)
+   #0277BD Light Blue 800 · 진한 강조 (h3, code, kw)
+   ────────────────────────────────────── */
+
+:root {
+    color-scheme: light;
+    --c-cyan-400:  #26C6DA;
+    --c-cyan-700:  #00B8D4;
+    --c-grey-900:  #212121;
+    --c-blue-500:  #2196F3;
+    --c-blue-800:  #0277BD;
+    --c-bg:        #ffffff;
+    --c-text-sub:  #5d6770;     /* Grey 900 의 살짝 옅은 톤 */
+    --c-text-muted:#7d8694;
+    --c-border:    #e3eaf0;
+    --c-surface:   #f5fafc;     /* 카드·코드 배경 (살짝 청록 톤) */
+}
+* { box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "SF Pro Text", system-ui, sans-serif;
+    background: var(--c-bg);
+    color: var(--c-grey-900);
+    margin: 0;
+    line-height: 1.7;
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 40px 28px 80px; }
+
+h1 {
+    font-size: 2rem;
+    margin: 0 0 8px;
+    background: linear-gradient(90deg, var(--c-cyan-700), var(--c-blue-800));
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+}
+.subtitle { color: var(--c-text-sub); font-size: 0.95rem; margin-bottom: 36px; }
+h2 {
+    color: var(--c-cyan-700);
+    border-left: 4px solid var(--c-cyan-700);
+    padding: 6px 14px;
+    margin: 48px 0 16px;
+    font-size: 1.45rem;
+}
+h3 {
+    color: var(--c-blue-800);
+    margin: 28px 0 10px;
+    font-size: 1.12rem;
+    border-bottom: 1px solid rgba(2,119,189,0.18);
+    padding-bottom: 4px;
+}
+h4 { color: var(--c-blue-500); margin: 20px 0 8px; font-size: 1rem; }
+
+.card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 20px 0;
+}
+.card.tip     { border-color: rgba(0,184,212,0.45);   background: rgba(0,184,212,0.06); }
+.card.warn    { border-color: rgba(33,150,243,0.45);  background: rgba(33,150,243,0.06); }
+.card.danger  { border-color: rgba(220,38,38,0.45);   background: rgba(220,38,38,0.05); }
+.card.success { border-color: rgba(38,198,218,0.55);  background: rgba(38,198,218,0.08); }
+.card .lbl { font-weight: 700; margin-bottom: 6px; }
+.card.tip .lbl     { color: var(--c-cyan-700); }
+.card.warn .lbl    { color: var(--c-blue-500); }
+.card.danger .lbl  { color: #dc2626; }
+.card.success .lbl { color: var(--c-cyan-700); }
+
+code {
+    background: var(--c-surface);
+    color: var(--c-blue-800);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.92em;
+    border: 1px solid var(--c-border);
+}
+pre {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.86rem;
+    line-height: 1.6;
+    color: var(--c-grey-900);
+}
+pre code { background: transparent; color: inherit; padding: 0; border: 0; }
+.cmt { color: var(--c-text-muted); font-style: italic; }
+.kw  { color: var(--c-blue-800); font-weight: 600; }
+.str { color: var(--c-cyan-700); }
+.num { color: var(--c-blue-500); }
+.fn  { color: var(--c-cyan-700); }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 0.92rem;
+}
+th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--c-border);
+    vertical-align: top;
+}
+th { color: var(--c-blue-800); font-weight: 600; background: var(--c-surface); }
+td code { white-space: nowrap; }
+
+.shot {
+    margin: 18px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--c-border);
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(33,33,33,0.05);
+}
+.shot img { display: block; width: 100%; height: auto; }
+.shot-cap {
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    color: var(--c-text-sub);
+    background: var(--c-surface);
+    border-top: 1px solid var(--c-border);
+}
+
+.flow {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 16px 0;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.88rem;
+}
+.flow .row {
+    padding: 12px 16px;
+    background: rgba(0,184,212,0.07);
+    border-left: 3px solid var(--c-cyan-700);
+    border-radius: 4px;
+    color: var(--c-grey-900);
+}
+.flow .row .num { color: var(--c-cyan-700); font-weight: 700; margin-right: 8px; }
+.flow .arr { text-align: center; color: var(--c-text-muted); }
+
+.toc {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
+    padding: 18px 24px;
+    margin: 24px 0 40px;
+}
+.toc ol { margin: 8px 0; padding-left: 22px; }
+.toc li { margin: 4px 0; }
+.toc a { color: var(--c-cyan-700); text-decoration: none; }
+.toc a:hover { text-decoration: underline; color: var(--c-blue-800); }
+
+.diagram {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.86rem;
+    line-height: 1.55;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    padding: 18px 22px;
+    color: var(--c-grey-900);
+    white-space: pre;
+    overflow-x: auto;
+}
+
+/* Mermaid 컨테이너 */
+.mermaid-wrap {
+    background: #ffffff;
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
+    padding: 24px 18px;
+    margin: 20px 0;
+    text-align: center;
+    overflow-x: auto;
+    box-shadow: 0 1px 3px rgba(33,33,33,0.05);
+}
+.mermaid {
+    display: inline-block;
+    background: transparent;
+    cursor: zoom-in;
+    transition: filter 0.15s ease;
+    padding: 4px;
+    border-radius: 6px;
+}
+.mermaid:hover { filter: brightness(0.97); box-shadow: 0 0 0 2px var(--c-cyan-700) inset; }
+.mermaid svg { max-width: 100%; height: auto; pointer-events: none; }
+.mermaid-cap {
+    margin-top: 14px;
+    font-size: 0.85rem;
+    color: var(--c-text-sub);
+    font-style: italic;
+}
+.mermaid-hint {
+    margin-top: 6px;
+    font-size: 0.78rem;
+    color: var(--c-text-muted);
+}
+
+/* 풀스크린 다이어그램 줌 모달 */
+.zoom-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(33, 33, 33, 0.86);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    user-select: none;
+}
+.zoom-modal.open { display: flex; }
+.zoom-close {
+    position: fixed;
+    top: 20px; right: 24px;
+    width: 48px; height: 48px;
+    background: rgba(255,255,255,0.15);
+    color: #ffffff;
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 50%;
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 10001;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s ease;
+}
+.zoom-close:hover { background: rgba(255,255,255,0.3); }
+
+.zoom-content {
+    transform-origin: center center;
+    transition: transform 0.1s ease-out;
+    cursor: grab;
+    will-change: transform;
+}
+.zoom-content:active { cursor: grabbing; }
+.zoom-content svg {
+    display: block;
+    max-width: none !important;
+    max-height: none !important;
+    width: 80vw;
+    height: auto;
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.zoom-info {
+    position: fixed;
+    bottom: 20px; left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,0.92);
+    background: rgba(2,119,189,0.85);
+    border: 1px solid rgba(255,255,255,0.25);
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    pointer-events: none;
+    z-index: 10000;
+}
+.zoom-info kbd {
+    background: rgba(255,255,255,0.18);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.85em;
+}
+
+footer {
+    margin-top: 60px;
+    padding-top: 24px;
+    border-top: 1px solid var(--c-border);
+    color: var(--c-text-sub);
+    font-size: 0.82rem;
+    text-align: center;
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            // Palette #87 — 청록·파랑 톤
+            background: '#ffffff',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
+            fontSize: '15px',
+
+            // 기본 노드 — Cyan A700
+            primaryColor: '#00B8D4',
+            primaryTextColor: '#ffffff',
+            primaryBorderColor: '#0097A7',
+
+            // 두 번째 — Light Blue 800
+            secondaryColor: '#0277BD',
+            secondaryTextColor: '#ffffff',
+            secondaryBorderColor: '#01579B',
+
+            // 세 번째 — Blue 500
+            tertiaryColor: '#2196F3',
+            tertiaryTextColor: '#ffffff',
+            tertiaryBorderColor: '#1976D2',
+
+            // 화살표 라벨 — 흰 박스 + Grey 900 글씨
+            lineColor: '#5d6770',
+            textColor: '#212121',
+            edgeLabelBackground: '#ffffff',
+
+            // 클러스터(서브그래프)
+            clusterBkg: 'rgba(0,184,212,0.07)',
+            clusterBorder: '#00B8D4',
+
+            // 노트
+            noteBkgColor: '#E1F5FE',
+            noteTextColor: '#212121',
+            noteBorderColor: '#0277BD',
+        },
+        flowchart: { curve: 'basis', htmlLabels: true, padding: 12 },
+    });
+
+    // ── 다이어그램 풀스크린 줌 모달 ────────────────────────
+    (function() {
+        const STATE = { scale: 1, x: 0, y: 0, dragging: false, dragStart: null };
+        const ZOOM_MIN = 0.4, ZOOM_MAX = 6;
+
+        function $(id) { return document.getElementById(id); }
+        function content() { return $('zoom-content'); }
+        function modal() { return $('zoom-modal'); }
+
+        function applyTransform() {
+            content().style.transform =
+                `translate(${STATE.x}px, ${STATE.y}px) scale(${STATE.scale})`;
+        }
+
+        window.openZoom = function(mermaidEl) {
+            const svg = mermaidEl.querySelector('svg');
+            if (!svg) return;
+            const clone = svg.cloneNode(true);
+            clone.removeAttribute('style');
+            const c = content();
+            c.innerHTML = '';
+            c.appendChild(clone);
+            STATE.scale = 1; STATE.x = 0; STATE.y = 0;
+            applyTransform();
+            modal().classList.add('open');
+            document.body.style.overflow = 'hidden';
+        };
+
+        window.closeZoom = function(e) {
+            if (e) {
+                // 닫기 버튼 또는 백드롭(모달 본체) 만. 콘텐츠 svg 클릭은 무시
+                if (e.target.closest('.zoom-content')) return;
+                e.stopPropagation();
+            }
+            modal().classList.remove('open');
+            content().innerHTML = '';
+            STATE.scale = 1; STATE.x = 0; STATE.y = 0;
+            document.body.style.overflow = '';
+        };
+
+        function bindMermaidClicks() {
+            document.querySelectorAll('.mermaid').forEach(el => {
+                if (el.dataset.zoomBound) return;
+                if (!el.querySelector('svg')) return;     // 아직 렌더 안 됨
+                el.dataset.zoomBound = '1';
+                el.addEventListener('click', () => window.openZoom(el));
+            });
+        }
+
+        function onWheel(e) {
+            if (!modal().classList.contains('open')) return;
+            e.preventDefault();
+            // 위(deltaY < 0) = 확대, 아래(deltaY > 0) = 축소
+            const factor = e.deltaY < 0 ? 1.12 : 1/1.12;
+            const prev = STATE.scale;
+            STATE.scale = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, prev * factor));
+            applyTransform();
+        }
+
+        // 드래그 팬
+        function onMouseDown(e) {
+            if (e.target.closest('.zoom-close')) return;
+            if (!e.target.closest('.zoom-content')) return;
+            STATE.dragging = true;
+            STATE.dragStart = { x: e.clientX - STATE.x, y: e.clientY - STATE.y };
+            e.preventDefault();
+        }
+        function onMouseMove(e) {
+            if (!STATE.dragging) return;
+            STATE.x = e.clientX - STATE.dragStart.x;
+            STATE.y = e.clientY - STATE.dragStart.y;
+            applyTransform();
+        }
+        function onMouseUp() { STATE.dragging = false; }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && modal().classList.contains('open')) {
+                window.closeZoom();
+            }
+        });
+
+        window.addEventListener('load', () => {
+            // mermaid 렌더링은 비동기 — 여러 번 시도
+            [400, 1000, 2000].forEach(t => setTimeout(bindMermaidClicks, t));
+            modal().addEventListener('wheel', onWheel, { passive: false });
+            modal().addEventListener('mousedown', onMouseDown);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
+    })();
+</script>
+</head>
+<body>
+<div class="wrap">
+
+<h1>macOS 코드 사인·공증·.pkg 인스톨러</h1>
+<div class="subtitle">
+    Developer ID 인증서부터 사인된 .pkg 배포까지 — 실제 작업 흐름 기반 강의록 · 2026-06-01
+</div>
+
+<div class="toc">
+    <strong>목차</strong>
+    <ol>
+        <li><a href="#why">왜 코드 사인이 필요한가?</a></li>
+        <li><a href="#overview">전체 그림 — 5단계 흐름</a></li>
+        <li><a href="#dev-program">사전 준비 — Apple Developer Program</a></li>
+        <li><a href="#dev-id-app">Developer ID Application 인증서</a></li>
+        <li><a href="#csr">중간 단계 — CSR 만들기 (Keychain Access)</a></li>
+        <li><a href="#dev-id-installer">Developer ID Installer 인증서</a></li>
+        <li><a href="#notarytool">notarytool credential — 공증 자격증명</a></li>
+        <li><a href="#pkg">.pkg 인스톨러란?</a></li>
+        <li><a href="#windows-compare">Windows 의 비슷한 형태</a></li>
+        <li><a href="#pkg-build">.pkg 빌드 실전 — 우리의 build-pkg.sh</a></li>
+        <li><a href="#trouble">자주 만나는 에러 + 트러블슈팅</a></li>
+    </ol>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="why">1. 왜 코드 사인이 필요한가?</h2>
+
+<p>
+macOS 는 <strong>Gatekeeper</strong> 라는 보안 검사 시스템을 통해
+인터넷에서 다운로드한 모든 실행 파일·인스톨러를 검증합니다.
+사인되지 않은 파일을 실행하면:
+</p>
+
+<div class="card danger">
+    <div class="lbl">🛑 "확인되지 않은 개발자" 차단</div>
+    Apple 은 이 파일이 누가 만들었는지, 변조됐는지 확인할 수 없습니다.<br>
+    사용자는 <strong>시스템 설정 → 개인정보 보호 및 보안 → 그래도 허용</strong> 으로 1회 우회 필요.
+</div>
+
+<p>이게 일반 사용자에게 큰 진입 장벽입니다. <strong>코드 사인</strong> 을 하면:</p>
+
+<table>
+<tr><th>항목</th><th>사인 안 함</th><th>사인 + 공증</th></tr>
+<tr><td>Gatekeeper</td><td>❌ 차단</td><td>✅ 통과</td></tr>
+<tr><td>사용자 클릭 수</td><td>여러 번 (우회 절차)</td><td>비밀번호 1회</td></tr>
+<tr><td>Apple 신원 보증</td><td>없음</td><td>인증서로 보증</td></tr>
+<tr><td>변조 감지</td><td>못함</td><td>해시 검증 자동</td></tr>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="overview">2. 전체 그림 — 5단계 흐름</h2>
+
+<div class="mermaid-wrap">
+<div class="mermaid">
+flowchart TD
+    A1["Apple Developer Program 가입<br/>$99/년"]
+    A2["Team ID 확인<br/>예: RRTB256N59"]
+    B["Mac 에서 CSR 생성<br/>Keychain Access<br/>→ CSR_xxx.certSigningRequest"]
+    C1["Developer ID Application<br/>.app · .command · .dylib 사인"]
+    C2["Developer ID Installer<br/>.pkg 사인"]
+    D["Keychain 에 인증서 등록<br/>security find-identity 검증"]
+    E["notarytool credential 등록<br/>xcrun notarytool store-credentials"]
+    F["사인·공증·staple 자동화 준비 완료<br/>build-pkg.sh 한 번 → 깨끗한 .pkg"]
+
+    A1 --> A2 --> B
+    B -- Apple 포털 업로드 --> C1
+    B -- Apple 포털 업로드 --> C2
+    C1 -- .cer 다운로드<br/>더블클릭 --> D
+    C2 -- .cer 다운로드<br/>더블클릭 --> D
+    D --> E --> F
+
+    classDef start fill:#00B8D4,stroke:#0097A7,color:#fff,stroke-width:2px
+    classDef cert  fill:#0277BD,stroke:#01579B,color:#fff,stroke-width:2px
+    classDef key   fill:#2196F3,stroke:#1976D2,color:#fff,stroke-width:2px
+    classDef done  fill:#26C6DA,stroke:#00ACC1,color:#fff,stroke-width:3px
+    class A1,A2 start
+    class B key
+    class C1,C2 cert
+    class D,E key
+    class F done
+</div>
+<div class="mermaid-cap">▶ 5단계 — 가입부터 자동화 빌드까지 한눈에</div>
+<div class="mermaid-hint">🔍 도식 클릭 → 전체화면 확대 · 마우스 휠로 줌 · ESC 로 닫기</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="dev-program">3. 사전 준비 — Apple Developer Program</h2>
+
+<h3>가입</h3>
+<p>
+<a href="https://developer.apple.com/programs/" style="color:#22d3ee;" target="_blank">developer.apple.com/programs</a>
+에서 가입. 비용은 연 <strong>$99 (개인) / $299 (회사)</strong>.
+</p>
+
+<div class="card tip">
+    <div class="lbl">💡 무료 Apple ID 와 차이</div>
+    무료 Apple ID 로도 Xcode 로 본인 디바이스에 빌드는 가능하지만,
+    <strong>Developer ID</strong> 인증서는 유료 멤버십에서만 발급 가능.
+    외부 배포(앱스토어 밖) 용 사인은 멤버십 필수.
+</div>
+
+<h3>Team ID 확인</h3>
+<p>가입 후 좌상단 계정명 옆 또는 Membership 페이지에서 확인. 10자리 영숫자 (예: <code>RRTB256N59</code>).</p>
+
+<div class="shot">
+    <img src="screenshots/00-developer-account.png" alt="Apple Developer 계정 메인 페이지">
+    <div class="shot-cap">▶ Apple Developer 계정 페이지. 우상단에 본인 이름 + Team ID 표시. "프로그램 리소스" 카드에서 "인증서, ID 및 프로파일" 진입.</div>
+</div>
+
+<h3>현재 보유 인증서 확인</h3>
+<p>Certificates 페이지에 들어가면 발급된 인증서 목록. 일반 가입자는 <strong>Development / Distribution</strong> 만 있고 Developer ID 는 없음 — 따로 발급해야 함.</p>
+
+<div class="shot">
+    <img src="screenshots/01-certificates-list-no-developerid.png" alt="Certificates 목록 — Developer ID 부재">
+    <div class="shot-cap">▶ 기본 발급 4개 (Development × 2, Distribution × 2). Developer ID 종류가 없음 — 우상단 [+] 로 별도 발급 필요.</div>
+</div>
+
+<table>
+<tr><th>인증서 종류</th><th>용도</th><th>외부 배포 가능?</th></tr>
+<tr><td>Apple Development</td><td>개발 빌드 (본인 디바이스)</td><td>❌</td></tr>
+<tr><td>Apple Distribution</td><td>App Store 업로드</td><td>❌ (App Store 만)</td></tr>
+<tr><td><strong>Developer ID Application</strong></td><td>.app / .command / .dylib 사인 → 외부 배포</td><td>✅</td></tr>
+<tr><td><strong>Developer ID Installer</strong></td><td>.pkg 사인 → 외부 배포</td><td>✅</td></tr>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="dev-id-app">4. Developer ID Application 인증서</h2>
+
+<h3>이게 뭔가요?</h3>
+<p>
+<strong>Apple 이 발급하는 디지털 신원 증명서</strong>. 이 인증서로 사인된 .app/.command/.dylib 는
+Apple 의 신원 보증을 받아 Gatekeeper 가 즉시 통과시킵니다.
+</p>
+
+<div class="card tip">
+    <div class="lbl">💡 비유</div>
+    여권과 비슷합니다 — 본인이 만들 수 없고, 권위 기관(Apple) 이 본인 신원 확인 후 발급.
+    파일에 사인하는 것 = 여권 도장으로 본인이 만든 거 증명하는 것.
+</div>
+
+<h3>의미·목적</h3>
+<table>
+<tr><th>측면</th><th>설명</th></tr>
+<tr><td>신원 보증</td><td>"이 .app 은 RRTB256N59 팀이 만든 진짜"</td></tr>
+<tr><td>변조 감지</td><td>파일이 한 비트라도 바뀌면 사인 무효화 (해시 검증)</td></tr>
+<tr><td>Gatekeeper 통과</td><td>"확인되지 않은 개발자" 차단 사라짐</td></tr>
+<tr><td>공증 전제</td><td>사인 안 된 파일은 Apple 공증 서버가 거부</td></tr>
+</table>
+
+<h3>왜 필요한가? — 우리 프로젝트 사례</h3>
+<p>
+KyoboLibrary 의 워커는 사용자 Mac 에서 백그라운드로 실행되어야 합니다.
+인스톨러를 사인 안 하면 사용자가 다운로드할 때마다 차단되어 매번 시스템 설정에서 우회해야 합니다.
+사인하면 <strong>더블클릭 → 비밀번호 1회 → 자동 설치</strong> 끝.
+</p>
+
+<h3>발급 절차</h3>
+
+<div class="flow">
+<div class="row"><span class="num">1</span> Apple Developer Portal → Certificates → 우상단 <code>[+]</code></div>
+<div class="row"><span class="num">2</span> Software 섹션에서 <strong>Developer ID Application</strong> 선택 → Continue</div>
+<div class="row"><span class="num">3</span> Profile Type: <strong>G2 Sub-CA (Xcode 11.4.1 or later)</strong> → Continue</div>
+<div class="row"><span class="num">4</span> CSR 파일 업로드 (다음 섹션 5 참조)</div>
+<div class="row"><span class="num">5</span> Download → .cer 파일 받음 → 더블클릭 → 키체인 등록</div>
+</div>
+
+<div class="shot">
+    <img src="screenshots/02-create-cert-csr-upload.png" alt="Developer ID Application 발급 — CSR 업로드 화면">
+    <div class="shot-cap">▶ "Create a New Certificate" 화면. Profile Type 선택 후 [Choose File] 로 CSR 업로드.</div>
+</div>
+
+<div class="shot">
+    <img src="screenshots/05-cert-download-application.png" alt="Developer ID Application 다운로드 화면">
+    <div class="shot-cap">▶ 발급 완료. Certificate Type 이 "Developer ID Application", 만료일 2031/06/02. [Download] 클릭 → .cer 파일 다운로드.</div>
+</div>
+
+<h3>검증 명령어</h3>
+<pre><code><span class="cmt"># 키체인 등록 확인 — codesigning policy</span>
+security find-identity -v -p codesigning | grep "Developer ID Application"
+
+<span class="cmt"># 결과 예:</span>
+<span class="cmt"># 13) B46F5D6A77504BED984712CBB629778879F6CAE4 "Developer ID Application: deok soo yun (RRTB256N59)"</span></code></pre>
+
+<h3>저장 위치 + 어떻게 사용</h3>
+<table>
+<tr><td>인증서 (.cer 파일)</td><td>OneDrive 안 보관 폴더 (백업·재사용)</td></tr>
+<tr><td>실제 사용</td><td>키체인 안 — <code>~/Library/Keychains/login.keychain-db</code></td></tr>
+<tr><td>비공개키</td><td>키체인 안 (Mac 본체에만 존재, export 금지)</td></tr>
+</table>
+
+<pre><code><span class="cmt"># 사용 예 — .app 사인</span>
+codesign --sign <span class="str">"Developer ID Application: deok soo yun (RRTB256N59)"</span> \
+         --options runtime --timestamp YourApp.app</code></pre>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="csr">5. 중간 단계 — CSR 만들기 (Keychain Access)</h2>
+
+<p>
+<strong>CSR (Certificate Signing Request)</strong> 은 "이런 인증서 만들어 주세요" 요청서.
+공개키 + 신원 정보(이메일·이름) 가 들어있고, Apple 이 이걸 받아서 검토 후 인증서 발급.
+비공개키는 Mac 의 키체인 안에 남아 절대 외부로 나가지 않음.
+</p>
+
+<div class="card tip">
+    <div class="lbl">🔑 비공개키 + 공개키 짝</div>
+    Keychain 에서 CSR 만들 때 RSA 2048 키쌍이 자동 생성:
+    <ul>
+        <li><strong>비공개키 (Private Key)</strong> — Mac 키체인 안. 절대 export X. 사인할 때 필수.</li>
+        <li><strong>공개키 (Public Key)</strong> — CSR 안에 들어가 Apple 에 전송. 인증서에 들어가 배포됨.</li>
+    </ul>
+</div>
+
+<h3>준비 조건</h3>
+<ul>
+    <li>macOS Mac (Apple Silicon / Intel 무관)</li>
+    <li>Keychain Access.app — macOS Tahoe (26) 이후엔 <code>/System/Library/CoreServices/Applications/Keychain Access.app</code></li>
+    <li>본인 Apple ID 이메일</li>
+</ul>
+
+<h3>생성 절차</h3>
+
+<div class="flow">
+<div class="row"><span class="num">1</span> Keychain Access 실행 (⌘+Space → "Keychain Access" 또는 한글 "키체인 접근")</div>
+<div class="row"><span class="num">2</span> 상단 메뉴 <code>키체인 접근 → 인증서 지원 → 인증 기관에서 인증서 요청...</code></div>
+<div class="row"><span class="num">3</span> 정보 입력 (다음 표 참조)</div>
+<div class="row"><span class="num">4</span> [계속] → 저장 위치 선택 → 파일 저장</div>
+<div class="row"><span class="num">5</span> 키 쌍 정보 → 2048비트 / RSA → [계속] → [완료]</div>
+</div>
+
+<div class="shot">
+    <img src="screenshots/03-keychain-csr-menu.png" alt="키체인 접근 메뉴 — 인증 기관에서 인증서 요청">
+    <div class="shot-cap">▶ 키체인 접근 메뉴 → 인증서 지원 → "인증 기관에서 인증서 요청..." 클릭.</div>
+</div>
+
+<h3>입력값</h3>
+<table>
+<tr><th>필드</th><th>값</th><th>비고</th></tr>
+<tr><td>사용자 이메일 주소</td><td>본인 Apple ID 이메일</td><td>예: <code>ckidsm@nate.com</code></td></tr>
+<tr><td>일반 이름</td><td>본인 이름</td><td>인증서 CN 으로 사용</td></tr>
+<tr><td>CA 이메일 주소</td><td>(비워두기)</td><td>Apple 이 무시</td></tr>
+<tr><td>요청 처리</td><td>⚪ <strong>디스크에 저장됨</strong></td><td>"이메일로 보냄" 아님!</td></tr>
+<tr><td>키 쌍 정보 지정</td><td>✅ 체크</td><td>RSA 2048 사용을 위해</td></tr>
+</table>
+
+<div class="shot">
+    <img src="screenshots/04-keychain-csr-form.png" alt="CSR 정보 입력 폼">
+    <div class="shot-cap">▶ 인증서 정보 입력 창. "디스크에 저장됨" + "본인이 키 페어 정보 지정" 체크 후 [계속].</div>
+</div>
+
+<h3>CSR 파일 검증</h3>
+<pre><code>openssl req -in <span class="str">"CSR_xxx.certSigningRequest"</span> -noout -subject -text
+
+<span class="cmt"># 정상 결과 예:</span>
+<span class="cmt"># subject=emailAddress=ckidsm@nate.com, CN=..., C=KR</span>
+<span class="cmt"># Public Key Algorithm: rsaEncryption</span>
+<span class="cmt"># Public-Key: (2048 bit)</span>
+<span class="cmt"># Signature Algorithm: sha256WithRSAEncryption</span></code></pre>
+
+<div class="card warn">
+    <div class="lbl">⚠ 같은 CSR 재사용은 한 번만</div>
+    Application 인증서 발급에 한 번 사용된 CSR 은 Installer 발급 시 거부될 수 있습니다.
+    각 인증서마다 새 CSR 생성을 권장.<br>
+    <strong>에러 메시지:</strong> <code>An attribute specified more than once</code>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="dev-id-installer">6. Developer ID Installer 인증서</h2>
+
+<h3>이게 뭔가요?</h3>
+<p>
+<strong>.pkg 파일 (인스톨러 패키지) 사인 전용</strong> 인증서.
+Application 인증서가 실행 파일 사인용이라면, 이건 인스톨러 사인용. 둘은 별개.
+</p>
+
+<h3>왜 따로 있나?</h3>
+<table>
+<tr><th>도구</th><th>대상 파일</th><th>사용 인증서</th></tr>
+<tr><td><code>codesign</code></td><td>.app, .command, .dylib</td><td>Developer ID Application</td></tr>
+<tr><td><code>productbuild --sign</code></td><td>.pkg</td><td>Developer ID Installer</td></tr>
+</table>
+
+<p>
+.pkg 는 인스톨러 메타데이터 + payload + 스크립트 모음이라 사인 방식이 다릅니다.
+Apple 이 두 종류로 분리해서 발급.
+</p>
+
+<h3>발급 절차 — Application 과 거의 같음</h3>
+
+<div class="flow">
+<div class="row"><span class="num">1</span> Apple Developer Portal → Certificates → <code>[+]</code></div>
+<div class="row"><span class="num">2</span> Software 섹션 → <strong>Developer ID Installer</strong> 선택 → Continue</div>
+<div class="row"><span class="num">3</span> G2 Sub-CA → Continue</div>
+<div class="row"><span class="num">4</span> <strong>새 CSR 업로드</strong> (Application 에 쓴 CSR 재사용 시 에러)</div>
+<div class="row"><span class="num">5</span> Download → 더블클릭 → 키체인</div>
+</div>
+
+<div class="shot">
+    <img src="screenshots/06-csr-reuse-error.png" alt="CSR 재사용 에러">
+    <div class="shot-cap">▶ "An attribute specified more than once" — 같은 CSR 을 두 번 사용했을 때 Apple 이 거부. 새 CSR 만들어서 다시.</div>
+</div>
+
+<div class="shot">
+    <img src="screenshots/07-cert-download-installer.png" alt="Developer ID Installer 다운로드">
+    <div class="shot-cap">▶ Installer 인증서 발급 완료. Certificate Type 이 "Developer ID Installer".</div>
+</div>
+
+<h3>검증 명령어 (주의 — policy 가 다름)</h3>
+<pre><code><span class="cmt"># Application 은 codesigning policy, Installer 는 basic policy</span>
+security find-identity -v -p basic | grep <span class="str">"Developer ID Installer"</span>
+
+<span class="cmt"># 또는 모든 policy 한꺼번에 (가장 간단)</span>
+security find-identity -v | grep <span class="str">"Developer ID"</span>
+
+<span class="cmt"># 결과 예:</span>
+<span class="cmt"># 13) B46F5D6A77504BED... "Developer ID Application: deok soo yun (RRTB256N59)"</span>
+<span class="cmt"># 14) E2F5E229E3702DE2... "Developer ID Installer: deok soo yun (RRTB256N59)"</span></code></pre>
+
+<div class="card tip">
+    <div class="lbl">💡 왜 두 policy 가 다른가</div>
+    macOS 의 키체인은 인증서의 "사용 목적" 에 따라 policy 분류합니다.
+    Application 은 코드 사인 용도(codesigning), Installer 는 일반 사인 용도(basic).
+    그래서 <code>-p codesigning</code> 만으로는 Installer 가 안 보입니다.
+</div>
+
+<h3>사용 예시</h3>
+<pre><code><span class="cmt"># .pkg 사인 (productbuild 또는 pkgbuild)</span>
+productbuild --distribution dist.xml \
+             --sign <span class="str">"Developer ID Installer: deok soo yun (RRTB256N59)"</span> \
+             output.pkg</code></pre>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="notarytool">7. notarytool credential — 공증 자격증명</h2>
+
+<h3>공증(Notarization) 이란?</h3>
+<p>
+사인만으로는 부족합니다 — Apple 은 추가로 <strong>"이 파일에 멀웨어가 없다"</strong> 를 직접 검사합니다.
+이 검사 과정이 <strong>공증(Notarization)</strong>. 사인된 파일을 Apple 서버에 업로드 →
+악성코드 스캔 → 통과 시 "Notarized" 도장.
+</p>
+
+<div class="mermaid-wrap">
+<div class="mermaid">
+flowchart TD
+    A["사인된 .pkg<br/>Developer ID Installer 사인 완료"]
+    B["Apple 공증 서버"]
+    C{{"자동 멀웨어 스캔<br/>보통 1 ~ 5 분"}}
+    D["status: Accepted"]
+    E["공증 도장 박힌 .pkg<br/>사용자에게 배포 가능"]
+    F["Gatekeeper 즉시 통과<br/>오프라인 검증 가능"]
+
+    A -- "xcrun notarytool submit --wait" --> B
+    B --> C
+    C --> D
+    D -- "xcrun stapler staple" --> E
+    E -- 사용자 다운로드 --> F
+
+    classDef inFile  fill:#2196F3,stroke:#1976D2,color:#fff,stroke-width:2px
+    classDef server  fill:#0277BD,stroke:#01579B,color:#fff,stroke-width:2px
+    classDef ok      fill:#26C6DA,stroke:#00ACC1,color:#fff,stroke-width:3px
+    classDef gate    fill:#00B8D4,stroke:#0097A7,color:#fff,stroke-width:2px
+    class A inFile
+    class B,C server
+    class D,E ok
+    class F gate
+</div>
+<div class="mermaid-cap">▶ 사인 → Apple 서버 업로드 → 스캔 → 통과 → 도장 박기 → 사용자 배포 → Gatekeeper 즉시 통과</div>
+<div class="mermaid-hint">🔍 도식 클릭 → 전체화면 확대 · 마우스 휠로 줌 · ESC 로 닫기</div>
+</div>
+
+<h3>credential 이 왜 필요?</h3>
+<p>
+공증 요청 시 Apple 서버에 인증해야 합니다. 인증 방법:
+</p>
+
+<table>
+<tr><th>인증 방식</th><th>설명</th><th>사용 빈도</th></tr>
+<tr><td><strong>App-specific password</strong></td><td>본인 Apple ID + 별도 비밀번호 1쌍</td><td>가장 일반적</td></tr>
+<tr><td>Developer ID API Key</td><td>App Store Connect API 키 발급</td><td>CI/CD 자동화</td></tr>
+<tr><td>로그인 세션</td><td>매번 Apple ID 비밀번호 + 2FA 입력</td><td>비효율적 — 거의 안 씀</td></tr>
+</table>
+
+<div class="card tip">
+    <div class="lbl">💡 왜 본인 Apple ID 비밀번호 직접 안 씀</div>
+    Apple 은 보안상 "앱별 비밀번호" 를 권장. 본인 비밀번호 노출 위험 X, 필요시 개별 폐기 가능.
+</div>
+
+<h3>App-specific password 생성</h3>
+
+<div class="flow">
+<div class="row"><span class="num">1</span> <a href="https://appleid.apple.com" style="color:#22d3ee;" target="_blank">appleid.apple.com</a> 접속 → 로그인</div>
+<div class="row"><span class="num">2</span> 좌측 메뉴 <strong>로그인 및 보안</strong></div>
+<div class="row"><span class="num">3</span> 우측 화면 → <strong>앱 암호</strong> 섹션 → [+] 또는 [생성]</div>
+<div class="row"><span class="num">4</span> 이름 입력 (예: <code>notarytool</code>) → 생성 → 본인 Apple ID 비밀번호 인증</div>
+<div class="row"><span class="num">5</span> ⚠ <strong>16자리 비밀번호 표시 (단 한 번!)</strong> — 창 닫기 전에 다음 단계까지 진행</div>
+</div>
+
+<div class="shot">
+    <img src="screenshots/08-app-specific-password.png" alt="App-specific password 관리 화면">
+    <div class="shot-cap">▶ 앱 암호 화면. 이미 생성된 notarytool 항목이 보임. ⊖ 로 삭제, [+] 로 새로 생성.</div>
+</div>
+
+<h3>keychain 에 credential 저장</h3>
+<pre><code>xcrun notarytool store-credentials <span class="str">"KYOBO_NOTARY"</span> \
+    --apple-id <span class="str">ckidsm@nate.com</span> \
+    --team-id <span class="str">RRTB256N59</span>
+
+<span class="cmt"># 실행 후 프롬프트:</span>
+<span class="cmt"># App-specific password for ckidsm@nate.com: </span><span class="str">xxxx-xxxx-xxxx-xxxx</span>
+<span class="cmt"># Validating your credentials...</span>
+<span class="cmt"># Success. Credentials validated.</span>
+<span class="cmt"># Credentials saved to Keychain.</span></code></pre>
+
+<p>이후 모든 공증 요청에서 이 profile 이름만 참조:</p>
+<pre><code>xcrun notarytool submit my.pkg --keychain-profile <span class="str">"KYOBO_NOTARY"</span> --wait</code></pre>
+
+<div class="card success">
+    <div class="lbl">✓ 한 번만 등록하면 끝</div>
+    이후 모든 빌드 스크립트에서 <code>--keychain-profile "KYOBO_NOTARY"</code> 만 쓰면 됨.
+    비밀번호 다시 입력할 일 없음.
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="pkg">8. .pkg 인스톨러란?</h2>
+
+<h3>정의</h3>
+<p>
+<strong>macOS 표준 인스톨러 패키지</strong>. 사용자가 더블클릭하면 <strong>Installer.app</strong> 이 자동 실행되어 표준 UI 로 설치 진행.
+</p>
+
+<h3>어디에 사용?</h3>
+<ul>
+    <li>앱 설치 (App Store 안 거치는 외부 배포)</li>
+    <li>드라이버·plugin 설치</li>
+    <li>시스템 설정 변경 (LaunchDaemons 등록 등)</li>
+    <li>여러 파일을 정해진 위치에 한꺼번에 복사</li>
+    <li>설치 전/후 스크립트 실행</li>
+</ul>
+
+<h3>구성 요소</h3>
+
+<div class="mermaid-wrap">
+<div class="mermaid">
+flowchart LR
+    subgraph PKG[".pkg (압축 파일 내부)"]
+        direction TB
+        PI["PackageInfo<br/>메타데이터"]
+        P["Payload<br/>실제 설치 파일들<br/>cpio 압축"]
+        S["Scripts/<br/>설치 전·후 스크립트"]
+
+        subgraph PL["Payload 내부 예시"]
+            direction TB
+            L1["Library/"]
+            L2["Application Support/"]
+            L3["MyApp/"]
+            L4["bin/, conf/, ..."]
+            L1 --> L2 --> L3 --> L4
+        end
+
+        subgraph SC["Scripts/ 내부"]
+            direction TB
+            SC1["preinstall<br/>선택"]
+            SC2["postinstall<br/>선택"]
+        end
+
+        P --> PL
+        S --> SC
+    end
+
+    subgraph EXT["productbuild 별도 입력 (빌드 시 합쳐짐)"]
+        direction TB
+        DX["distribution.xml<br/>UI · 플로우 정의"]
+        R["resources/"]
+        R1["welcome.html<br/>환영 화면"]
+        R2["conclusion.html<br/>완료 화면"]
+        R --> R1
+        R --> R2
+    end
+
+    classDef pkgnode fill:#00B8D4,stroke:#0097A7,color:#fff,stroke-width:2px
+    classDef extnode fill:#0277BD,stroke:#01579B,color:#fff,stroke-width:2px
+    classDef inner   fill:#2196F3,stroke:#1976D2,color:#fff
+    classDef script  fill:#26C6DA,stroke:#00ACC1,color:#fff
+    class PI,P,S pkgnode
+    class DX,R,R1,R2 extnode
+    class L1,L2,L3,L4 inner
+    class SC1,SC2 script
+</div>
+<div class="mermaid-cap">▶ .pkg 자체는 압축 파일. PackageInfo·Payload·Scripts 가 핵심. distribution.xml·resources/ 는 productbuild 가 사용</div>
+<div class="mermaid-hint">🔍 도식 클릭 → 전체화면 확대 · 마우스 휠로 줌 · ESC 로 닫기</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="windows-compare">9. Windows 의 비슷한 형태</h2>
+
+<table>
+<tr><th>macOS</th><th>Windows</th><th>설명</th></tr>
+<tr><td>.pkg</td><td><strong>.msi</strong> (Windows Installer)</td><td>표준 인스톨러 — UI 자동</td></tr>
+<tr><td>.pkg + custom UI</td><td><strong>.exe</strong> (NSIS, Inno Setup, WiX)</td><td>커스텀 인스톨러</td></tr>
+<tr><td>Developer ID Installer 인증서</td><td><strong>Authenticode Code Signing Certificate</strong></td><td>DigiCert, Sectigo 등에서 발급</td></tr>
+<tr><td>notarytool 공증</td><td><strong>Microsoft SmartScreen 평판</strong></td><td>공식 공증 없음. 다운로드 횟수·시간으로 평판 누적</td></tr>
+<tr><td><code>productbuild --sign</code></td><td><code>signtool sign /f cert.pfx</code></td><td>사인 명령</td></tr>
+<tr><td>Gatekeeper</td><td>Windows SmartScreen / Defender</td><td>OS 보안 검사</td></tr>
+</table>
+
+<div class="card tip">
+    <div class="lbl">💡 핵심 차이</div>
+    Windows 는 공증 같은 강제 과정이 없는 대신, 사인된 인스톨러도 처음엔 SmartScreen 경고가 떠요.
+    "다운로드 평판" 이 충분히 누적되면 자동으로 사라집니다 (Apple 의 공증과 비슷한 효과지만 메커니즘이 달라요).
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="pkg-build">10. .pkg 빌드 실전 — 우리의 build-pkg.sh</h2>
+
+<h3>전체 흐름</h3>
+
+<div class="mermaid-wrap">
+<div class="mermaid">
+flowchart TD
+    S1["1. payload root 준비<br/>설치될 파일들 + postinstall"]
+    S2["2. pkgbuild<br/>component .pkg 빌드<br/>사인 없음"]
+    S3["3. productbuild --sign<br/>distribution .pkg + Installer 인증서 사인"]
+    S4["4. xcrun notarytool submit --wait<br/>Apple 공증 (1~5분)"]
+    S5["5. xcrun stapler staple<br/>공증 결과 .pkg 안에 박기"]
+    S6["6. spctl --assess<br/>최종 검증<br/>(Notarized Developer ID 확인)"]
+    S7["install/install-worker.pkg<br/>배포 준비 완료"]
+
+    S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
+
+    classDef step  fill:#00B8D4,stroke:#0097A7,color:#fff,stroke-width:2px
+    classDef sign  fill:#0277BD,stroke:#01579B,color:#fff,stroke-width:2px
+    classDef apple fill:#2196F3,stroke:#1976D2,color:#fff,stroke-width:2px
+    classDef done  fill:#26C6DA,stroke:#00ACC1,color:#fff,stroke-width:3px
+    class S1,S2 step
+    class S3 sign
+    class S4,S5 apple
+    class S6 step
+    class S7 done
+</div>
+<div class="mermaid-cap">▶ 한 줄 명령 ./scripts/build-pkg.sh 이 위 6단계를 순차 자동 실행</div>
+<div class="mermaid-hint">🔍 도식 클릭 → 전체화면 확대 · 마우스 휠로 줌 · ESC 로 닫기</div>
+</div>
+
+<h3>핵심 명령어</h3>
+
+<h4>① pkgbuild (component pkg 만들기)</h4>
+<pre><code>pkgbuild \
+    --root <span class="str">"$PAYLOAD_ROOT"</span> \
+    --identifier <span class="str">"com.kyobolibrary.worker"</span> \
+    --version <span class="str">"1.0.0"</span> \
+    --scripts <span class="str">"$SCRIPTS_DIR"</span> \
+    --install-location <span class="str">"/"</span> \
+    /tmp/install-worker-component.pkg</code></pre>
+
+<table>
+<tr><th>옵션</th><th>의미</th></tr>
+<tr><td><code>--root</code></td><td>설치할 파일들이 들어있는 디렉토리. 이 안의 파일 구조 = 사용자 시스템에 그대로 복사됨</td></tr>
+<tr><td><code>--identifier</code></td><td>역방향 도메인 ID — 패키지 고유 식별자</td></tr>
+<tr><td><code>--version</code></td><td>버전 (업그레이드/다운그레이드 판단)</td></tr>
+<tr><td><code>--scripts</code></td><td>preinstall, postinstall 스크립트 디렉토리</td></tr>
+<tr><td><code>--install-location</code></td><td>payload 의 root 가 설치될 위치. <code>"/"</code> 면 절대 경로 그대로</td></tr>
+</table>
+
+<h4>② productbuild (distribution pkg + 사인)</h4>
+<pre><code>productbuild \
+    --distribution <span class="str">"$DIST_XML"</span> \
+    --package-path /tmp \
+    --resources <span class="str">"$RESOURCES_DIR"</span> \
+    --sign <span class="str">"Developer ID Installer: deok soo yun (RRTB256N59)"</span> \
+    install/install-worker.pkg</code></pre>
+
+<h4>③ 공증</h4>
+<pre><code>xcrun notarytool submit install/install-worker.pkg \
+    --keychain-profile <span class="str">"KYOBO_NOTARY"</span> \
+    --wait
+
+<span class="cmt"># 결과:</span>
+<span class="cmt"># Current status: In Progress...</span>
+<span class="cmt"># Current status: Accepted</span></code></pre>
+
+<h4>④ Staple</h4>
+<pre><code><span class="cmt"># 공증 결과를 .pkg 안에 박아넣음 → 오프라인에서도 검증 가능</span>
+xcrun stapler staple install/install-worker.pkg</code></pre>
+
+<h4>⑤ 검증</h4>
+<pre><code>spctl --assess --type install -v install/install-worker.pkg
+
+<span class="cmt"># 정상 결과:</span>
+<span class="cmt"># install/install-worker.pkg: accepted</span>
+<span class="cmt"># source=Notarized Developer ID</span></code></pre>
+
+<h3>우리가 만든 디렉토리 구조</h3>
+<pre><code>book-capture/
+├── pkg/                              <span class="cmt">← 빌드 입력</span>
+│   ├── payload-root/                 <span class="cmt"># 설치될 파일들 (거의 빈 마커)</span>
+│   │   └── Library/Application Support/KyoboLibrary/
+│   ├── scripts/
+│   │   └── postinstall               <span class="cmt"># 설치 후 자동 실행 (sudo -u 로 사용자 컨텍스트)</span>
+│   ├── resources/
+│   │   ├── welcome.html              <span class="cmt"># 인스톨러 환영 화면</span>
+│   │   └── conclusion.html           <span class="cmt"># 인스톨러 완료 화면</span>
+│   └── distribution.xml              <span class="cmt"># UI·플로우 정의</span>
+├── scripts/
+│   ├── build-pkg.sh                  <span class="cmt">← 빌드 자동화 스크립트</span>
+│   └── install-worker-macos.sh       <span class="cmt"># postinstall 이 호출 (실제 설치 로직)</span>
+└── ...
+
+install/
+└── install-worker.pkg                <span class="cmt">← 빌드 결과물 (사인+공증된 .pkg)</span></code></pre>
+
+<h3>postinstall 스크립트 (핵심 트릭)</h3>
+
+<p>
+.pkg postinstall 은 <strong>root 권한</strong> 으로 실행됩니다. 하지만 사용자 컨텍스트의 launchd 에 등록하려면 <strong>사용자 권한</strong> 이 필요. 그래서 <code>sudo -u</code> 로 컨텍스트 전환:
+</p>
+
+<pre><code><span class="cmt">#!/bin/bash</span>
+<span class="cmt"># root 컨텍스트에서 콘솔 사용자 찾기</span>
+CONSOLE_USER=$(stat -f <span class="str">"%Su"</span> /dev/console)
+USER_HOME=$(dscl . -read /Users/<span class="str">"$CONSOLE_USER"</span> NFSHomeDirectory | awk <span class="str">'{print $2}'</span>)
+
+<span class="cmt"># 사용자 권한으로 install-worker-macos.sh 실행</span>
+sudo -u <span class="str">"$CONSOLE_USER"</span> -H bash -c <span class="str">"
+    export HOME='$USER_HOME'
+    export PATH='/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
+    '$USER_HOME/.../install-worker-macos.sh'
+"</span></code></pre>
+
+<h3>설치된 결과 확인 — welcome 화면</h3>
+<div class="shot">
+    <img src="screenshots/09-pkg-installer-welcome.png" alt=".pkg 인스톨러 welcome 화면">
+    <div class="shot-cap">▶ 사용자가 .pkg 더블클릭 → macOS Installer.app 표준 UI 자동 실행 → 사인+공증 됐으니 Gatekeeper 차단 없이 진행.</div>
+</div>
+
+<h3>전체 build-pkg.sh 한 번 실행 결과</h3>
+<pre><code><span class="cmt"># ./scripts/build-pkg.sh</span>
+▶ 사전 점검
+▶ [1] payload root 준비
+▶ [2] postinstall 실행권
+▶ [3] install-worker-macos.sh 실행권
+▶ [4] pkgbuild → /tmp/install-worker-component.pkg
+▶ [5] productbuild + Installer 사인 → install/install-worker.pkg
+▶ [6] notarytool submit (Apple 서버, 보통 1~5분)
+  Current status: Accepted
+▶ [7] stapler staple
+  The staple and validate action worked!
+▶ [8] 최종 검증 (spctl)
+  install/install-worker.pkg: accepted
+  source=Notarized Developer ID
+
+✓ 완료
+   파일: install/install-worker.pkg
+   크기:  24K
+   서명: Developer ID Installer: deok soo yun (RRTB256N59)</code></pre>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="trouble">11. 자주 만나는 에러 + 트러블슈팅</h2>
+
+<h3>① "An attribute specified more than once"</h3>
+<div class="card danger">
+    <div class="lbl">증상</div>
+    Apple Developer 포털에서 CSR 업로드 시 빨간 알림.
+</div>
+<p><strong>원인:</strong> 같은 CSR 을 두 번째 인증서 발급에 재사용.</p>
+<p><strong>해결:</strong> Keychain Access 에서 새 CSR 생성. 기존 CSR 은 보관(감사 추적용).</p>
+
+<h3>② security find-identity 에 Installer 가 안 보임</h3>
+<p><strong>원인:</strong> Installer 는 <code>basic</code> policy 라 <code>-p codesigning</code> 으로 안 검색됨.</p>
+<pre><code><span class="cmt"># 둘 다 보려면 -p 빼고</span>
+security find-identity -v | grep <span class="str">"Developer ID"</span></code></pre>
+
+<h3>③ "notarytool: command not found"</h3>
+<p><strong>원인:</strong> Xcode CLT 미설치. 또는 PATH 누락.</p>
+<pre><code><span class="cmt"># 설치</span>
+xcode-select --install
+
+<span class="cmt"># 또는 xcrun 으로 호출</span>
+xcrun notarytool ...</code></pre>
+
+<h3>④ launchd 로 실행되는 Python 의 PATH 누락</h3>
+<p><strong>원인:</strong> launchd plist 의 <code>EnvironmentVariables.PATH</code> 가 시스템 기본과 다름.</p>
+<pre><code><span class="cmt"># /usr/sbin 누락 시 screencapture 못 찾음 → 무한 실패</span>
+&lt;key&gt;PATH&lt;/key&gt;
+&lt;string&gt;/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin<span style="color:#34d399">:/usr/sbin:/sbin</span>&lt;/string&gt;</code></pre>
+
+<h3>⑤ 공증 status: Invalid</h3>
+<p><strong>원인:</strong> 사인 안 된 바이너리 포함, hardened runtime 미설정, entitlements 누락 등.</p>
+<pre><code><span class="cmt"># 상세 로그 확인</span>
+xcrun notarytool log &lt;submission-id&gt; \
+    --keychain-profile <span class="str">"KYOBO_NOTARY"</span></code></pre>
+
+<h3>⑥ "Developer ID 인증서가 키체인에 없음"</h3>
+<p><strong>원인:</strong> .cer 파일을 더블클릭만 하면 안 됨. 실제로는 <strong>비공개키와 짝지어진 인증서</strong> 만 사인에 쓸 수 있음.</p>
+<p>비공개키는 CSR 만든 Mac 의 키체인에 있어야 합니다 — 다른 Mac 에서 사인하려면 <strong>p12 export</strong> 필요.</p>
+
+<footer>
+KyoboLibrary · macOS 코드 사인·공증·.pkg 강의록 · 2026-06-01<br>
+실제 작업 기록 기반 · 5단계 흐름으로 정리
+</footer>
+
+</div>
+
+<!-- 다이어그램 풀스크린 줌 모달 -->
+<div id="zoom-modal" class="zoom-modal" onclick="closeZoom(event)">
+    <button class="zoom-close" type="button" onclick="closeZoom(event)" aria-label="닫기">×</button>
+    <div class="zoom-content" id="zoom-content"></div>
+    <div class="zoom-info">
+        <kbd>휠↑</kbd> 확대 &nbsp;·&nbsp; <kbd>휠↓</kbd> 축소 &nbsp;·&nbsp; <kbd>드래그</kbd> 이동 &nbsp;·&nbsp; <kbd>ESC</kbd>/<kbd>×</kbd> 닫기
+    </div>
+</div>
+
+</body>
+</html>

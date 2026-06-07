@@ -1,0 +1,10 @@
+KyoboLibrary Worker installer marker.
+Installed: 2026년  6월  1일 월요일 09시 52분 48초 KST
+Version: 1.0.1
+
+The actual worker code lives in your OneDrive sync folder:
+  ~/Library/CloudStorage/OneDrive-개인/Claude/NAS/KyoboLibrary/book-capture/
+
+postinstall script registered the worker via launchd (com.kyobolibrary.worker).
+To uninstall:
+  ~/.../book-capture/scripts/uninstall-worker-macos.sh

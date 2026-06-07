@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTTP_완벽_가이드 - 도서 요약</title>
+<style>
+html { font-size: 18px; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #f5f5f5; color: #333; display: flex; min-height: 100vh; font-size: 0.85rem; }
+
+/* Sidebar */
+.sidebar { width: 320px; background: #1a2332; color: white; position: fixed; top: 0; left: 0; height: 100vh; overflow-y: auto; z-index: 100; display: flex; flex-direction: column; }
+.sidebar-header { padding: 18px 20px; border-bottom: 1px solid #2c3e50; }
+.sidebar-header h1 { font-size: 1.05rem; margin-bottom: 4px; }
+.sidebar-header .subtitle { font-size: 0.72rem; color: #8899aa; line-height: 1.5; }
+.tree { padding: 10px 0; flex: 1; overflow-y: auto; }
+.tree-chapter { padding: 0; margin-bottom: 2px; }
+.tree-chapter-title { display: block; padding: 11px 18px; font-size: 0.84rem; font-weight: 700; color: #7ee787; text-decoration: none; border-left: 3px solid transparent; transition: all 0.15s; cursor: pointer; }
+.tree-chapter-title:hover { background: #2c3e50; }
+.tree-chapter-title.active { background: #f1c40f; color: #1a2332 !important; border-left-color: #f39c12; }
+.tree-section { padding: 0; }
+.tree-section-title { display: block; padding: 6px 18px 6px 30px; font-size: 0.72rem; font-weight: 600; color: #95a5a6; cursor: default; }
+.tree-pages { padding: 0; }
+.tree-pages-intro { margin-bottom: 4px; }
+.tree-page { display: block; padding: 5px 18px 5px 42px; font-size: 0.7rem; color: #bdc3c7; text-decoration: none; transition: all 0.15s; border-left: 3px solid transparent; }
+.tree-page:hover { background: #2c3e50; color: white; }
+.tree-page.active { background: #f1c40f; color: #2c3e50 !important; font-weight: 700; border-left-color: #f39c12; }
+.tree-page .page-num { color: #7f8c8d; margin-right: 6px; font-size: 0.92em; }
+.tree-page.active .page-num { color: #1a2332; }
+
+/* Main */
+.main { margin-left: 320px; flex: 1; padding: 24px 28px; max-width: calc(100vw - 360px); }
+
+/* Main Title */
+.main-title { background: linear-gradient(135deg, #1a2332 0%, #2c3e50 100%); border-radius: 12px; padding: 28px 32px; margin-bottom: 28px; color: white; box-shadow: 0 4px 24px rgba(0,0,0,0.15); }
+.main-title h1 { font-size: 1.6rem; margin: 0 0 6px; font-weight: 800; }
+.main-title .mt-sub { font-size: 0.9rem; color: #8899aa; margin-bottom: 12px; }
+.main-title .mt-desc { font-size: 0.82rem; color: #bcc8d4; line-height: 1.7; margin-bottom: 14px; }
+.main-title .mt-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.mt-tag { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; color: white; background: rgba(41,128,185,0.4); }
+
+/* Page Cards */
+.page-card { background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 30px; overflow: hidden; scroll-margin-top: 20vh; }
+.page-header { background: #1abc9c; color: white; padding: 14px 22px; display: flex; justify-content: space-between; align-items: center; }
+.page-header h2 { font-size: 1.05rem; }
+.page-nav { display: flex; gap: 8px; }
+.page-nav a { color: white; text-decoration: none; padding: 4px 12px; border: 1px solid rgba(255,255,255,0.5); border-radius: 4px; font-size: 0.74rem; }
+.page-nav a:hover { background: rgba(255,255,255,0.2); }
+.page-body { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.page-image { padding: 18px; background: #fafafa; border-right: 1px solid #eee; display: flex; align-items: flex-start; justify-content: center; }
+.page-image img { max-width: 100%; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: transform 0.3s; }
+.page-image img:hover { transform: scale(1.02); }
+.page-summary { padding: 22px; }
+.section { margin-bottom: 18px; }
+.section-title { font-size: 0.82rem; font-weight: 700; color: #1abc9c; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 2px solid #1abc9c; display: inline-block; }
+.section ul { list-style: none; padding: 0; }
+.section li { padding: 4px 0 4px 16px; position: relative; font-size: 0.82rem; line-height: 1.6; }
+.section li::before { content: "\25B8"; position: absolute; left: 0; color: #1abc9c; }
+.section li strong { color: #2c3e50; }
+.section li code { background: #f4f4f4; padding: 1px 5px; border-radius: 3px; font-family: 'SF Mono', Consolas, Menlo, monospace; font-size: 0.92em; color: #c0392b; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { background: #e8f8f5; color: #1abc9c; padding: 4px 10px; border-radius: 12px; font-size: 0.74rem; font-weight: 600; }
+.summary-text { font-size: 0.82rem; line-height: 1.8; color: #555; }
+.chapter-intro { background: #f0faf7; border-left: 4px solid #1abc9c; padding: 14px 18px; margin-bottom: 18px; border-radius: 0 8px 8px 0; }
+.chapter-intro h3 { font-size: 0.95rem; color: #2c3e50; margin-bottom: 6px; }
+.chapter-intro p { font-size: 0.8rem; line-height: 1.7; color: #555; margin: 0; }
+
+.signature { margin-top: 40px; padding: 18px 22px; background: white; border-radius: 8px; border-left: 4px solid #1abc9c; font-size: 0.78rem; color: #555; }
+.signature strong { color: #2c3e50; }
+
+/* Modal */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; cursor: zoom-out; }
+.modal-overlay.active { display: flex; }
+.modal-overlay img { max-width: 95vw; max-height: 95vh; object-fit: contain; border-radius: 4px; box-shadow: 0 0 40px rgba(0,0,0,0.5); }
+.modal-close { position: fixed; top: 20px; right: 30px; color: white; font-size: 2em; cursor: pointer; z-index: 1001; line-height: 1; }
+.modal-close:hover { color: #1abc9c; }
+
+@media (max-width: 900px) {
+    .sidebar { width: 240px; }
+    .main { margin-left: 240px; max-width: calc(100vw - 260px); padding: 16px; }
+    .page-body { grid-template-columns: 1fr; }
+    .page-image { border-right: none; border-bottom: 1px solid #eee; }
+}
+
+</style>
+</head>
+<body>
+
+<nav class="sidebar">
+    <div class="sidebar-header">
+        <h1>HTTP_완벽_가이드</h1>
+        <div class="subtitle">도서 페이지별 요약 노트</div>
+    </div>
+    <div class="tree">
+        <div class="tree-chapter">
+            <a href="#page-" class="tree-chapter-title" data-target=""></a>
+            <div class="tree-section">
+                <div class="tree-section-title">기타</div>
+                <div class="tree-pages">
+                    <a href="#page-1" class="tree-page"><span class="page-num">p.1</span> p.1</a>
+                    <a href="#page-2" class="tree-page"><span class="page-num">p.2</span> p.2</a>
+                    <a href="#page-3" class="tree-page"><span class="page-num">p.3</span> p.3</a>
+                    <a href="#page-4" class="tree-page"><span class="page-num">p.4</span> p.4</a>
+                    <a href="#page-5" class="tree-page"><span class="page-num">p.5</span> p.5</a>
+                    <a href="#page-6" class="tree-page"><span class="page-num">p.6</span> p.6</a>
+                    <a href="#page-7" class="tree-page"><span class="page-num">p.7</span> p.7</a>
+                    <a href="#page-9" class="tree-page"><span class="page-num">p.9</span> p.9</a>
+                    <a href="#page-10" class="tree-page"><span class="page-num">p.10</span> p.10</a>
+                    <a href="#page-11" class="tree-page"><span class="page-num">p.11</span> p.11</a>
+                    <a href="#page-12" class="tree-page"><span class="page-num">p.12</span> p.12</a>
+                    <a href="#page-15" class="tree-page"><span class="page-num">p.15</span> p.15</a>
+                    <a href="#page-19" class="tree-page"><span class="page-num">p.19</span> p.19</a>
+                    <a href="#page-20" class="tree-page"><span class="page-num">p.20</span> p.20</a>
+                    <a href="#page-22" class="tree-page"><span class="page-num">p.22</span> p.22</a>
+                    <a href="#page-23" class="tree-page"><span class="page-num">p.23</span> p.23</a>
+                    <a href="#page-24" class="tree-page"><span class="page-num">p.24</span> p.24</a>
+                    <a href="#page-25" class="tree-page"><span class="page-num">p.25</span> p.25</a>
+                    <a href="#page-26" class="tree-page"><span class="page-num">p.26</span> p.26</a>
+                    <a href="#page-27" class="tree-page"><span class="page-num">p.27</span> p.27</a>
+                    <a href="#page-28" class="tree-page"><span class="page-num">p.28</span> p.28</a>
+                    <a href="#page-29" class="tree-page"><span class="page-num">p.29</span> p.29</a>
+                    <a href="#page-30" class="tree-page"><span class="page-num">p.30</span> p.30</a>
+                    <a href="#page-125" class="tree-page"><span class="page-num">p.125</span> p.125</a>
+                    <a href="#page-135" class="tree-page"><span class="page-num">p.135</span> p.135</a>
+                    <a href="#page-139" class="tree-page"><span class="page-num">p.139</span> p.139</a>
+                    <a href="#page-145" class="tree-page"><span class="page-num">p.145</span> p.145</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<div class="main">
+
+<div class="main-title">
+    <h1>HTTP_완벽_가이드</h1>
+    <div class="mt-sub">도서 페이지별 요약 노트</div>
+    <div class="mt-desc">
+        교보eBook 앱에서 캡처한 도서 이미지를 바탕으로 정리한 페이지별 요약 노트.
+        좌측 사이드바의 페이지 번호를 클릭하면 해당 페이지의 상세 요약과 원본 이미지로 이동합니다.
+    </div>
+    <div class="mt-tags">
+        <span class="mt-tag">27페이지</span>
+        <span class="mt-tag">1챕터</span>
+    </div>
+</div>
+
+<div class="page-card" id="page-1">
+    <div class="page-header">
+        <h2>Page 1</h2>
+        <div class="page-nav"><a href="#page-2">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_001.png" alt="Page 1" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">프락시 요청 헤더</span><span class="tag">응답 헤더</span><span class="tag">협상 헤더</span><span class="tag">응답 보안 헤더</span><span class="tag">엔터티 헤더</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">Max-Forwards</span><span class="tag">Proxy-Authorization</span><span class="tag">Age</span><span class="tag">Accept-Ranges</span><span class="tag">WWW-Authenticate</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">프락시가 흔해지면서 프락시 기능을 돕기 위한 헤더들이 정의되었으며, Max-Forwards, Proxy-Authorization, Proxy-Connection 등이 있다.<br>응답 헤더는 클라이언트에게 부가 정보를 제공하며, Age, Server, Warning 등을 통해 응답자의 능력과 응답에 대한 설명을 제공한다.<br>협상 헤더는 서버와 클라이언트가 여러 표현 중 어떤 것을 택할지 협상할 수 있도록 지원한다.<br>응답 보안 헤더는 HTTP 인증요구/응답 체계에서 사용되며, WWW-Authenticate, Set-Cookie 등이 포함된다.<br>엔터티 헤더는 요청과 응답 양쪽 모두에 나타날 수 있으며, 엔터티와 그 내용물에 대한 광범위한 정보를 제공한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>Max-Forwards</strong>: 요청이 원 서버로 향하는 과정에서 다른 프락시나 게이트웨이로 전달될 수 있는 최대 횟수를 지정하며, TRACE 메서드와 함께 사용</li><li><strong>Proxy-Authorization</strong>: Authorization과 같으나 프락시에서 인증을 할 때 사용</li><li><strong>Age 헤더</strong>: 응답이 얼마나 오래되었는지를 나타내며, 응답이 중개자나 프락시를 통해 왔음을 암시</li><li><strong>Accept-Ranges</strong>: 서버가 자원에 대해 받아들일 수 있는 범위의 형태를 명시</li><li><strong>WWW-Authenticate</strong>: 서버에서 클라이언트로 보낸 인증요구의 목록을 포함하는 응답 보안 헤더</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-2">
+    <div class="page-header">
+        <h2>Page 2</h2>
+        <div class="page-nav"><a href="#page-1">&larr; 이전</a><a href="#page-3">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_002.png" alt="Page 2" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">HTTP 엔터티 헤더</span><span class="tag">콘텐츠 헤더와 캐싱 헤더</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">엔터티 정보 헤더</span><span class="tag">콘텐츠 헤더</span><span class="tag">엔터티 캐싱 헤더</span><span class="tag">Content-Type</span><span class="tag">ETag</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">HTTP 엔터티 헤더는 리소스의 특정 버전에 대한 정보를 제공한다.<br>엔터티 정보 헤더는 Allow, Location, ETag, Expires, Last-Modified 등을 포함하며 엔터티의 위치와 유효성 정보를 제공한다.<br>콘텐츠 헤더는 Content-Type, Content-Length, Content-Encoding 등으로 본문의 종류, 크기, 인코딩 정보를 기술한다.<br>엔터티 캐싱 헤더는 캐시된 사본의 유효성과 만료 시점에 대한 정보를 제공한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>엔터티 정보 헤더</strong>: Allow(수행 가능한 요청 메서드), Location(실제 위치), ETag(엔터티 태그), Expires(만료 일시), Last-Modified(최근 변경 일시)</li><li><strong>콘텐츠 헤더</strong>: Content-Type(객체 종류), Content-Length(본문 길이), Content-Encoding(인코딩), Content-Language(자연어), Content-Range(범위)</li><li><strong>엔터티 캐싱 헤더</strong>: 캐시된 사본의 유효성 정보와 만료 시점 추정을 위한 단서 제공</li><li>브라우저는 <code>Content-Type</code> 헤더를 보고 객체를 어떻게 표시할지 결정</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-3">
+    <div class="page-header">
+        <h2>Page 3</h2>
+        <div class="page-nav"><a href="#page-2">&larr; 이전</a><a href="#page-4">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_003.png" alt="Page 3" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">HTTP 커넥션과 TCP</span><span class="tag">HTTP 통신 과정</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">TCP 커넥션</span><span class="tag">HTTP 커넥션</span><span class="tag">패킷 교환 네트워크</span><span class="tag">신뢰할 수 있는 데이터 전송</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">· 4장 HTTP 커넥션 관리의 개요와 학습 목표를 소개한다.<br>HTTP는 TCP/IP를 통해 통신하며, TCP 커넥션을 통해 메시지를 안전하게 전달한다.<br>· 4.1 TCP 커넥션에서는 HTTP 통신이 TCP를 기반으로 이루어지는 과정을 설명한다.<br>브라우저가 URL에서 호스트명과 포트를 추출하고, IP 주소를 찾아 TCP 커넥션을 맺은 후 HTTP 메시지를 주고받는 7단계 과정을 제시한다.<br>· 4.1.1에서는 TCP가 신뢰할 수 있는 데이터 전송 통로임을 강조한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li>4장에서 다루는 내용: HTTP의 TCP 커넥션 사용 방식, TCP 커넥션의 지연·병목·막힘, 병렬 커넥션·keep-alive·파이프라인을 활용한 최적화, 커넥션 관리 규칙</li><li>HTTP 통신의 7단계: (1) 호스트명 추출 → (2) IP 주소 조회 → (3) 포트 번호 획득 → (4) TCP 커넥션 생성 → (5) HTTP 요청 전송 → (6) HTTP 응답 수신 → (7) 커넥션 종료</li><li><strong>TCP 커넥션의 특징</strong>: 메시지가 손실·손상되거나 순서가 바뀌지 않고 안전하게 전달되는 신뢰할 수 있는 데이터 전송 통로</li><li>HTTP 커넥션은 몇몇 사용 규칙을 제외하고는 TCP 커넥션에 불과하며, HTTP 애플리케이션 개발을 위해서는 TCP의 기초를 이해해야 함</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-4">
+    <div class="page-header">
+        <h2>Page 4</h2>
+        <div class="page-nav"><a href="#page-3">&larr; 이전</a><a href="#page-5">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_004.png" alt="Page 4" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">TCP 연결과 데이터 전송</span><span class="tag">IP 패킷과 세그먼트 구조</span><span class="tag">TCP/IP 프로토콜 스택</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">TCP</span><span class="tag">IP 패킷</span><span class="tag">세그먼트</span><span class="tag">프로토콜 스택</span><span class="tag">포트 번호</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">·4.1.2 TCP는 데이터를 세그먼트 단위로 나누어 IP 패킷에 담아 전송한다.<br>HTTP는 IP, TCP, HTTP로 구성된 프로토콜 스택의 최상위 계층이며, HTTPS는 TCP와 HTTP 사이에 TLS/SSL 암호화 계층을 둔다.<br>각 IP 패킷은 IP 패킷 헤더(20바이트), TCP 세그먼트 헤더(20바이트), TCP 데이터 조각으로 구성된다.<br>·4.1.3 컴퓨터는 여러 개의 TCP 커넥션을 포트 번호를 통해 유지한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>TCP 스트림 전송 구조</strong>: HTTP 메시지 → TCP 세그먼트로 분할 → IP 패킷에 담아 전송</li><li><strong>프로토콜 스택 계층</strong>: HTTP(애플리케이션) - TCP(전송) - IP(네트워크) - 데이터링크, HTTPS는 HTTP와 TCP 사이에 TLS/SSL 보안 계층 추가</li><li><strong>IP 패킷 구성요소</strong>: IP 헤더(발신지/목적지 IP 주소, 크기, 플래그), TCP 헤더(포트 번호, 제어 플래그, 순서/무결성 검사 값), TCP 데이터</li><li><strong>TCP 포트 번호</strong>: 하나의 컴퓨터에서 여러 TCP 커넥션을 구분하고 유지하는 식별자</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-5">
+    <div class="page-header">
+        <h2>Page 5</h2>
+        <div class="page-nav"><a href="#page-4">&larr; 이전</a><a href="#page-6">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_005.png" alt="Page 5" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">TCP 커넥션 식별</span><span class="tag">소켓 프로그래밍</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">TCP 커넥션</span><span class="tag">포트 번호</span><span class="tag">소켓 API</span><span class="tag">발신지/수신지 주소</span><span class="tag">TCP 종단</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">·4.1.4 TCP 소켓 프로그래밍: TCP 커넥션은 발신지 IP 주소, 발신지 포트, 수신지 IP 주소, 수신지 포트 네 가지 값으로 유일하게 식별된다.<br>운영체제는 TCP 커넥션 생성을 위한 소켓 API를 제공하며, 이는 TCP와 IP의 세부사항을 숨긴다.<br>소켓 API는 유닉스용으로 먼저 개발되었지만 현재는 대부분의 운영체제와 프로그램 언어에서 사용 가능하다.<br>주요 소켓 함수로는 socket, bind, connect, listen, accept, read, write, close 등이 있다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>TCP 커넥션 식별</strong>: 발신지 IP 주소, 발신지 포트, 수신지 IP 주소, 수신지 포트 네 가지 값으로 유일한 커넥션 생성</li><li><strong>소켓 API 함수</strong>: socket(소켓 생성), bind(로컬 포트 할당), connect(커넥션 생성), listen(연결 대기), accept(연결 수락), read/write(데이터 송수신), close(커넥션 종료)</li><li><strong>소켓 API의 역할</strong>: TCP/IP의 세부사항, 핸드셰이킹, 데이터 스트림 분할 및 재조립 등을 외부로부터 숨김</li><li>웹브라우저는 소켓 API를 이용하여 URL에서 IP 주소와 포트 번호를 알아내고 서버에 TCP 커넥션을 생성</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-6">
+    <div class="page-header">
+        <h2>Page 6</h2>
+        <div class="page-nav"><a href="#page-5">&larr; 이전</a><a href="#page-7">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_006.png" alt="Page 6" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">TCP 소켓 인터페이스</span><span class="tag">HTTP 트랜잭션 지연</span><span class="tag">TCP 성능 고려사항</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">소켓</span><span class="tag">커넥션</span><span class="tag">HTTP 트랜잭션</span><span class="tag">TCP 지연</span><span class="tag">DNS 이름 분석</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">클라이언트와 서버는 TCP 소켓 인터페이스를 통해 상호작용하며, 서버는 소켓 생성·바인딩·리스닝 과정을 거치고 클라이언트는 연결 후 HTTP 요청을 전송한다.<br>· 4.2 HTTP 트랜잭션의 성능은 하위 계층인 TCP 성능에 영향을 받으며, 대부분의 HTTP 지연은 TCP 네트워크 지연 때문에 발생한다.<br>· 4.2.1 HTTP 트랜잭션을 지연시키는 주요 원인은 DNS 이름 분석(수십 초), TCP 커넥션 설정(1~2초), 요청/응답 전송 시간이다.<br>클라이언트나 서버가 대량 데이터를 처리하지 않는 한, 실제 트랜잭션 처리 시간은 TCP 커넥션 설정 및 전송 시간에 비해 상당히 짧다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>TCP 소켓 통신 과정</strong>: 서버는 소켓 생성(S1) → 포트 바인딩(S2) → 커넥션 허가(S3) → 대기(S4), 클라이언트는 주소 획득(C1) → 소켓 생성(C2) → 연결(C3) 순서로 진행</li><li><strong>DNS 이름 분석 지연</strong>: URI의 호스트명을 IP 주소로 변환하는 데 수십 초 소요 가능 (최근 방문 기록 없을 시)</li><li><strong>TCP 커넥션 설정 지연</strong>: 새로운 TCP 커넥션마다 1~2초 소요되며, 수백 개의 HTTP 트랜잭션 시 누적 시간 증가</li><li><strong>HTTP 지연의 주요 원인</strong>: 트랜잭션 처리 시간보다 TCP 네트워크 지연(커넥션 설정, 전송)이 대부분의 지연 발생</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-7">
+    <div class="page-header">
+        <h2>Page 7</h2>
+        <div class="page-nav"><a href="#page-6">&larr; 이전</a><a href="#page-9">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_007.png" alt="Page 7" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">TCP 커넥션 성능</span><span class="tag">HTTP 트랜잭션 지연</span><span class="tag">TCP 핸드셰이크</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">TCP 핸드셰이크</span><span class="tag">SYN</span><span class="tag">ACK</span><span class="tag">네이글 알고리즘</span><span class="tag">느린 시작</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">· 4.2.2 HTTP 성능에 영향을 주는 TCP 관련 지연 요소로는 핸드셰이크 설정, 느린 시작, 네이글 알고리즘, 확인응답 지연, TIME_WAIT 지연 등이 있다.<br>· 4.2.3 새로운 TCP 커넥션을 열 때마다 SYN, SYN+ACK, ACK 패킷을 순서대로 교환하는 핸드셰이크 과정이 필요하다.<br>작은 크기의 HTTP 트랜잭션은 50% 이상의 시간을 TCP 구성에 소비하여 성능 저하가 발생한다.<br>HTTP는 이러한 지연을 줄이기 위해 기존 커넥션을 재활용하는 방법을 사용한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>TCP 성능 관련 주요 요소</strong>: 핸드셰이크 설정, 느린 시작(slow-start), 네이글 알고리즘, 확인응답 지연, TIME_WAIT 지연과 포트 고갈</li><li><strong>TCP 핸드셰이크 3단계</strong>: ① 클라이언트가 SYN 플래그를 가진 패킷 전송 ② 서버가 SYN+ACK 플래그 패킷으로 응답 ③ 클라이언트가 ACK 확인응답 전송</li><li>작은 HTTP 트랜잭션의 경우 <strong>50% 이상의 시간을 TCP 구성에 소비</strong>하여 핸드셰이크 지연이 성능에 큰 영향을 미침</li><li>ACK 패킷은 HTTP 요청 메시지 전체를 전달할 수 있을 만큼 크며, 많은 서버 응답도 하나의 IP 패킷에 담길 수 있음</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-9">
+    <div class="page-header">
+        <h2>Page 9</h2>
+        <div class="page-nav"><a href="#page-7">&larr; 이전</a><a href="#page-10">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_009.png" alt="Page 9" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">네이글 알고리즘과 HTTP 성능</span><span class="tag">TIME_WAIT 포트 고갈</span><span class="tag">HTTP 커넥션 관리</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">네이글 알고리즘</span><span class="tag">TCP_NODELAY</span><span class="tag">TIME_WAIT</span><span class="tag">포트 고갈</span><span class="tag">2MSL</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">네이글 알고리즘은 작은 HTTP 메시지를 지연시키고 확인응답 지연과 함께 사용 시 성능 문제를 발생시키므로, HTTP 애플리케이션은 TCP_NODELAY 파라미터로 이를 비활성화하기도 한다.<br>TCP 커넥션 종료 시 TIME_WAIT 상태로 인해 같은 주소와 포트의 재사용이 2분(2MSL) 동안 제한되며, 성능 테스트 환경에서는 포트 고갈 문제가 발생할 수 있다.<br>제한된 발신지 포트(약 60,000개)와 TIME_WAIT 시간(120초)으로 인해 초당 약 500개의 커넥션으로 제한되며, 이는 성능 측정 시 심각한 병목이 될 수 있다.<br>포트 고갈 문제 해결을 위해 부하 생성 장비를 늘리거나 여러 가상 IP 주소를 사용할 수 있다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>네이글 알고리즘 문제</strong>: 작은 HTTP 메시지 지연, 확인응답 지연(100~200ms)과 함께 사용 시 성능 저하</li><li><strong>TCP_NODELAY 파라미터</strong>: 네이글 알고리즘 비활성화로 성능 개선, 단 큰 데이터 덩어리 생성 필요</li><li><strong>TIME_WAIT 포트 고갈</strong>: 2MSL(약 2분) 동안 같은 주소/포트 재사용 불가, 성능 테스트 시 초당 500개 커넥션 제한</li><li><strong>포트 고갈 해결책</strong>: 부하 생성 장비 추가, 여러 가상 IP 주소 사용으로 가능한 연결 조합 확대</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-10">
+    <div class="page-header">
+        <h2>Page 10</h2>
+        <div class="page-nav"><a href="#page-9">&larr; 이전</a><a href="#page-11">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_010.png" alt="Page 10" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">Connection 헤더</span><span class="tag">순차적 트랜잭션 처리의 지연</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">Connection 헤더</span><span class="tag">hop-by-hop</span><span class="tag">커넥션 토큰</span><span class="tag">순차적 트랜잭션</span><span class="tag">TCP 성능</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">· 4.3.1 Connection 헤더는 현재 커넥션에만 적용될 옵션을 지정하며, HTTP 헤더 필드명/임시 토큰/close 값 세 가지 종류의 토큰을 전달할 수 있다.<br>Connection 헤더에 명시된 헤더들은 hop-by-hop 헤더로, 다음 커넥션으로 전달되지 않고 삭제되어야 한다.<br>· 4.3.2 순차적 트랜잭션 처리는 각 트랜잭션마다 새로운 커넥션을 맺어 지연과 느린 시작 문제를 발생시킨다.<br>여러 이미지가 있는 웹페이지를 순차적으로 로드하면 물리적 지연과 심리적 지연이 모두 발생한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>Connection 헤더의 세 가지 토큰</strong>: HTTP 헤더 필드명(현재 커넥션만 해당), 임시 토큰(비표준 옵션), close(작업 완료 후 종료)</li><li><strong>hop-by-hop 헤더</strong>: Connection 헤더에 명시된 헤더는 다음 hop으로 전달 시 삭제되며, Proxy-Authenticate, Transfer-Encoding 등도 hop-by-hop 헤더에 해당</li><li><strong>순차적 처리의 문제</strong>: 네 개의 트랜잭션이 순차적으로 처리되면 각각 커넥션 맺기 지연과 느린 시작 지연 발생</li><li>사용자는 이미지를 하나씩 순차적으로 내려받는 것보다 여러 개가 동시에 로드되는 방식을 더 선호</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-11">
+    <div class="page-header">
+        <h2>Page 11</h2>
+        <div class="page-nav"><a href="#page-10">&larr; 이전</a><a href="#page-12">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_011.png" alt="Page 11" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">HTTP 커넥션 성능 향상 기술</span><span class="tag">병렬 커넥션</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">병렬 커넥션</span><span class="tag">지속 커넥션</span><span class="tag">파이프라인 커넥션</span><span class="tag">다중 커넥션</span><span class="tag">대역폭</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">순차적 로드 방식은 객체 크기를 알아야 화면에 배치할 수 있어 모든 객체를 내려받기 전까지 빈 화면을 보여주는 단점이 있다.<br>HTTP 커넥션 성능 향상을 위한 네 가지 기술로는 병렬 커넥션, 지속 커넥션, 파이프라인 커넥션, 다중 커넥션이 있다.<br>· 4.4 병렬 커넥션은 여러 개의 커넥션을 맺어 여러 HTTP 트랜잭션을 병렬로 처리하여 페이지를 더 빠르게 내려받는다.<br>병렬 커넥션은 커넥션 지연을 겹치게 하고 남은 대역폭을 활용하여 총 지연시간을 줄일 수 있다.<br>하지만 클라이언트의 네트워크 대역폭이 좁거나 여러 커넥션 생성 부하가 클 경우 오히려 더 느릴 수 있다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>HTTP 커넥션 성능 향상 기술 4가지</strong>: 병렬 커넥션(동시 HTTP 요청), 지속 커넥션(TCP 커넥션 재활용), 파이프라인 커넥션(공유 TCP 커넥션 통한 병렬 요청), 다중 커넥션(요청과 응답 중재)</li><li><strong>병렬 커넥션의 장점</strong>: 단일 커넥션의 대역폭 제한과 대기 시간을 활용하여 여러 객체를 동시에 내려받아 총 지연시간 감소</li><li><strong>병렬 커넥션의 한계</strong>: 네트워크 대역폭이 좁을 때(예: 28.8Kbps 모뎀) 제한된 대역폭 내에서 각 객체 전송이 느려져 성능 장점 거의 없음</li><li>여러 커넥션 생성 부하로 인해 순차적 내려받기보다 오히려 더 오래 걸릴 수 있음</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-12">
+    <div class="page-header">
+        <h2>Page 12</h2>
+        <div class="page-nav"><a href="#page-11">&larr; 이전</a><a href="#page-15">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_012.png" alt="Page 12" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">병렬 커넥션의 한계</span><span class="tag">지속 커넥션의 개념과 장점</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">병렬 커넥션</span><span class="tag">지속 커넥션</span><span class="tag">사이트 지역성</span><span class="tag">TCP 느린 시작</span><span class="tag">비지속 커넥션</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">병렬 커넥션은 메모리를 많이 소모하고 성능 문제를 발생시키며, 브라우저는 보통 4개 정도의 병렬 커넥션만 허용한다.<br>병렬 커넥션이 실제로 더 빠르지는 않지만, 여러 객체가 동시에 내려받는 모습을 보여줘 사용자에게 더 빠르게 느껴질 수 있다.<br>·4.5 지속 커넥션은 처리 완료 후에도 TCP 커넥션을 유지하여 재사용하는 방식으로, HTTP/1.1에서 지원한다.<br>지속 커넥션은 커넥션 준비 시간을 절약하고 TCP 느린 시작을 피해 더 빠른 데이터 전송이 가능하다.<br>지속 커넥션과 병렬 커넥션을 함께 사용할 때 가장 효과적이다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>병렬 커넥션의 한계</strong>: 메모리 과다 소모, 서버는 과도한 커넥션을 임의로 끊을 수 있음, 브라우저는 보통 4개 정도만 허용</li><li><strong>사용자 체감 속도</strong>: 병렬 커넥션은 실제 속도는 느려도 여러 객체가 동시에 로드되는 모습으로 더 빠르게 느껴짐</li><li><strong>지속 커넥션</strong>: 처리 완료 후에도 TCP 커넥션을 유지하여 재사용, 사이트 지역성 활용</li><li><strong>지속 커넥션의 장점</strong>: 커넥션 준비 시간 절약, TCP 느린 시작 회피, 커넥션 수 감소</li><li><strong>최적 조합</strong>: 지속 커넥션과 병렬 커넥션을 함께 사용할 때 가장 효과적</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-15">
+    <div class="page-header">
+        <h2>Page 15</h2>
+        <div class="page-nav"><a href="#page-12">&larr; 이전</a><a href="#page-19">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_015.png" alt="Page 15" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">Keep-Alive 헤더</span><span class="tag">Keep-Alive 커넥션 제한과 규칙</span><span class="tag">멍청한(dumb) 프락시 문제</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">Keep-Alive</span><span class="tag">Connection 헤더</span><span class="tag">max</span><span class="tag">timeout</span><span class="tag">멍청한 프락시</span><span class="tag">Content-Length</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">·Keep-Alive 헤더는 <code>max</code>(트랜잭션 수)와 <code>timeout</code>(유지 시간) 파라미터를 통해 커넥션 유지 정보를 전달한다.<br>·Keep-alive 커넥션은 HTTP/1.0에서 기본이 아니며, 모든 메시지에 <code>Connection: Keep-Alive</code> 헤더를 포함해야 한다.<br>·커넥션 유지를 위해서는 정확한 <code>Content-Length</code> 값이나 청크 전송 인코딩이 필요하며, 프락시는 Connection 헤더 규칙을 철저히 지켜야 한다.<br>·멍청한 프락시는 Connection 헤더를 이해하지 못해 삭제하지 않고 그대로 전달하여 문제를 발생시킨다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>Keep-Alive 헤더 파라미터</strong>: <code>max</code>는 처리할 트랜잭션 수, <code>timeout</code>은 유지 시간(초)을 의미</li><li><strong>커넥션 유지 조건</strong>: 엔터티 본문의 정확한 <code>Content-Length</code> 또는 멀티파트 미디어 타입, 청크 전송 인코딩 필요</li><li><strong>프락시 규칙</strong>: Connection 헤더에 명시된 모든 헤더 필드와 Connection 헤더 자체를 전달 전에 제거해야 함</li><li><strong>멍청한 프락시 문제</strong>: Connection 헤더를 이해하지 못하고 그대로 전달하여 keep-alive 커넥션에 문제 발생</li><li><strong>클라이언트 준비사항</strong>: 응답 전체를 받기 전에 커넥션이 끊어진 경우 요청을 다시 보낼 수 있어야 함</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-19">
+    <div class="page-header">
+        <h2>Page 19</h2>
+        <div class="page-nav"><a href="#page-15">&larr; 이전</a><a href="#page-20">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_019.png" alt="Page 19" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">Proxy-Connection 헤더</span><span class="tag">HTTP/1.1 지속 커넥션</span><span class="tag">멍청한 프락시 문제 해결</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">Proxy-Connection</span><span class="tag">멍청한 프락시</span><span class="tag">지속 커넥션</span><span class="tag">Connection: close</span><span class="tag">HTTP/1.1</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">넷스케이프는 멍청한 프락시 문제를 해결하기 위해 Proxy-Connection 확장 헤더를 도입했다.<br>영리한 프락시는 Proxy-Connection 헤더를 Connection 헤더로 변환하여 지속 커넥션을 맺을 수 있다.<br>하지만 이 방식은 클라이언트와 서버 사이에 한 개의 프락시만 있을 때만 동작하며, 여러 프락시가 있으면 문제가 재발한다.<br>HTTP/1.1에서는 지속 커넥션이 기본으로 활성화되어 있으며, 커넥션을 끊으려면 Connection: close 헤더를 명시해야 한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>Proxy-Connection 헤더</strong>: 브라우저가 Connection 헤더 대신 전송하며, 멍청한 프락시가 무조건 전달해도 웹 서버는 무시하므로 문제없음</li><li><strong>영리한 프락시</strong>: Proxy-Connection 헤더를 인식하고 Connection: Keep-Alive 헤더로 변환하여 서버에 전송</li><li><strong>다중 프락시 환경의 한계</strong>: 멍청한 프락시 양옆에 영리한 프락시가 있으면 잘못된 헤더를 만들어내는 문제 재발</li><li><strong>HTTP/1.1 지속 커넥션</strong>: 기본으로 활성화되어 있으며, 트랜잭션 종료 후 커넥션을 끊으려면 <code>Connection: close</code> 헤더 명시 필요</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-20">
+    <div class="page-header">
+        <h2>Page 20</h2>
+        <div class="page-nav"><a href="#page-19">&larr; 이전</a><a href="#page-22">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_020.png" alt="Page 20" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">지속 커넥션의 제한과 규칙</span><span class="tag">HTTP 파이프라인 커넥션</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">Connection: close</span><span class="tag">지속 커넥션 규칙</span><span class="tag">파이프라인</span><span class="tag">비멱등성</span><span class="tag">요청 순서</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">·4.5.9 지속 커넥션의 제한과 규칙에서는 Connection: close 헤더 사용 시 추가 요청 금지, 메시지 길이 정보 필수, 프락시의 별도 커넥션 관리 등 9가지 규칙을 설명한다.<br>·4.6 파이프라인 커넥션에서는 HTTP/1.1의 요청 파이프라이닝을 통해 응답 대기 없이 여러 요청을 연속 전송하여 네트워크 지연을 줄이는 방법을 다룬다.<br>파이프라인은 지속 커넥션 확인 후 사용, 응답 순서 보장, POST 같은 비멱등 요청 제외 등의 제약사항이 있다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>지속 커넥션 규칙</strong>: Connection: close 전송 시 추가 요청 불가, 모든 메시지는 정확한 Content-Length나 청크 전송 인코딩 필요</li><li><strong>프락시 관리</strong>: HTTP/1.1 프락시는 클라이언트와 서버에 대해 별도의 지속 커넥션을 관리하며, 클라이언트당 최대 2개 커넥션 유지 권장</li><li><strong>파이프라인 성능</strong>: 응답 도착 전 여러 요청을 큐에 쌓아 전송하여 네트워크 왕복 시간 단축</li><li><strong>파이프라인 제약</strong>: 지속 커넥션 확인 후 사용, 응답은 요청 순서대로 수신, 커넥션 끊김 시 미완료 요청 재전송 준비 필요</li><li><strong>비멱등 요청 제한</strong>: POST 같은 비멱등 요청은 파이프라인 사용 금지 - 에러 발생 시 서버 처리 여부 확인 불가</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-22">
+    <div class="page-header">
+        <h2>Page 22</h2>
+        <div class="page-nav"><a href="#page-20">&larr; 이전</a><a href="#page-23">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_022.png" alt="Page 22" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">HTTP 요청 재시도와 멱등성</span><span class="tag">TCP 커넥션 종료 방식</span><span class="tag">우아한 커넥션 끊기</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">멱등성(idempotent)</span><span class="tag">전체 끊기</span><span class="tag">절반 끊기</span><span class="tag">close()</span><span class="tag">shutdown()</span><span class="tag">connection reset by peer</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">멱등성(idempotent)은 한 번 또는 여러 번 실행해도 같은 결과를 반환하는 특성으로, GET, HEAD, PUT, DELETE, TRACE, OPTIONS 메서드가 이에 해당한다.<br>POST와 같이 멱등이 아닌 요청은 파이프라인을 통해 요청하면 안 되며, 재시도 시 이전 응답을 받을 때까지 기다려야 한다.<br>TCP 커넥션 종료 방식에는 close()를 사용한 '전체 끊기'와 shutdown()을 사용한 '절반 끊기'가 있다.<br>입력 채널을 먼저 끊으면 클라이언트가 데이터를 전송할 때 'connection reset by peer' 에러가 발생하여 버퍼의 데이터가 삭제될 수 있다.<br>파이프라인 지속 커넥션에서는 예상치 못한 쓰기 에러를 방지하기 위해 절반 끊기를 사용해야 한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>멱등성 메서드</strong>: GET, HEAD, PUT, DELETE, TRACE, OPTIONS는 여러 번 실행해도 같은 결과를 반환</li><li><strong>POST 요청 주의</strong>: 멱등이 아닌 요청은 파이프라인 사용 금지, 재시도 시 이전 응답 대기 필요</li><li><strong>전체 끊기</strong>: <code>close()</code> 호출로 입력/출력 채널 모두 종료</li><li><strong>절반 끊기</strong>: <code>shutdown()</code> 호출로 입력 또는 출력 채널 중 하나만 종료</li><li><strong>입력 채널 종료 위험</strong>: 클라이언트가 끊긴 입력 채널에 데이터 전송 시 'connection reset by peer' 에러 발생, 버퍼 데이터 삭제</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-23">
+    <div class="page-header">
+        <h2>Page 23</h2>
+        <div class="page-nav"><a href="#page-22">&larr; 이전</a><a href="#page-24">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_023.png" alt="Page 23" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">HTTP 커넥션 종료</span><span class="tag">우아한 커넥션 끊기</span><span class="tag">HTTP 성능 참고자료</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">connection reset by peer</span><span class="tag">절반 끊기</span><span class="tag">파이프라인 커넥션</span><span class="tag">우아한 종료</span><span class="tag">RFC 2616</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">· 파이프라인 커넥션에서 서버가 연결을 끊으면 버퍼에 있던 응답 데이터가 'connection reset by peer' 에러로 사라질 수 있다.<br>· HTTP 명세는 우아한 커넥션 끊기를 권장하며, 이는 출력 채널을 먼저 끊고 상대방의 출력 채널이 끊기길 기다리는 방식이다.<br>· 절반 끊기 후에도 입력 채널 상태를 주기적으로 검사해야 하며, 타임아웃 시 강제로 커넥션을 끊을 수 있다.<br>· 4.8절에서는 HTTP 커넥션 관리와 성능 관련 참고자료들을 소개한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>connection reset by peer 에러</strong>: 파이프라인 요청 중 서버가 커넥션을 끊으면 버퍼의 응답 데이터가 리셋 메시지로 인해 사라짐</li><li><strong>우아한 커넥션 끊기</strong>: 출력 채널을 먼저 끊고 상대방의 출력 채널 종료를 기다려 리셋 위험 없이 종료</li><li><strong>절반 끊기 검사</strong>: 상대방이 절반 끊기를 구현했다는 보장이 없으므로 입력 채널 상태를 주기적으로 검사 필요</li><li><strong>주요 참고자료</strong>: RFC 2616(HTTP/1.1 공식 명세), RFC 2068(Keep-Alive 설명 포함), W3C HTTP Performance Overview</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-24">
+    <div class="page-header">
+        <h2>Page 24</h2>
+        <div class="page-nav"><a href="#page-23">&larr; 이전</a><a href="#page-25">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_024.png" alt="Page 24" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">TCP/IP 참고자료</span><span class="tag">HTTP 성능 관련 문서</span><span class="tag">네트워크 프로토콜 RFC</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">TCP Slow Start</span><span class="tag">네이글 알고리즘</span><span class="tag">지연된 확인응답</span><span class="tag">RFC</span><span class="tag">혼잡 제어</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">TCP/IP와 HTTP 성능에 관한 주요 참고자료를 소개한다.<br>W. Richard Stevens의 TCP Illustrated 시리즈와 UNIX Network Programming 등 기술 서적을 추천한다.<br>네이글 알고리즘, TCP 느린 시작, 혼잡 제어 등을 다룬 RFC 문서들을 안내한다.<br>RFC 896(네이글 알고리즘), RFC 2001(느린 시작), RFC 793(TCP 프로토콜 정의) 등 핵심 명세를 제시한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>W. Richard Stevens 저서</strong>: TCP Illustrated Volume 1, UNIX Network Programming Volume 1/2 등 TCP/IP 기술의 상세한 내용을 다루는 필독서</li><li><strong>네이글 알고리즘 재고찰</strong>: Jeff Mogul과 Greg Minshall의 논문으로 현대적 관점에서 네이글 알고리즘 적용 방법과 개선사항 제안</li><li><strong>RFC 2001</strong>: TCP 느린 시작, 혼잡 회피, 빠른 재전송 및 빠른 복구 알고리즘 정의</li><li><strong>RFC 896</strong>: John Nagle이 1984년 발표한 TCP 혼잡 제어 필요성 설명 문서</li><li><strong>RFC 793</strong>: Jon Postel의 1981년 TCP 프로토콜 정의서</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-25">
+    <div class="page-header">
+        <h2>Page 25</h2>
+        <div class="page-nav"><a href="#page-24">&larr; 이전</a><a href="#page-26">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_025.png" alt="Page 25" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">HTTP 아키텍처</span><span class="tag">웹 시스템 구성요소</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">웹 서버</span><span class="tag">프락시</span><span class="tag">캐시</span><span class="tag">게이트웨이</span><span class="tag">웹 로봇</span><span class="tag">HTTP/2.0</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">2부는 HTTP 아키텍처를 구성하는 핵심 컴포넌트들을 다룬다.<br>·5장은 웹 서버 아키텍처를, 6장은 중개 서버인 프락시를 설명한다.<br>·7장은 성능 개선을 위한 웹 캐시, 8장은 게이트웨이/터널/릴레이를 다룬다.<br>·9장은 웹 로봇을, 10장은 HTTP/2.0의 성능 개선 사항을 소개한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>5장 웹 서버</strong>: 웹 서버 아키텍처 개요</li><li><strong>6장 프락시</strong>: HTTP 클라이언트와 서버 사이의 중개 서버</li><li><strong>7장 캐시</strong>: 지역 사본을 통한 트래픽 감소 및 성능 개선</li><li><strong>8장 게이트웨이/터널/릴레이</strong>: 서로 다른 프로토콜 간 HTTP 상호작용 지원</li><li><strong>10장 HTTP/2.0</strong>: HTTP/1.1의 성능 문제 개선</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-26">
+    <div class="page-header">
+        <h2>Page 26</h2>
+        <div class="page-nav"><a href="#page-25">&larr; 이전</a><a href="#page-27">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_026.png" alt="Page 26" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">웹 서버 개요</span><span class="tag">웹 서버 구현</span><span class="tag">웹 서버 종류</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">웹 서버</span><span class="tag">HTTP 요청</span><span class="tag">리소스</span><span class="tag">다목적 소프트웨어 웹 서버</span><span class="tag">웹 서버 구현</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">· 5장 웹 서버: 웹 서버는 HTTP 요청을 처리하고 응답을 제공하는 소프트웨어 및 하드웨어를 의미한다.<br>· 5.1 다채로운 웹 서버: 웹 서버는 기능, 형태, 크기가 다양하며, 모든 웹 서버는 리소스에 대한 HTTP 요청을 받아 콘텐츠를 클라이언트에게 돌려준다.<br>· 5.1.1 웹 서버 구현: 웹 서버는 HTTP 프로토콜을 구현하고, 웹 리소스를 관리하며, 관리 기능을 제공하고, TCP 커넥션 관리 책임을 운영체제와 나눠 갖는다.<br>· 5.1.2 다목적 소프트웨어 웹 서버: 표준 컴퓨터 시스템에서 동작하며, 아파치, W3C의 직소, 마이크로소프트 등의 소프트웨어가 널리 사용된다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>웹 서버의 역할</strong>: HTTP 요청 처리, 응답 제공, 리소스 관리, 설정·통제·확장을 위한 관리 기능 제공</li><li><strong>웹 서버 구현 형태</strong>: 다목적 소프트웨어 웹 서버(표준 컴퓨터 시스템), 내장형 웹 서버(마이크로프로세서 칩)</li><li><strong>운영체제와의 협력</strong>: TCP/IP 네트워크 지원, 파일 시스템, 프로세스 관리 등 TCP 커넥션 관리 책임 분담</li><li><strong>다목적 소프트웨어 웹 서버</strong>: 아파치, W3C 직소(오픈소스), 마이크로소프트, 아이플래닛(상용) 등이 대표적</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-27">
+    <div class="page-header">
+        <h2>Page 27</h2>
+        <div class="page-nav"><a href="#page-26">&larr; 이전</a><a href="#page-28">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_027.png" alt="Page 27" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">웹 서버 시장 점유율</span><span class="tag">임베디드 웹 서버</span><span class="tag">간단한 펄 웹 서버 구현</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">아파치</span><span class="tag">nginx</span><span class="tag">임베디드 웹 서버</span><span class="tag">type-o-serve</span><span class="tag">펄(Perl)</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">· 5.1 넷크래프트 조사에 따르면 마이크로소프트 웹 서버가 37%, 아파치가 35%, nginx가 14%의 시장 점유율을 보인다.<br>· 5.1.3 임베디드 웹 서버는 프린터나 가전제품 같은 소비자용 제품에 내장되어 웹 브라우저 인터페이스로 관리할 수 있게 해준다.<br>· 5.2 완전한 HTTP 서버는 아파치처럼 50,000줄 이상의 코드가 필요하지만, 최소 기능 서버는 30줄 이하의 펄 코드로도 구현 가능하다.<br>type-o-serve는 HTTP 커넥션을 받아 요청 메시지를 출력하고 응답 메시지를 타이핑할 수 있는 진단 도구이다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>웹 서버 시장 점유율</strong>: 마이크로소프트 37%, 아파치 35%, nginx 14%</li><li><strong>임베디드 웹 서버</strong>: 1제곱인치 미만 크기로 프린터·가전제품에 내장되어 최소 기능 제공</li><li><strong>type-o-serve</strong>: 30줄 이하 펄 코드로 구현된 HTTP 디버깅용 최소 기능 웹 서버</li><li>8080 포트를 기본으로 사용하며 TCP 소켓 생성, 바인딩, 리스닝 과정을 거쳐 커넥션 대기</li><li>클라이언트 요청 메시지를 화면에 출력하고 응답 메시지를 수동으로 입력할 수 있는 진단 툴</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-28">
+    <div class="page-header">
+        <h2>Page 28</h2>
+        <div class="page-nav"><a href="#page-27">&larr; 이전</a><a href="#page-29">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_028.png" alt="Page 28" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">type-o-serve 진단 도구</span><span class="tag">웹 서버의 기본 동작</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">type-o-serve</span><span class="tag">HTTP 요청 메시지</span><span class="tag">HTTP 응답 메시지</span><span class="tag">커넥션</span><span class="tag">트랜잭션</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">· type-o-serve는 HTTP 통신을 테스트하기 위한 진단 서버로, 특정 포트(예: 8080)로 수신하며 브라우저로부터 HTTP 요청을 받아 화면에 출력한다.<br>관리자는 마침표(.)로 끝나는 응답 메시지를 직접 입력하면, type-o-serve가 이를 브라우저에게 전송하여 HTTP 통신을 수동으로 테스트할 수 있다.<br>· 5.3절에서는 진짜 웹 서버가 수행하는 7가지 기본 작업을 소개한다: 커넥션 맺기, 요청 받기, 요청 처리, 리소스 접근, 응답 생성, 응답 전송, 트랜잭션 로깅.<br>상용 웹 서버는 복잡하지만 이러한 공통적인 기본 동작들을 수행한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>type-o-serve 실행</strong>: <code>type-o-serve.pl 8080</code> 명령으로 8080번 포트에서 진단 서버 시작</li><li><strong>HTTP 요청 수신</strong>: 브라우저로부터 HTTP 요청 메시지를 받아 화면에 출력하고, 관리자가 응답 내용을 직접 타이핑</li><li><strong>웹 서버의 7가지 기본 동작</strong>: ① 커넥션 맺기 ② 요청 받기 ③ 요청 처리 ④ 리소스 접근 ⑤ 응답 생성 ⑥ 응답 전송 ⑦ 트랜잭션 로깅</li><li>관리자는 마침표 하나뿐인 줄(<code>.</code>)로 응답 메시지 입력을 종료하며, 서버는 이를 브라우저에게 전송</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-29">
+    <div class="page-header">
+        <h2>Page 29</h2>
+        <div class="page-nav"><a href="#page-28">&larr; 이전</a><a href="#page-30">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_029.png" alt="Page 29" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">웹 서버 클라이언트 커넥션 수락</span><span class="tag">클라이언트 식별 기법</span><span class="tag">ident 프로토콜</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">TCP 커넥션</span><span class="tag">역방향 DNS</span><span class="tag">호스트 명 룩업</span><span class="tag">ident 프로토콜</span><span class="tag">HostnameLookups</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">· 5.4 클라이언트가 웹 서버에 TCP 커넥션을 요청하면, 서버는 커넥션을 수락하고 IP 주소를 추출하여 클라이언트를 확인한다.<br>· 5.4.2 대부분의 웹 서버는 역방향 DNS를 사용해 클라이언트의 IP 주소를 호스트 명으로 변환하며, 아파치에서는 HostnameLookups 지시자로 제어할 수 있다.<br>· 5.4.3 일부 웹 서버는 ident 프로토콜을 지원하여 HTTP 커넥션을 초기화한 사용자 이름을 찾아낼 수 있으며, 이는 웹 서버 로깅에 유용하다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li>웹 서버는 새 커넥션을 맺으면 커넥션 목록에 추가하고, 인가되지 않거나 악의적인 클라이언트의 경우 커넥션을 거절하거나 즉시 닫을 수 있음</li><li><strong>역방향 DNS</strong>는 시간이 많이 걸려 웹 트랜잭션을 느리게 할 수 있어, 많은 대용량 웹 서버는 호스트 명 분석을 꺼두거나 특정 콘텐츠에만 적용</li><li>아파치의 <code>HostnameLookups</code> 지시자로 HTML과 CGI 리소스만을 위한 호스트 명 룩업 설정 가능</li><li><strong>ident 프로토콜</strong>은 TCP 포트 113번을 통해 클라이언트의 사용자 이름을 조회하며, 일반 로그 포맷의 두 번째 필드에 기록됨</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-30">
+    <div class="page-header">
+        <h2>Page 30</h2>
+        <div class="page-nav"><a href="#page-29">&larr; 이전</a><a href="#page-125">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_030.png" alt="Page 30" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">ident 프로토콜을 통한 클라이언트 식별</span><span class="tag">HTTP 요청 메시지 수신 및 파싱</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">ident</span><span class="tag">identd</span><span class="tag">요청 메시지 파싱</span><span class="tag">CRLF</span><span class="tag">내부 자료 구조</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">· ident 프로토콜은 클라이언트의 사용자명을 알아내기 위해 113번 포트로 identd 데몬에 질의하지만, 공공 인터넷에서는 지연, 방화벽 차단, 보안 취약성, 프라이버시 침해 등의 이유로 잘 동작하지 않는다.<br>· 5.5 단계 2에서는 웹 서버가 커넥션에서 데이터를 읽어 요청 메시지를 구성하며, 요청줄(메서드, URI, 버전), 헤더들, 빈 줄, 본문 순으로 파싱한다.<br>· 웹 서버는 네트워크로부터 불규칙적으로 받는 데이터를 메모리에 임시 저장하며, 요청 메시지를 내부 자료 구조(포인터, 길이, 룩업 테이블)에 저장하여 빠르게 접근할 수 있도록 한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>ident 프로토콜의 한계</strong>: 많은 클라이언트가 identd를 실행하지 않고, HTTP 트랜잭션 지연, 방화벽 차단, 보안 취약성, 가상 주소 미지원, 프라이버시 침해 문제 존재</li><li><strong>요청 메시지 파싱 과정</strong>: 요청줄(메서드, URI, 버전)을 스페이스로 분리하여 파싱하고, CRLF로 끝나는 헤더들을 읽으며, 빈 줄로 헤더 끝을 확인 후 본문 읽기</li><li><strong>네트워크 데이터 처리</strong>: 불규칙적으로 도착하는 데이터를 파싱 가능한 수준까지 메모리에 임시 저장</li><li><strong>내부 자료 구조</strong>: 요청 메시지 각 조각의 포인터와 길이를 담고, 헤더는 룩업 테이블에 저장하여 신속한 접근 지원</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-125">
+    <div class="page-header">
+        <h2>Page 125</h2>
+        <div class="page-nav"><a href="#page-30">&larr; 이전</a><a href="#page-135">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_125.png" alt="Page 125" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">TCP 확인응답 지연</span><span class="tag">TCP 느린 시작</span><span class="tag">네이글 알고리즘</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">확인응답 지연</span><span class="tag">piggyback</span><span class="tag">TCP 느린 시작</span><span class="tag">혼잡 윈도</span><span class="tag">네이글 알고리즘</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">·4.2.4 TCP는 데이터 무결성 보장을 위해 확인응답 체계를 사용하며, 확인응답 지연 알고리즘은 0.1~0.2초 동안 확인응답을 버퍼에 저장해 송출 데이터 패킷에 편승시킨다.<br>HTTP의 요청-응답 구조는 확인응답이 편승할 기회를 감소시켜 지연을 자주 발생시킨다.<br>·4.2.5 TCP 느린 시작은 커넥션 초기에 전송 패킷 수를 제한하고, 성공적 전달 시점마다 전송 권한을 늘려가며 혼잡을 방지한다.<br>·4.2.6 네이글 알고리즘은 작은 데이터를 버퍼에 모아 최대 크기의 세그먼트로 합쳐 전송함으로써 네트워크 효율을 높인다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>확인응답 지연(Delayed ACK)</strong>: 확인응답을 0.1~0.2초 버퍼에 저장하여 송출 데이터 패킷에 piggyback 시도</li><li><strong>TCP 느린 시작(Slow Start)</strong>: 초기 1개 패킷 전송 후 확인응답마다 전송 가능 패킷 수를 2배씩 증가(혼잡 윈도 열기)</li><li><strong>네이글 알고리즘</strong>: 세그먼트가 최대 크기(1,500바이트)가 되거나 모든 패킷이 확인응답 받을 때까지 전송 지연</li><li>HTTP 요청-응답 구조는 확인응답 편승 기회를 감소시켜 지연 발생 빈도 증가</li><li>튜닝된 커넥션이 새 커넥션보다 빠르므로 HTTP는 기존 커넥션 재사용(지속 커넥션) 기능 제공</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-135">
+    <div class="page-header">
+        <h2>Page 135</h2>
+        <div class="page-nav"><a href="#page-125">&larr; 이전</a><a href="#page-139">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_135.png" alt="Page 135" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">HTTP Keep-Alive 커넥션</span><span class="tag">HTTP/1.0+ 지속 커넥션</span><span class="tag">Keep-Alive 동작 방식</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">Keep-Alive</span><span class="tag">지속 커넥션</span><span class="tag">Connection 헤더</span><span class="tag">timeout 파라미터</span><span class="tag">핸드셰이크</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">· 4.5.2 HTTP/1.0+는 실험적인 keep-alive 커넥션을 통해 지속 커넥션을 지원하며, 연속 커넥션 대비 커넥션 생성/종료 오버헤드를 제거하여 성능을 향상시킨다.<br>· 4.5.3 Keep-Alive는 HTTP/1.1 명세에서 빠졌지만 여전히 널리 사용되며, 클라이언트가 <code>Connection: Keep-Alive</code> 헤더를 보내면 서버도 같은 헤더로 응답하여 커넥션을 유지한다.<br>· 4.5.4 Keep-Alive 헤더는 요청일 뿐 강제가 아니며, timeout 파라미터 등의 옵션으로 동작을 제어할 수 있다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>Keep-Alive 성능 이점</strong>: 네 개의 HTTP 트랜잭션 처리 시 연속 커넥션 대비 하나의 지속 커넥션 사용으로 커넥션 생성/종료 작업 제거</li><li><strong>Keep-Alive 핸드셰이크</strong>: 클라이언트가 <code>Connection: Keep-Alive</code> 헤더를 요청에 포함하고, 서버가 응답에 같은 헤더를 포함하면 커넥션 유지</li><li><strong>Keep-Alive 옵션</strong>: <code>timeout</code> 파라미터로 커넥션 유지 시간 지정 가능하나 동작 보장은 없음</li><li>서버 응답에 <code>Connection: Keep-Alive</code> 헤더가 없으면 클라이언트는 응답 후 커넥션이 끊길 것으로 판단</li><li>클라이언트나 서버는 keep-alive 요청을 받아도 무조건 따를 필요 없으며, 언제든지 커넥션을 끊거나 트랜잭션 수를 제한 가능</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-139">
+    <div class="page-header">
+        <h2>Page 139</h2>
+        <div class="page-nav"><a href="#page-135">&larr; 이전</a><a href="#page-145">다음 &rarr;</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_139.png" alt="Page 139" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">Keep-Alive와 프락시 상호작용 문제</span><span class="tag">Connection 헤더 전달 규칙</span><span class="tag">Proxy-Connection 헤더</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">Keep-Alive</span><span class="tag">멍청한 프락시(dumb proxy)</span><span class="tag">홉별 헤더(hop-by-hop header)</span><span class="tag">Connection 헤더</span><span class="tag">Proxy-Connection</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">· HTTP/1.0 Keep-Alive를 이해하지 못하는 멍청한 프락시는 Connection: Keep-Alive 헤더를 서버로 그대로 전달하여 문제를 발생시킨다.<br>Connection 헤더는 홉별(hop-by-hop) 헤더로 한 개의 전송 링크에만 적용되며 다음 서버로 전달되어서는 안 된다.<br>프락시가 Connection 헤더를 전달하면 클라이언트-프락시-서버 간 커넥션 상태 불일치가 발생하고, 클라이언트의 두 번째 요청이 무시되어 행에 걸린다.<br>프락시는 Connection 헤더와 그 헤더에 명시된 헤더들(Keep-Alive 등)을 절대 전달하면 안 되며, Proxy-Authenticate, Transfer-Encoding 등의 홉별 헤더도 전달하거나 캐시하면 안 된다.<br>넷스케이프는 Proxy-Connection 헤더를 차선책으로 제시했으나 특정 상황에서만 동작한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>멍청한 프락시 문제</strong>: Keep-Alive를 이해하지 못하는 프락시가 Connection 헤더를 그대로 전달하여 클라이언트-서버 간 커넥션 상태 불일치 발생</li><li><strong>홉별 헤더 규칙</strong>: <code>Connection</code> 헤더는 한 개의 전송 링크에만 적용되며 다음 서버로 전달 금지</li><li><strong>프락시 전달 금지 헤더</strong>: Connection에 명시된 헤더, Proxy-Authenticate, Proxy-Connection, Transfer-Encoding, Upgrade 등은 전달하거나 캐시 금지</li><li><strong>Proxy-Connection 헤더</strong>: 넷스케이프가 제시한 차선책으로, 현대 브라우저와 많은 프락시에서 지원하지만 모든 상황에서 동작하지는 않음</li></ul></div>
+        </div>
+    </div>
+</div><div class="page-card" id="page-145">
+    <div class="page-header">
+        <h2>Page 145</h2>
+        <div class="page-nav"><a href="#page-139">&larr; 이전</a></div>
+    </div>
+    <div class="page-body">
+        <div class="page-image"><img src="../thumbs/page_145.png" alt="Page 145" loading="lazy"></div>
+        <div class="page-summary">
+            
+            <div class="section"><div class="section-title">주요 주제</div><div class="tag-list"><span class="tag">커넥션 끊기</span><span class="tag">Content-Length</span><span class="tag">파이프라인 커넥션</span></div></div>
+            <div class="section"><div class="section-title">주요 용어</div><div class="tag-list"><span class="tag">커넥션 끊기</span><span class="tag">Content-Length</span><span class="tag">Truncation</span><span class="tag">파이프라인</span><span class="tag">재시도</span></div></div>
+            <div class="section"><div class="section-title">강의 요약</div><p class="summary-text">· 4.7 커넥션 끊기에 대한 미스터리: HTTP 커넥션 관리에는 명확한 기준이 없으며, 클라이언트/서버/프락시는 언제든지 TCP 커넥션을 끊을 수 있다.<br>· 4.7.1 '마음대로' 커넥션 끊기: 커넥션은 메시지 전송 후 끊기지만 에러 상황에서는 헤더 중간에도 끊길 수 있으며, 지속 커넥션은 유휴 상태에서 임의로 끊길 수 있다.<br>· 4.7.2 Content-Length와 Truncation: 각 HTTP 응답은 정확한 Content-Length 헤더를 가져야 하며, 길이 불일치 시 수신자는 서버에 확인해야 한다.<br>· 4.7.3 커넥션 끊기의 허용과 재시도: 예상치 못한 커넥션 끊김에 대비해야 하며, 클라이언트는 문제없는 트랜잭션을 재시도할 수 있어야 한다.</p></div>
+            <div class="section"><div class="section-title">핵심 내용</div><ul><li><strong>임의 커넥션 끊기</strong>: HTTP 애플리케이션은 언제든지 지속 커넥션을 임의로 끊을 수 있으며, 유휴 상태의 커넥션도 끊을 수 있음</li><li><strong>Content-Length 검증</strong>: 커넥션 끊김 후 실제 엔터티 길이와 Content-Length 값이 불일치하면 서버에 확인 필요, 캐시 프락시는 응답을 캐시하면 안 됨</li><li><strong>파이프라인 커넥션의 복잡성</strong>: 서버가 처리되지 않은 요청을 남겨둔 채 커넥션을 끊을 수 있어 재시도 처리가 어려움</li><li><strong>트랜잭션 재시도</strong>: 전송 중 커넥션이 끊기면 문제가 없는 경우 커넥션을 다시 맺고 재시도해야 함</li></ul></div>
+        </div>
+    </div>
+</div>
+
+<div class="signature">
+    작성: <strong>YUNDEOKSOO</strong> · 2026-06-04 · 자동 생성 (bookcapture)
+</div>
+
+</div>
+
+<div class="modal-overlay" id="imageModal">
+    <span class="modal-close" id="modalClose">&times;</span>
+    <img id="modalImg" src="" alt="">
+</div>
+
+<script>
+const modal = document.getElementById('imageModal');
+const modalImg = document.getElementById('modalImg');
+document.querySelectorAll('.page-image img').forEach(function(img) {
+    img.addEventListener('click', function() {
+        modalImg.src = img.src;
+        modal.classList.add('active');
+    });
+});
+modal.addEventListener('click', function() { modal.classList.remove('active'); });
+document.getElementById('modalClose').addEventListener('click', function() { modal.classList.remove('active'); });
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') modal.classList.remove('active');
+});
+
+var spyDisabled = false;
+document.querySelectorAll('.tree-chapter-title, .tree-page').forEach(function(link) {
+    link.addEventListener('click', function() {
+        spyDisabled = true;
+        setTimeout(function() { spyDisabled = false; }, 1000);
+    });
+});
+
+var allSidebarLinks = document.querySelectorAll('.tree-chapter-title, .tree-page');
+var linkMap = {};
+allSidebarLinks.forEach(function(a) {
+    var h = a.getAttribute('href') || '';
+    if (h.startsWith('#')) linkMap[h.slice(1)] = a;
+});
+function setActive(id) {
+    allSidebarLinks.forEach(function(a) { a.classList.remove('active'); });
+    var link = linkMap[id];
+    if (link) {
+        link.classList.add('active');
+        link.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+}
+var spyTargets = document.querySelectorAll('.page-card');
+var observer = new IntersectionObserver(function(entries) {
+    if (spyDisabled) return;
+    entries.forEach(function(entry) {
+        if (entry.isIntersecting) setActive(entry.target.id);
+    });
+}, { rootMargin: '-15% 0px -75% 0px', threshold: 0 });
+spyTargets.forEach(function(t) { observer.observe(t); });
+
+</script>
+
+</body>
+</html>

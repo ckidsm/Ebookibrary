@@ -596,3 +596,346 @@ python -m bookcapture build    --slug "그림으로 이해하는 알고리즘"
 5. 교보 e-Library 페이지 우측 하단 다크 동기화 패널
 
 캡처에 ①②③ 번호 박스는 사용자가 미리 그려서 보내거나, 그대로 보내도 install.html 의 step-num 박스로 단계 식별 가능.
+---
+
+### 2026-05-29: Phase C-3 Part3 — 백엔드 작업 큐 + worker polling
+
+**추가/수정**
+- `kyobo-bridge/app/db.py` — `jobs` 테이블 (id, slug, title, mode, status, progress, error...), `cancel_job()` (running→cancelling 비파괴 전이), `claim_next_job()` 원자 transition
+- `kyobo-bridge/app/main.py` — POST/GET/PATCH/DELETE `/api/jobs`, `/api/jobs/next/claim` (LAN-only), `/api/jobs/{jid}` DELETE → cancel
+- `book-capture/bookcapture/worker.py` (신규) — polling 워커, progress JSON 보고, is_cancelling 체크 후 subprocess.terminate, heartbeat
+- `book-capture/bookcapture/cli.py` — `worker` 서브커맨드, `capture-auto` (비대화형)
+- `book-capture/bookcapture/kyobo_app.py` — `noninteractive=True` 파라미터 추가 (input() 우회)
+
+### 2026-05-29: Phase C-4 보강 — 폴링·진행률·중단·다이얼로그
+
+**추가/수정**
+- `index.html` — 분석 모달에 progress bar, stage 박스, 중단 버튼, 워커 상태 표시
+- 분석 시작 → 백엔드 큐 등록 → 즉시 폴링 → 모달 안 박스 갱신
+- 모달 X 닫기 → 백그라운드 폴링 유지 (작업 안 죽임)
+- Job 상태 라이프사이클: pending → running → done/failed/cancelled. cancelling 은 비파괴 (워커가 graceful terminate)
+
+### 2026-05-29: 외부 노출 — Web Station + DSM Reverse Proxy
+
+**문제**: Synology DSM 의 Reverse Proxy 는 **URL Path 분기 미지원**. 같은 호스트 443 안에서 `/api/*` 만 따로 라우팅 불가.
+
+**해결**: 백엔드를 다른 포트(9443)로 매핑.
+- `https://redcodeme.synology.me/` → Web Station (메인)
+- `https://redcodeme.synology.me/kyobo/` → Web Station (KyoboLibrary 정적)
+- `https://redcodeme.synology.me:9443/` → Reverse Proxy → localhost:9000 (백엔드 API)
+
+**라우터·방화벽 (2026-05-29 적용 완료)**:
+- DSM Reverse Proxy: `Kyobo Bridge API`, 소스 HTTPS `redcodeme.synology.me:9443`, 대상 HTTP `localhost:9000`
+- 공유기 NAT 9443 외부 포워딩 (외부 포트 오타 9433→9443 수정)
+- Synology 방화벽: 비활성 (NAS 자체 방화벽 OFF)
+- 검증: 외부 `https://redcodeme.synology.me:9443/health` → 200 OK
+
+**추가**
+- `index.html` — `BRIDGE_URL` 자동 분기: LAN(8080/IP)→`:9000`, 외부(redcodeme)→`:9443`
+- `deploy.sh` — 정적 rsync 두 곳 (`/volume1/docker/web-apps/kyobo-library` + `/volume1/web/kyobo`) + 백엔드 데이터 snapshot (`api-cache/*.json` Reverse Proxy 미설정 시 fallback)
+- `docs/EXTERNAL_ACCESS.md` — 외부 노출 매뉴얼
+
+### 2026-05-29: UX 개선 모듈 — confirm·카드 오버레이·worker 추적
+
+**1) 책 모달 X 닫기 — 커스텀 confirm**
+- `index.html` — `showCustomConfirm({title, body, options})` Promise 모달
+- 분석 진행 중일 때 모달 X → 사이트 톤 다이얼로그: [작업 계속 (창만 닫기)] / [작업 중단하고 나가기]
+- 백드롭 클릭 = 취소. 후자 선택 시 백엔드 cancel 호출.
+
+**2) 메인 카드 — 진행 중 도서 progress + 중단**
+- `_activeJobs` 글로벌 Map (slug → {jobId, status, pct, stageName})
+- 카드 하단 그라데이션 오버레이: stage 이름 + % + bar + [상세][⏹ 중단]
+- 단일 timer 가 모든 active jobs 폴링. 종료 잡 모두 빠지면 timer 자동 해제.
+- 페이지 새로고침 시 `restoreActiveJobs()` 가 `GET /api/jobs` 호출 → pending/running/cancelling 복원
+
+**3) 워커 client 추적 (worker_clients 테이블)**
+- `db.py` — `worker_clients(client_ip, hostname, platform, first_seen, last_seen, ping_count)`, `upsert_worker_client()`, `get_worker_client_by_ip()`
+- `main.py` — `POST /api/worker/ping` 가 hostname/platform 받아 자동 저장 (pydantic `WorkerPing` 모델)
+- `GET /api/worker/status` 응답에 `previously_seen`, `known.{hostname, platform, last_seen_ago_sec}` 추가
+- `worker.py` — `_ping_meta()` 가 socket.gethostname() + platform.system() 보냄
+
+**4) 워커 안내 톤 분기**
+- `index.html` — `buildWorkerInstallHint(ws)` 가 `ws.previously_seen` 분기
+  - 처음 (false): 🛑 빨강 + ⬇ "워커 인스톨러 다운로드" 큰 초록 버튼 primary
+  - 이전 설치됨 (true): 🔵 청록 + "워커가 멈췄어요 (hostname)" + ▶ "워커 다시 시작" 큰 청록 버튼
+- `install/restart-worker.command` (신규) — bootout + bootstrap 재시작 전용 더블클릭
+
+**5) 매크로 무한 루프 사고 — plist PATH 누락**
+- 사고: 워커 launchctl 등록 후 매크로 무한 시도 (screencapture command not found)
+- 원인: `~/Library/LaunchAgents/com.kyobolibrary.worker.plist` EnvironmentVariables PATH 에 `/usr/sbin` 누락
+  → `screencapture` 가 `/usr/sbin/screencapture` 에 있음 → 매번 실패 → KeepAlive 재시작 → 무한 루프
+- 처리: 워커 unload (`launchctl bootout`), 쌓인 pending/running 6개 모두 cancel
+- 수정: `install-worker-macos.sh` PATH 에 `/usr/sbin:/sbin` 추가, `launchctl load` → `launchctl bootstrap gui/$UID` 로 현대화 (실패 시 legacy 폴백)
+- 현재 plist 도 즉시 sed patch 완료
+
+**6) backendUnreachableHint 문구 갱신**
+- 9443 외부 노출 완료된 지금, 이전 "외부 노출 안 됨" 문구는 사실과 다름
+- "백엔드 API 일시 미응답 + 새로고침 권유 + LAN 직접 접속 대안" 으로 변경
+
+### 2026-05-29: 진행 중 — Developer ID 사인 + .pkg 인스톨러
+
+**배경**
+- 사용자: "터미널 명령 자주 보여주는 게 일반 사용자에게 과하다. JS 등으로 처리"
+- JS 로 시스템 명령 실행은 보안상 절대 불가
+- 사인 없는 .command/.pkg/.app 은 macOS Gatekeeper 가 1회 차단 (시스템 설정 → '그래도 허용' 가능)
+- 사용자가 "Apple Developer ID 있다" 라고 함 → 사인 + 공증으로 Gatekeeper 완전 우회 가능
+
+**현재 인증서 점검 결과 (2026-05-29)**
+- ✅ Apple Development (개발 빌드)
+- ✅ Apple Distribution (App Store 업로드)
+- ❌ **Developer ID Application** (외부 배포 .app 사인) — **추가 발급 필요**
+- ❌ **Developer ID Installer** (외부 배포 .pkg 사인) — **추가 발급 필요**
+- ❌ notarytool credential 프로필 없음
+
+**Apple ID 후보**
+- ckidsm@nate.com / "Apple Development: deok soo yun" (Team: RRTB256N59) — 개인
+- kkidsm@mirusystems.com — 회사
+- 이 프로젝트는 개인 계정 (Team `RRTB256N59`) 사용 예정
+
+**사용자 액션 대기 중 (Developer ID 발급)**
+1. https://developer.apple.com/account → Certificates → +
+   - Developer ID Application 발급
+   - Developer ID Installer 발급
+   - CSR 은 Keychain Access → 인증서 도우미에서 생성
+2. https://appleid.apple.com → 로그인 및 보안 → 앱 암호 → `notarytool` 생성 (xxxx-xxxx 형식)
+3. Team ID 확인
+
+**발급 후 자동화 단계 (claude 작업)**
+1. `xcrun notarytool store-credentials "KYOBO_NOTARY" --apple-id ... --team-id RRTB256N59 --password xxxx` 으로 keychain 등록
+2. `scripts/build-pkg.sh` 작성:
+   - payload root 구조 (`/Library/Application Support/KyoboLibrary/...`)
+   - postinstall 스크립트 (`install-worker-macos.sh` 자동 호출)
+   - `pkgbuild --root ... --identifier com.kyobolibrary.worker --version 1.0`
+   - `productbuild --distribution dist.xml --sign "Developer ID Installer: ..."`
+   - `xcrun notarytool submit --keychain-profile KYOBO_NOTARY --wait`
+   - `xcrun stapler staple`
+3. `install/install-worker.pkg` 배포
+4. UI 안내 갱신: .command 대신 .pkg 다운로드 버튼 (큰 파란색)
+
+### 진행 상황 요약 (Phase 별)
+
+**완료**
+- ✅ Phase A: 폴더 이동 + nginx 컨테이너 + 기존 데이터 배포
+- ✅ Phase B-0: 교보 외부 링크 카드
+- ✅ Phase B-1: 9000 FastAPI + docker-compose
+- ✅ Phase B-2: Tampermonkey Userscript + 도서함 동기화 (40/280권 매칭)
+- ✅ Phase B-2.1: install.html 가이드 페이지 (Gatekeeper 우회 가이드 #gatekeeper 섹션 추가)
+- ✅ Phase C-1: 톱니바퀴 + 설정 모달 + `/api/settings`
+- ✅ Phase C-2: book-capture 패키지 + 기존 캡처 이식
+- ✅ Phase C-3 Part 1: AI 요약 (Claude Sonnet 4.5)
+- ✅ Phase C-3 Part 2: merge + build_html 본격
+- ✅ Phase C-3 Part 3: 백엔드 큐 + worker polling
+- ✅ Phase C-4: 카드 모달 + 진행률 박스 + 중단 버튼
+- ✅ 외부 노출: redcodeme.synology.me + 9443 Reverse Proxy
+- ✅ UX 모듈: 커스텀 confirm + 카드 오버레이 + worker_clients 추적 + 톤 분기
+- ✅ 매크로 무한 루프 사고 수습 (plist PATH 수정, install 스크립트 현대화)
+
+**진행 중 (사용자 액션 대기)**
+- ⏳ Developer ID Application/Installer 인증서 발급 (사용자)
+- ⏳ App-specific password 생성 (사용자)
+- → 받으면 .pkg 사인 + 공증 + 배포 (claude)
+
+**대기 중 (#47 등)**
+- ⏳ 웹뷰어(wviewer) Playwright 캡처 모드 — 매크로 자체 제거, 화면 점유 X
+- ⏳ brew tap 저장소 (ckidsm/homebrew-kyobo) — Developer ID 발급 후 옵션
+- ⏳ 280권 재동기화 (현재 40권만 SQLite. Userscript v0.5 셀렉터 추가 보정)
+- ⏳ 동일 slug 중복 pending job 차단 (백엔드)
+
+---
+
+### 2026-06-04: 좀비 job 복구 + heartbeat reaper (재발 방지)
+
+**사고**
+- job #51 (HTTP_완벽_가이드, mode=auto) 가 `summarize` 단계 "시작..." 40% 에서 ~24시간 박제.
+- 원인: capture+OCR(30p) 정상 완료 직후 **워커가 죽음**(Mac 슬립/네트워크 단절 추정). DB 는 `running` 인데 실제 처리 주체 없음. 새 워커는 `pending` 만 claim 하므로 영원히 안 잡힘 = 좀비.
+
+**복구 (수동)**
+- OCR 30개 그대로 살아있어 재캡처 불필요. `summarize`(30p, $0.507) → `merge` → `build` 수동 실행.
+- worker 산출물(`book-capture/books/HTTP_완벽_가이드`)을 정적 `books/` 로 승격(index.html + pages_data.json + thumbs/). `book-capture/` 는 `.dockerignore` 제외라 deploy 에 안 실려 수동 복사 필요.
+- `./deploy.sh --static` → 8080·9000 200, `/api/books/analyzed` 에 30p 등록. job #51 → `done` PATCH.
+
+**재발 방지 (코드)**
+- `kyobo-bridge/app/db.py`
+  - jobs 에 `heartbeat` 컬럼 멱등 추가(ALTER). `claim_next_job`·`update_job` 이 매 보고마다 `heartbeat=now` 갱신.
+  - `reap_stale_jobs(stale_seconds=600)` 신규 — heartbeat 끊긴 running/cancelling → `failed` + 안내 error. (컨테이너 내부 라이브 테스트로 2h-old running → failed 확인)
+- `kyobo-bridge/app/main.py` — `POST /api/jobs/next/claim`(워커 2s 폴링 = 주 트리거) + `GET /api/jobs`(UI 복원) 에서 `reap_stale_jobs()` 호출. 별도 백그라운드 태스크 불필요.
+- `book-capture/bookcapture/worker.py` — `_CURRENT_JID` 추적 + SIGTERM 핸들러·KeyboardInterrupt 에서 `_fail_current_job()` (in-flight job 이 아직 running 이면 즉시 failed). launchctl 정지 시 graceful 정리. 강제 종료/슬립은 백엔드 reaper 가 커버.
+- 임계 600s 근거: 정상 작업은 progress 보고가 수 초 간격(요약 1p 재시도 누적 최대 ~180s) → false positive 없음. 어제 좀비는 ~24h 라 확실히 걸림.
+
+**캡처 오염(콘솔 화면 혼입) 방지 — page17 사고**
+- 증상: HTTP 완벽 가이드 page_017 이 책이 아니라 **내 Claude Code 터미널 스크린샷**(rsync/deploy.sh/grep 검증 명령)이 찍힘 → AI 가 콘솔을 책 내용으로 요약. 원인: 화면영역 캡처 도중 모니터링 터미널이 그 순간 위로 올라옴.
+- 전수 조사: 육안+필터로 **013·017·018 세 장**이 콘솔(같은 모니터링 TUI) 임을 확인. 나머지 27장은 정상. (육안으론 017만 봤는데 필터가 013·018 추가 검출 → 필터가 더 신뢰성 높음)
+- 처리: 세 장 batch/PNG/OCR/thumbs 제거 → merge/build/deploy. 27페이지로 정리.
+- 방지: `book-capture/bookcapture/summarize.py` 에 `is_contaminated_ocr()` 추가. **책엔 절대 없고 이 환경에서만 나오는 지문**만 사용 — `/Users/deoksooyun`, `OneDrive`, `KyoboLibrary`, `deploy.sh`, `192.168.10.205`(풀 IP), `kyobo-bridge`, `page_NNN.png`/`batch_NNN.json` 정규식 등. 일반 셸 단어(curl/grep)는 HTTP 책 예제 오탐 우려로 **제외**. `summarize_pages()` 가 오염 페이지를 요약 전에 skip + 로그 + 반환값에 `skipped` 포함.
+- 검증: 실제 책 OCR 27장 오탐 0, 콘솔 샘플 4종 모두 검출. (근본 해결은 로드맵 #47 wviewer 헤드리스 캡처 — 화면 점유 자체가 없음)
+- 후속: 필터가 육안으로 놓친 **013·018 추가 검출** → 셋 다 제거, 27페이지로 재배포. (HTTP 완벽 가이드는 30장 부분 테스트본이라 전권 재캡처는 Mac 한가할 때 별도 진행 예정)
+
+**브라우저 캐시로 옛 페이지 보이는 문제 → nginx no-cache**
+- 증상: 13·17·18 제거·재배포 후에도 사용자 화면엔 콘솔 페이지가 남아 보임. 원인은 서버가 아니라 **브라우저 캐시**(서버 파일은 mtime·ETag·cache-bust fetch 로 깨끗함 확인).
+- 조치: `nginx-default.conf` 신규 — `*.html|*.json` 에 `Cache-Control: no-cache, must-revalidate` (이미지 PNG 는 캐시 유지). `docker-compose.yml` library-web 에 `./nginx-default.conf:/etc/nginx/conf.d/default.conf:ro` 마운트, `deploy.sh` step[3] 에 conf scp 한 줄 추가.
+- 적용: scp → `nginx -t`(throwaway 컨테이너) 통과 → `docker-compose up -d library-web` 재기동. 검증: 책 HTML `Cache-Control: no-cache` / PNG 기본캐시 / 사이트 200. 이후 재분석 시 브라우저가 ETag 로 자동 재검증 → 강력 새로고침 불필요.
+
+**웹 분석 시작 시 클라이언트 접속 정보 로깅 (어느 OS에서 걸었나 추적)**
+- `kyobo-bridge/app/db.py` — jobs 에 `client_info` 컬럼(JSON) 멱등 추가. `create_job(client_info=...)` 저장.
+- `kyobo-bridge/app/main.py` — `_parse_ua()`(UA→OS/브라우저), `_best_effort_mac()`(LAN ARP 시도), `_client_info(request)` 추가. `POST /api/jobs` 가 `request: Request` 받아 접속 정보 수집·로그·job 저장.
+- 수집 항목: os/browser(UA 파싱·확실), ip(XFF 우선), peer_ip, lang, user_agent / mac(best-effort).
+- **제약**: 백엔드가 Docker bridge 라 LAN 직접(:9000) 접속은 peer_ip 가 **게이트웨이 172.x** 로 보임 → 실제 IP 는 외부 reverse proxy(9443, XFF 추가) 경유 때만 정확. **MAC 은 HTTP 로 수집 불가**(L2 정보·브라우저 샌드박스). OS/브라우저는 항상 정확.
+- 보강 관점: 실제 "매크로 도는 머신" 은 worker_clients(hostname/platform/IP)가 더 정확 — 웹 client_info 는 "누가 큐에 넣었나" 용도. 검증: Windows UA 테스트 → `os=Windows 10/11 browser=Chrome` 로그·저장 확인.
+
+### 2026-06-04: #67 완성 — 백엔드 업로드 처리(멀티 OS) + OS-aware UI
+
+**배경**: Windows 에서 분석하려는데 (1) 모달이 Mac 전용 "로컬 매크로" 를 기본·추천으로 띄움, (2) 업로드 모드가 NAS 에 저장만 하고 원격 워커는 자기 로컬 디스크를 봐서 처리 불가(구조적 공백).
+
+**Phase 1 — OS-aware UI** (`index.html`)
+- `navigator.userAgent` 로 isMac 판별. 비-Mac 이면 🖥 로컬 매크로 **비활성(⛔ macOS 전용)**, 📤 캡처 업로드를 **checked + Recommended** 로. 캡처방식 제목에 `(macOS/non-Mac 감지)` 표시.
+- `deploy.sh --static` 배포.
+
+**Phase 2 — 백엔드가 upload-process 직접 처리**
+- 처리 모듈 vendoring: `book-capture/bookcapture/{ocr,summarize,merge,build_html,settings}.py` → `kyobo-bridge/app/processing/`. (오염필터 든 summarize 도 함께 → 백엔드 처리도 콘솔페이지 자동 제외)
+- `kyobo-bridge/Dockerfile` — `tesseract-ocr` + `tesseract-ocr-kor/eng` 설치. `requirements.txt` — Pillow, pytesseract. 이미지 67MB→111MB.
+- `app/upload_processor.py` (신규) — 데몬 스레드가 `claim_next_upload_job()` 폴링 → 업로드 폴더(`LIBRARY_BOOKS_WRITE_DIR/<slug>`)에서 OCR→요약→merge→build, 진행률·상태 보고. 산출물이 곧 서빙 폴더라 별도 배포 불필요. cfg 는 db 설정(ai/ocr)에서 직접 구성.
+- `app/db.py` — `claim_next_upload_job()` 추가, `claim_next_job()` 은 `mode != 'upload-process'` 로 원격 워커가 업로드 잡 못 잡게 분리.
+- `app/main.py` — lifespan 에서 `start_processor()`/`stop_processor()`.
+- **검증(end-to-end)**: 실제 책 PNG 3장 업로드 → job #57 → OCR→요약(25%)→done(100%) ~55초. index.html·썸네일 200, 요약 내용 삽입, analyzed 등록 확인 후 정리. tesseract 5.5.0(kor/eng) 컨테이너 동작 확인.
+- **효과**: OS 무관(Windows/Linux/모바일) 브라우저에서 PNG 업로드만으로 분석 완료. 워커·tesseract 로컬 설치 불필요.
+- 메모: 컨테이너가 만든 파일은 SSH 유저로 못 지움 → 정리는 `docker exec ... rm` 로.
+
+### 2026-06-04: Windows 로컬 캡처 지원 (앱 자동설치·실행)
+
+**요구**: Windows 도 앱 경로 고정(`C:\Program Files (x86)\Kyobobook\eLibrary\KyoboBook.Ebook.ELibrary.exe`)이라 로컬 캡처 가능. 없으면 설치파일(`https://contents.kyobobook.co.kr/digital/download/elibrary/b2c/KyoboeBook_Setup.exe`) 받아 설치하고, 분석 시 앱 실행.
+
+**추가/수정**
+- `book-capture/bookcapture/win_app.py` (신규) — `is_installed()`/`download_installer()`/`ensure_installed()`(미설치 시 설치파일 다운 + `/S` 무인설치 시도 + exe 출현 폴링) + `KyoboWinCapture` 클래스(macOS `KyoboAppScreenshot` 와 동일 인터페이스). 캡처는 Pillow `ImageGrab` + `ctypes` SendInput 페이지 넘김(추가 의존성 0). 직전 해시 동일 시 책 끝으로 보고 중단.
+- `book-capture/bookcapture/cli.py` — `cmd_capture_auto` 를 `platform.system()` 으로 분기: Windows → `KyoboWinCapture`(설치확인→실행→deep link→캡처, region/next_key 설정 반영), macOS → 기존 `KyoboAppScreenshot`.
+- `index.html` — 캡처방식 UI 를 macOS **및 Windows** 둘 다 로컬 매크로 활성(`canMacro = isMac || isWin`). Windows 라벨 "앱 자동 설치·실행 후 캡처". 그 외 OS 만 업로드 전용.
+
+**남은 검증·요구 (실 Windows 필요)**
+- KyoboWinCapture 는 Mac 에서 작성·미검증 — 실제 Windows 에서 (1) 설치파일 `/S` 무인설치 동작 여부, (2) deep link `kyoboebook://` 등록 여부, (3) 캡처 region·페이지넘김 키 튜닝 확인 필요.
+- Windows 로컬 캡처가 돌려면 **Windows 에 bookcapture 워커 실행** 필요 (Python + Pillow + 이 패키지). mode=auto 전체 파이프라인은 OCR 에 **Windows tesseract** 도 필요 → 또는 캡처만 하고 업로드→백엔드 처리(#67) 하이브리드가 더 단순.
+
+### 2026-06-04: Windows 하이브리드 (B) — 원격 캡처 → 업로드 → 백엔드 처리
+
+**배경**: Windows PC 가 **원격(외부망)**. full-local 은 (1) 산출물이 원격 PC 에 갇혀 NAS 발행 불가, (2) AI 키 LAN 전용, (3) claim LAN 전용 문제. → 캡처만 Windows, 나머지는 NAS 백엔드(#67)가 처리하는 하이브리드 채택.
+
+**연결성 확인**: `_is_lan` 은 `request.client.host`(peer)만 검사. 9443 리버스 프록시 → localhost → docker 라 peer=게이트웨이(172.x, private) → 원격이라도 claim/patch/secrets 통과.
+
+**구현**
+- `cli.py` `cmd_upload` (신규) — 책 폴더 PNG 를 `/api/books/<slug>/upload` 로 multipart 업로드(urllib, stdlib만). 백엔드가 upload-process job 생성·처리.
+- `worker.py` capture-only = `[capture-auto, upload]` — 캡처 후 업로드. (워커·자식 모두 `KYOBO_BRIDGE_URL` env 로 9443 사용)
+- `index.html` — Windows 로컬 매크로 radio value=`capture-only`(Mac 은 `auto` 유지). 라벨 "앱 자동 실행·캡처 → 서버 처리".
+- `scripts/install-worker-windows.ps1` — `-BridgeUrl` 파라미터(기본 LAN, env 우선) + `KYOBO_BRIDGE_URL` User env 설정 + tesseract kor/eng traineddata 자동 다운로드 보강.
+- 검증: `bookcapture upload` 로 실 PNG 2장 업로드 → job #58 → 백엔드 done. (Windows 캡처 KyoboWinCapture 는 실기 미검증)
+
+**원격 Windows 설치 (사용자)**
+```powershell
+$env:KYOBO_BRIDGE_URL="https://redcodeme.synology.me:9443"
+cd <OneDrive>\Claude\NAS\KyoboLibrary\book-capture\scripts
+powershell -ExecutionPolicy Bypass -File .\install-worker-windows.ps1 -BridgeUrl "https://redcodeme.synology.me:9443"
+```
+이후 웹(외부 URL)에서 책 → 🖥 로컬 매크로(capture-only) → 분석 시작 → Windows 워커가 앱 실행·캡처·업로드 → 백엔드 처리 → 서빙.
+
+**무입력(더블클릭) 설치** — 명령어 타이핑 없이:
+- `install/install-worker.cmd` (신규) — 더블클릭하면 `install-worker.ps1` 을 ExecutionPolicy Bypass 로 실행 (Mac `.command` 대응).
+- `install/install-worker.ps1` — 백엔드 주소 **자동 감지**(LAN `:9000/health` 닿으면 LAN, 아니면 외부 `:9443`) 후 `KYOBO_BRIDGE_URL` 설정 → 메인 설치 스크립트 호출. winget Tesseract 설치 시 UAC [예] 한 번만 필요.
+- 사용자: OneDrive 의 `KyoboLibrary\install\install-worker.cmd` 더블클릭 → 끝.
+- 메모(MSI/서명): 진짜 MSI/.exe 인스톨러는 Windows 빌드도구(Inno/WiX) + **Windows 코드서명 인증서**(Apple Developer ID 와 별개) 필요 → Mac 에서 못 만듦. 폴리시드 .exe 원하면 Inno Setup 스크립트 스캐폴딩은 가능(빌드·서명은 Windows 에서).
+
+### 2026-06-05: 앱/책 열림 실제 검증 (안내가 아니라 확인)
+- 요구: 분석 시작 시 교보 앱 실행+해당 책 열림을 실제로 확인(Windows는 창 제목으로 가능).
+- `win_app.get_app_window_title()` — ctypes EnumWindows 로 교보 창 제목 읽음(예 "교보eBook - HTTP 완벽 가이드"). win32 의존성 없음.
+- `cli.cmd_capture_auto` (Win): 캡처 전 fail-fast — 앱 미실행/창 없음/책 제목 불일치(정규화 substring)면 명확한 메시지로 중단(잘못된 화면 캡처 방지).
+- `worker.ping` 에 동적 `app_title` 첨부. `main.py` WorkerPing.app_title + `_last_app_title` + status 반환.
+- `index.html showCapturePrep` — 워커 status 의 app_title 로 라이브 검증 배너: ✅감지 / ⚠️다른 책 / ⚠️앱 미감지 + [🔄 다시 확인] 루프.
+
+### 2026-06-05: 워커가 자꾸 죽는 버그 — 자동업데이트 os._exit(0) 가 범인
+- 증상: 워커가 잠깐 떴다 죽고 "워커 다시 시작" 패널이 계속 뜸(마지막 ping 36분 전).
+- 원인: 자동업데이트가 `os._exit(0)` 로 재시작 시도 → **Windows 작업 스케줄러는 정상종료(코드 0)면 재시작 안 함**(실패=비0 일 때만) → 워커가 업데이트마다 죽고 안 살아남. (개발 중 버전 잦은 배포로 매번 발생)
+- 수정 `worker.py _maybe_self_update`: **os._exit 제거** → zip 만 풀고 워커는 계속 실행. capture-auto/ocr/upload 는 매 subprocess 라 새 코드 즉시 사용. worker.py 자체 변경만 다음 재시작 때 반영.
+- 보강 `install-worker-windows.ps1`: AtLogon 트리거에 **5분 반복**(RepetitionInterval) + `MultipleInstances IgnoreNew` → 워커가 어떤 이유로 죽어도 5분 내 자동 부활(반복 트리거는 전체 install 로 작업 재등록 시 적용).
+
+### 2026-06-05: 캡처 준비 팝업(사용자 싱크) — 준비 안내 → 준비 완료 → 앱 전환 카운트다운
+- 문제: 분석 시작 누르면 준비도 안 됐는데 바로 캡처 → 사용자와 싱크 안 맞음.
+- `index.html` `showCapturePrep()` — 분석 시작(캡처 모드) 시 **준비 체크리스트 팝업**(OS별: 앱 실행→책 열기→시작페이지 이동→최대화→다른 창 치우기). [준비 완료] 눌러야 진행.
+- Windows: 준비 완료 후 **5초 카운트다운**("교보 앱으로 전환 Alt+Tab") → 그동안 사용자가 앱으로 전환 → job 등록 → 워커가 포커스된 앱 캡처. (`_countdown` confirm 모달 재사용)
+- bb-analyze onclick async 화: upload 는 기존, 캡처는 showCapturePrep 통과해야 showAnalyzeCmd. 프론트만 — 새로고침 즉시 적용.
+
+### 2026-06-05: Windows 앱 크롬 크롭(OCR 깨끗) + 시작페이지=도서 페이지번호 명확화
+- 교보 Windows 앱: 최대화 시 상단(제목+툴바)·하단(음성/페이지 컨트롤바, 우하단 `21/757p`)이 책과 같이 찍힘 → OCR 오염.
+- `win_app._WIN_CROP` (top80/bottom70/left0/right0) — region 미지정 시 전체화면에서 크롬 크롭 후 캡처. 캡처 영역 로그 출력. region(절대좌표) 설정 시 그쪽 우선. (해상도/DPI 다르면 값 조정 필요 — 책 본문은 가운데라 여유 크롭 OK)
+- 시작 페이지 라벨 = "앱에 표시된 도서 페이지 번호". 사용자가 앱 우하단 번호(예 21) 읽어 입력 → 파일 page_021+ 로 번호 매겨 도서 페이지와 정렬.
+- (향후) 우하단 페이지번호 영역만 따로 OCR 해 자동 라벨링 가능.
+
+### 2026-06-05: 시작 페이지 지정 (처음부터/이어서) — 자동 이동 불가 대응
+- 한계: 교보 Windows 앱은 특정 페이지로 보내는 API·딥링크 없음 → 워커가 앱을 자동 이동 불가. 캡처는 현재 화면만 찍음.
+- 대응(수동 위치 + 웹에서 번호 지정): `index.html` 에 **시작 페이지** number input(`cap-start-page`, 기본 1). showAnalyzeCmd 가 N>1 이면 `payload.pages=N`.
+- `worker.py` capture-only: `job.pages` 가 숫자면 `--start-page N` 전달.
+- `win_app`: `start_page==1` → 처음부터(잔여 삭제), `>1` → 그 번호부터 이어서(기존 유지, 앱이 그 페이지에 있어야 함). 로그로 명시.
+- 워크플로: 앱에서 원하는 페이지로 직접 이동 → 웹 시작 페이지에 그 번호 → 분석 시작.
+
+### 2026-06-05: 캡처 시작 페이지 검증 + 잔여 페이지 정리
+- 로그 확인: capture-auto 는 **항상 page_001 부터**(처음부터). continue_from_last 미사용.
+- 버그: 처음부터 찍지만 **기존 page 이미지를 안 지워** 이전 실행 잔여가 섞임(예: 9장 캡처했는데 백엔드가 더 많이 OCR). 
+- 수정 `win_app.take_multiple_screenshots`: 시작 전 체크 — continue 면 "▶ 이어서 캡처: page N 부터(기존 유지)", 아니면 "▶ 처음부터 캡처: page 001 부터(기존 N장 삭제)" 로그 + 잔여 page/thumbs 삭제.
+- 수정 `main.py upload`: 새 업로드 전 book_dir 의 page 이미지·thumbs/·summary/ 제거(잔여 OCR 방지). 백엔드 즉시 적용(워커 무관).
+- #73 에 보인 `UnicodeDecodeError 0xc0` 는 옛 워커(인코딩 수정 전) — update-worker 로 해소.
+
+### 2026-06-05: 워커 버전 라이브 옵저버
+- `worker.py _ping_meta` 에 `version`(=_local_version) 추가 → ping 마다 워커 버전 전송.
+- `main.py` — `WorkerPing.version`, `_last_worker_version` 전역, `_read_server_version()`(컨테이너 `/mnt/library/install/worker-version.txt` ro 마운트에서 읽음). `/api/worker/status` 에 `worker_version`·`server_version`·`up_to_date` 추가.
+- `index.html` refreshWorkerBox — worker-alive 박스에 `v{ver} ✓최신` / `v{old} → v{new} 업데이트 중…(최대 5분)` 배지. 분석 중 자동 표시.
+- 검증: status `server_version=ceace83ca0e7` 정상, 옛 워커라 `worker_version=None`. update-worker 1회 후 보고 시작.
+
+### 2026-06-05: 워커 자동 업데이트 (매번 수동 irm 불필요)
+- `worker.py` — `_maybe_self_update()`: idle 일 때 5분마다 `install/worker-version.txt` 조회, 로컬 `bookcapture/_version.txt` 와 다르면 `bookcapture.zip` 받아 `extractall` 후 `os._exit(0)` → Task Scheduler/launchd KeepAlive 가 새 코드로 재시작.
+- `scripts/build-zip.sh` (신규) — 버전 = `.py`+requirements md5(12자) → `bookcapture/_version.txt`(zip 내) + `install/worker-version.txt`(서버) 동시 생성 후 zip. 코드 바뀌면 버전 자동 변경. 앞으로 워커 배포는 이 스크립트로.
+- 효과: `irm update-worker` 는 **이 자동업데이트 워커를 까는 마지막 1회만**. 이후 서버에 새 버전 올리면 워커가 5분 내 자동 반영.
+- (옵션 후보) 워커가 ping 에 `_version` 실어 보내면 웹 옵저버가 "워커 vXXX · 최신/업데이트중" 라이브 표시 가능.
+
+### 2026-06-05: MS Store 버그 수정 + 분석 절차 안내(옵저버)
+- 버그: Windows capture-auto 가 `os.startfile("kyoboebook://book/<id>")` deep link 시도 → Windows 에 이 스킴 미등록이라 **"프로토콜 열 앱을 MS Store 에서 찾기"** 창이 뜨고 책도 안 열림. (캡처가 된 건 사용자가 이미 책을 펼쳐둬서)
+- 수정: `win_app.open_book_by_id()` 의 deep link 제거 → Windows 는 책 자동열기 미지원, 안내 메시지만. (앱 exe 실행은 유지)
+- 절차 안내(`index.html` capture-guide): 로컬 매크로 선택 시 OS별 단계 표시. Windows = ①앱 직접 실행 ②책 펼치고 1p·전체화면 ③화면 그대로 ④[분석 시작] ⑤자동 페이지 넘김 ⑥서버 처리. "캡처 중 화면 건드리지 말 것 / 일찍 멈추면 →키 포커스" 경고.
+- ⚠️ 캡처가 17p 에서 중단(직전 동일 해시) — Windows 에서 페이지 넘김(→ keybd_event)이 책 뷰어 포커스 없으면 안 먹음. 전권 캡처하려면 책 뷰어 포커스 유지 필요(절차 안내에 반영). 향후: 워커가 is_app_running/포커스 상태를 ping 에 실어 웹 옵저버가 라이브 표시.
+- 적용: zip 재생성(딥링크 제거 win_app) + 프론트 배포. 워커는 update-worker 재실행으로 갱신 필요.
+
+### 2026-06-05: 🎉 Windows 하이브리드 전 구간 end-to-end 성공
+- 원격 Windows(OneDrive 없음, host=yundeoksoo)에서 `update-worker.ps1` 로 워커 갱신·재시작 후:
+  - #71 capture-only **done** — 교보 eLibrary 앱 자동 실행 + ImageGrab 32페이지 캡처 성공(인코딩 크래시 없음)
+  - 9443 으로 업로드 → #72 upload-process: 백엔드 OCR(32p)→요약($0.45)→merge→build **done**
+  - analyzed: HTTP_완벽_가이드 **32페이지**, index.html 200. 캡처 썸네일 검증 = 실제 책 본문(콘솔 아님).
+- 즉 **무설치 한 줄(irm) → 워커 설치 → 앱 캡처 → 서버 처리 → 라이브러리 게시** 전 구간 작동.
+- `install/update-worker.ps1` (신규) — 관리자 권한 없이 워커 코드만 갱신+재시작(Stop→zip 다운로드→Expand→Start ScheduledTask). 전체 재설치보다 가볍고 빠름.
+- 알려진 소소한 점(후순위): 백엔드 upload_processor 가 요약 진행을 페이지별로 job.progress 에 안 올려서 UI 진행바가 요약 중 25% 로 멈춘 듯 보임(실제론 백엔드 stdout 에 N/32 진행). summarize_pages 에 progress 콜백 추가하면 개선.
+
+**Windows 워커 실전 연결 성공 + 잔여 버그 수정 (2026-06-04~05)**
+- ✅ Windows 워커 연결됨(host=yundeoksoo, 9443 경유 ping/claim 정상). 설치→연결→claim 전 구간 검증.
+- 권한 버그: 비관리자라 (1)kor.traineddata Program Files 쓰기 실패, (2)Register-ScheduledTask Access denied → install-worker-windows.ps1 에 **self-elevation**(UAC RunAs 재실행) 추가.
+- zip 캐시 버그: Web Station 이 zip 캐시 → 부트스트랩 zip URL 에 `?t=ticks` 캐시버스트.
+- 인코딩 크래시: capture-auto 가 cp949 콘솔에서 `—`(em-dash) 출력 시 `UnicodeEncodeError` 로 즉사 → `__main__.py` 에서 stdout/stderr `reconfigure(encoding=utf-8)`, `worker.py` Popen `encoding=utf-8`, 설치 시 `PYTHONUTF8=1` env.
+- 재설치 잠금: 부트스트랩이 다운로드 전 `Stop-ScheduledTask` 로 워커 정지 후 덮어쓰기.
+
+**OneDrive 없는 PC (A~Z 일반 사용자) 대응 — 워커 zip 다운로드 설치**
+- `install/bookcapture.zip` (신규, ~64KB) — bookcapture 패키지 + requirements + scripts. `deploy.sh` 가 서빙(LAN 8080 / 외부 /kyobo).
+- 부트스트랩이 OneDrive 에서 book-capture 못 찾으면 → 서버 zip 다운로드 → `%LOCALAPPDATA%\KyoboLibrary\book-capture` 풀기 → 거기서 설치. OneDrive·repo 불필요, 어느 Windows 든 `irm|iex` 한 줄로 끝.
+- 의존성 멈춤 버그: 설치가 `pip install pyautogui` 에서 수 분 멈춤(pytweening 등 sdist 빌드). **win_app 은 ctypes+PIL 만 써서 pyautogui 불필요** → 제거. `--quiet` 도 제거(진행 표시), `--no-input` 추가. zip 재생성.
+
+**Windows 설치 자동화 보강 (Python 자동설치 + 자체완결 .cmd + irm|iex 부트스트랩)**
+- `install-worker-windows.ps1` — Python 미설치 시 그냥 죽던 것을 **자동 설치**로: `winget install Python.Python.3.12 --scope user` → 실패/부재 시 **python.org 무인설치**(`/quiet PrependPath=1`, `Start-Process -Wait` 로 완료 대기) → `Refresh-Path`(Machine+User PATH 재로드) → 재확인. MS Store 가짜 python stub(`WindowsApps`) 제외. `Die` 를 `throw` 로(iex 창 안 닫힘).
+- `install/install-worker.ps1` (부트스트랩) — **ASCII + BOM 제거**(irm|iex 안전) + `Set-ExecutionPolicy -Scope Process Bypass` + 백엔드 자동감지 + `$env:OneDrive` 로 book-capture 탐색. 외부 경로 `/kyobo/install/install-worker.ps1`.
+- `install/install-worker.cmd` — **자체완결**: 옆 .ps1(`%~dp0`) 찾던 것(다운로드 단독이면 깨짐) → `powershell -Command "irm <ext>/install-worker.ps1 | iex"` 로 변경. .cmd 하나만 받아도 동작.
+- 권장 실행: PowerShell 에 `irm https://redcodeme.synology.me/kyobo/install/install-worker.ps1 | iex` (다운로드·인증서 불필요). 다중 사용자 무경고 .exe 는 Windows 코드서명 인증서 필요(별도).
+
+**Windows .cmd/.ps1 인코딩·줄바꿈 버그** — Mac 에서 만든 `install-worker.cmd` 가 **LF 줄바꿈**이라 cmd.exe 가 파싱 실패('r'/'tionPolicy' 등 조각을 명령으로 실행, 한글 주석 mojibake). 수정: `.cmd` 를 **CRLF + ASCII**(한글 메시지는 PS 가 담당)로 printf 재작성. `.ps1` 2개는 **UTF-8 BOM** 추가(PS 5.1 이 CP949 로 오독해 한글 경로 후보 `OneDrive - 개인` 깨지는 것 방지). 교훈: Windows 배치는 CRLF 필수, PS 스크립트는 BOM 권장.
+
+**워커 안내 패널 OS 인식 버그 수정** — `buildWorkerInstallHint` 가 `known.platform`(이전에 본 워커=Mac)을 우선해서 Windows 에서도 .pkg 패널을 띄우던 문제. `usePlat` 을 **현재 브라우저 OS(`detectOS()`)** 기준으로 변경. Windows 패널을 `irm|iex` 한 줄 → **`install-worker.cmd` 더블클릭 다운로드(무입력)** 우선으로 교체(PowerShell 은 details 폴백). (docker NAT 로 Windows 브라우저·Mac 워커가 같은 게이트웨이 IP 라 `previously_seen`/`known` 이 엉뚱하게 매칭되는 부작용도 이 변경으로 표시상 무력화.)
+
+**Mac 워커 정지(다른 OS 로 전환)** — `launchctl bootout`+`disable`+plist 를 LaunchAgents 밖(`~/kyobo-worker-disabled/`)으로 이동. 로그인/재부팅에도 자동로드 안 됨. 재가동하려면 plist 복귀 후 `launchctl bootstrap gui/$UID ...` 또는 `install/restart-worker.command`.
+
+**Mac 절전 방지 (caffeinate, 슬립으로 인한 좀비 근본 차단)**
+- `worker.py` — `_start_caffeinate()`/`_stop_caffeinate()` 추가. `run_worker` 가 **job 도는 동안만** `caffeinate -i -m -s -w <worker_pid>` 를 띄우고 `finally` 로 해제. 평소(유휴)엔 안 켜므로 전력 영향 없음.
+- `-w <pid>` 로 워커가 죽으면 caffeinate 도 따라 종료(orphan 방지). macOS/caffeinate 없으면 조용히 skip (`shutil.which`).
+- 검증: 라이브로 `pmset -g assertions` 에 `PreventUserIdleSystemSleep`+`PreventSystemSleep` 활성 확인, stop 후 해제 확인. 워커 재시작 후 idle 상태에선 caffeinate 자식 없음(정상).
+
+**배포·검증**
+- `./deploy.sh --backend` (buildx amd64 → load → compose up) 8080·9000 200.
+- reaper 라이브 테스트 OK, done job 은 미회수 확인. 워커 새 코드로 재시작(launchctl kickstart -k, PID 83011, ping 정상).

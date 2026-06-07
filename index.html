@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 캐시 방지 (개발·갱신 빈번) -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>교보 전자책 라이브러리</title>
     <style>
         * {
@@ -438,6 +442,95 @@
             color: rgba(255,255,255,0.85);
         }
 
+        /* 카드 위 작업 진행 오버레이 */
+        .kyobo-job-overlay {
+            position: absolute;
+            left: 0; right: 0; bottom: 0;
+            background: linear-gradient(180deg, rgba(15,23,42,0.0) 0%, rgba(15,23,42,0.94) 38%);
+            padding: 22px 12px 12px;
+            border-radius: 0 0 12px 12px;
+            color: white;
+            z-index: 5;
+        }
+        .kyobo-job-overlay .kjo-head {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.72rem; margin-bottom: 6px;
+        }
+        .kyobo-job-overlay .kjo-stage {
+            font-weight: 700; color: #22d3ee;
+            text-transform: uppercase; letter-spacing: 0.4px;
+        }
+        .kyobo-job-overlay .kjo-pct { font-weight: 700; }
+        .kyobo-job-overlay .kjo-bar {
+            height: 6px; background: rgba(255,255,255,0.18);
+            border-radius: 3px; overflow: hidden;
+        }
+        .kyobo-job-overlay .kjo-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22d3ee 0%, #a855f7 100%);
+            transition: width 0.4s ease;
+        }
+        .kyobo-job-overlay .kjo-bar-fill.is-failed { background: #ef4444; }
+        .kyobo-job-overlay .kjo-foot { display: flex; gap: 6px; margin-top: 8px; }
+        .kyobo-job-overlay .kjo-btn {
+            flex: 1; padding: 5px;
+            border: 1px solid rgba(255,255,255,0.25);
+            background: rgba(255,255,255,0.12);
+            color: white; border-radius: 4px;
+            font-size: 0.7rem; cursor: pointer;
+        }
+        .kyobo-job-overlay .kjo-btn:hover { background: rgba(255,255,255,0.22); }
+        .kyobo-job-overlay .kjo-btn-stop {
+            background: rgba(239,68,68,0.28);
+            border-color: #ef4444; color: #fca5a5; font-weight: 700;
+        }
+        .kyobo-job-overlay .kjo-btn-stop:hover { background: rgba(239,68,68,0.45); }
+        .kyobo-job-overlay .kjo-btn:disabled {
+            opacity: 0.55; cursor: not-allowed;
+        }
+
+        /* 커스텀 confirm 다이얼로그 */
+        .confirm-bd {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.72); z-index: 250;
+        }
+        .confirm-bd.open { display: block; }
+        .confirm {
+            display: none; position: fixed;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 92%; max-width: 480px;
+            background: #0f172a; border: 1px solid #334155;
+            border-radius: 10px; color: #e2e8f0;
+            z-index: 251; box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+        }
+        .confirm.open { display: block; }
+        .confirm-head {
+            padding: 16px 22px 0; font-size: 1rem;
+            font-weight: 700; color: #fbbf24;
+        }
+        .confirm-body {
+            padding: 10px 22px 18px;
+            color: #cbd5e1; font-size: 0.86rem; line-height: 1.65;
+        }
+        .confirm-foot {
+            padding: 12px 18px; display: flex; gap: 8px;
+            justify-content: flex-end; border-top: 1px solid #334155;
+        }
+        .confirm-btn {
+            padding: 8px 16px; border-radius: 6px;
+            border: 1px solid #334155; background: rgba(255,255,255,0.05);
+            color: #e2e8f0; font-size: 0.83rem; cursor: pointer;
+        }
+        .confirm-btn:hover { background: rgba(255,255,255,0.12); }
+        .confirm-btn-primary {
+            background: rgba(34,211,238,0.18);
+            border-color: #22d3ee; color: #22d3ee; font-weight: 600;
+        }
+        .confirm-btn-danger {
+            background: rgba(239,68,68,0.20);
+            border-color: #ef4444; color: #fca5a5; font-weight: 700;
+        }
+
         /* 도서 분석 모달 */
         .bmodal-bd {
             position: fixed; inset: 0;
@@ -517,6 +610,56 @@
         }
         .bmodal-status.is-analyzed { background: rgba(16,185,129,0.18); color: #6ee7b7; border: 1px solid #10b981; }
         .bmodal-status.is-none { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid #f59e0b; }
+
+        /* #47 캡처 모드 토글 */
+        .capture-mode-box {
+            margin: 14px 0 10px;
+            padding: 12px 14px;
+            background: rgba(34,211,238,0.05);
+            border: 1px solid rgba(34,211,238,0.25);
+            border-radius: 6px;
+        }
+        .capture-guide {
+            margin: 0 0 12px;
+            padding: 12px 14px;
+            background: rgba(16,185,129,0.06);
+            border: 1px solid rgba(16,185,129,0.3);
+            border-radius: 6px;
+        }
+        .capture-guide .cg-title {
+            font-size: 0.82rem; font-weight: 700; color: #6ee7b7; margin-bottom: 8px;
+        }
+        .capture-guide .cg-steps {
+            margin: 0 0 8px; padding-left: 1.2em; color: #cbd5e1;
+            font-size: 0.8rem; line-height: 1.7;
+        }
+        .capture-guide .cg-steps li { margin-bottom: 3px; }
+        .capture-guide .cg-steps b { color: #fff; }
+        .capture-guide .cg-warn {
+            font-size: 0.76rem; color: #fcd34d; line-height: 1.6;
+            background: rgba(245,158,11,0.1); border-radius: 5px; padding: 7px 9px;
+        }
+        .capture-mode-title {
+            font-size: 0.74rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .capture-mode-opt {
+            display: flex; align-items: center; gap: 10px;
+            padding: 7px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.12s;
+            font-size: 0.86rem;
+        }
+        .capture-mode-opt:hover { background: rgba(255,255,255,0.04); }
+        .capture-mode-opt input[type="radio"] { accent-color: #22d3ee; cursor: pointer; }
+        .capture-mode-opt span strong { color: #e2e8f0; }
+        .capture-mode-opt span small { color: #94a3b8; margin-left: 8px; font-size: 0.78rem; }
+        .capture-mode-opt.is-disabled { opacity: 0.5; cursor: not-allowed; }
+        .capture-mode-opt.is-disabled input { cursor: not-allowed; }
 
         .bmodal-foot {
             display: flex; flex-wrap: wrap; gap: 8px;
@@ -801,6 +944,13 @@
         </section>
 
         <!-- 도서 분석 모달 -->
+        <div class="confirm-bd" id="confirm-bd"></div>
+        <div class="confirm" id="confirm" role="dialog" aria-modal="true">
+            <div class="confirm-head" id="confirm-head"></div>
+            <div class="confirm-body" id="confirm-body"></div>
+            <div class="confirm-foot" id="confirm-foot"></div>
+        </div>
+
         <div class="bmodal-bd" id="bmodal-bd"></div>
         <div class="bmodal" id="bmodal">
             <div class="bmodal-head">
@@ -885,6 +1035,190 @@
         // ── Phase C-4: slugify + 분석 상태 캐시 + 카드 클릭 모달 ──
         let _kyoboBooks = [];          // 동기화된 책 목록
         let _analyzedMap = new Map();  // slug → {pages, url}
+        let _activeJobs = new Map();   // slug → { jobId, status, pct, stage, stageName, msg }
+
+        // ── 커스텀 confirm 다이얼로그 (Promise) ──
+        function showCustomConfirm({ title = '확인', body = '', options = [] }) {
+            return new Promise(resolve => {
+                const bd = document.getElementById('confirm-bd');
+                const dlg = document.getElementById('confirm');
+                document.getElementById('confirm-head').textContent = title;
+                document.getElementById('confirm-body').innerHTML = body;
+                const foot = document.getElementById('confirm-foot');
+                foot.innerHTML = '';
+                options.forEach(opt => {
+                    const btn = document.createElement('button');
+                    btn.className = 'confirm-btn' + (opt.kind === 'primary' ? ' confirm-btn-primary'
+                                                 : opt.kind === 'danger'  ? ' confirm-btn-danger' : '');
+                    btn.textContent = opt.label;
+                    btn.onclick = () => {
+                        bd.classList.remove('open');
+                        dlg.classList.remove('open');
+                        resolve(opt.value);
+                    };
+                    foot.appendChild(btn);
+                });
+                bd.onclick = () => {
+                    bd.classList.remove('open');
+                    dlg.classList.remove('open');
+                    resolve(null);  // 백드롭 클릭 = 취소
+                };
+                bd.classList.add('open');
+                dlg.classList.add('open');
+            });
+        }
+
+        // confirm 모달 DOM 을 카운트다운으로 재사용 (버튼 없음, 백드롭 잠금, 자동 닫힘)
+        function _countdown(secs, headText, bodyFn) {
+            return new Promise(resolve => {
+                const bd = document.getElementById('confirm-bd');
+                const dlg = document.getElementById('confirm');
+                document.getElementById('confirm-head').textContent = headText;
+                document.getElementById('confirm-foot').innerHTML = '';
+                bd.onclick = null;
+                let n = secs;
+                const render = () => { document.getElementById('confirm-body').innerHTML = bodyFn(n); };
+                render();
+                bd.classList.add('open'); dlg.classList.add('open');
+                const t = setInterval(() => {
+                    n--;
+                    if (n <= 0) {
+                        clearInterval(t);
+                        bd.classList.remove('open'); dlg.classList.remove('open');
+                        resolve();
+                    } else { render(); }
+                }, 1000);
+            });
+        }
+
+        // 캡처 준비 팝업 — 사용자와 싱크: 화면 준비 안내 → "준비 완료" → (Windows) 앱 전환 카운트다운
+        async function showCapturePrep(book, slug, isWin, startPage) {
+            const title = escapeHtml(book.title || slug);
+            const pageStep = startPage > 1
+                ? `<b>${startPage}페이지</b>로 이동 (앱 우하단 <code>${startPage} / …p</code> 번호 확인)`
+                : `<b>첫 페이지</b>로 이동`;
+            const steps = isWin ? `
+                <ol style="margin:0;padding-left:1.3em;line-height:1.9;">
+                    <li><b>교보 eLibrary 앱</b>을 실행하세요.</li>
+                    <li><b>「${title}」</b> 책을 여세요.</li>
+                    <li>${pageStep}.</li>
+                    <li>창을 <b>최대화</b>하세요 (페이지 넘김 ‹ › 버튼이 보이게).</li>
+                    <li>책 화면을 <b>가리는 다른 창을 모두 치우세요</b>.</li>
+                </ol>
+                <div style="margin-top:10px;font-size:0.78rem;color:#fcd34d;background:rgba(245,158,11,0.1);border-radius:6px;padding:9px 11px;line-height:1.6;">
+                    ⚠️ [준비 완료] 후 <b>5초 카운트다운</b> 동안 교보 앱으로 전환(Alt+Tab)하세요. 그 화면을 그대로 찍습니다.<br>
+                    캡처 중에는 마우스·키보드를 건드리지 마세요. 상·하단 컨트롤바는 자동 크롭됩니다.
+                </div>` : `
+                <ol style="margin:0;padding-left:1.3em;line-height:1.9;">
+                    <li>[준비 완료] 하면 교보 eBook 앱이 책을 deep link 로 엽니다.</li>
+                    <li>다중 모니터 권장: 책은 한 모니터, 분석은 다른 모니터 브라우저에서.</li>
+                    <li>${startPage > 1 ? pageStep + ' (수동).' : '책이 첫 페이지에 있는지 확인.'}</li>
+                </ol>
+                <div style="margin-top:10px;font-size:0.78rem;color:#fcd34d;background:rgba(245,158,11,0.1);border-radius:6px;padding:9px 11px;">
+                    ⚠️ 캡처 중 책 화면을 가리거나 건드리지 마세요.
+                </div>`;
+            // 라이브 검증 배너 — 워커가 보고한 교보 창 제목으로 책이 열렸는지 확인
+            const _norm = (s) => (s || '').toLowerCase().replace(/[\s_]/g, '');
+            function verifyBanner(ws) {
+                if (!isWin) return '';  // Mac 은 deep link 자동
+                const at = ws && ws.app_title;
+                const want = _norm(book.title || slug);
+                if (!ws || !ws.alive) return `<div style="margin-bottom:10px;padding:9px 11px;border-radius:6px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;color:#fca5a5;font-size:0.8rem;">✗ 워커가 감지되지 않습니다 (꺼짐?). 워커가 켜진 뒤 [🔄 다시 확인].</div>`;
+                if (!at) return `<div style="margin-bottom:10px;padding:9px 11px;border-radius:6px;background:rgba(245,158,11,0.12);border:1px solid #f59e0b;color:#fcd34d;font-size:0.8rem;">⚠️ 교보 앱 창이 감지되지 않습니다. 앱을 실행하고 책을 펼친 뒤 [🔄 다시 확인].</div>`;
+                if (want && _norm(at).includes(want)) return `<div style="margin-bottom:10px;padding:9px 11px;border-radius:6px;background:rgba(16,185,129,0.12);border:1px solid #10b981;color:#6ee7b7;font-size:0.8rem;">✅ 교보 앱에서 <b>「${escapeHtml(book.title || slug)}」</b> 감지됨 — 준비됐습니다!<br><span style="color:#94a3b8;font-size:0.72rem;">창: ${escapeHtml(at)}</span></div>`;
+                return `<div style="margin-bottom:10px;padding:9px 11px;border-radius:6px;background:rgba(245,158,11,0.12);border:1px solid #f59e0b;color:#fcd34d;font-size:0.8rem;">⚠️ <b>다른 책</b>이 열려 있습니다: <code>${escapeHtml(at)}</code><br>「${escapeHtml(book.title || slug)}」 을 펼친 뒤 [🔄 다시 확인].</div>`;
+            }
+            // 준비 완료/재확인 루프
+            while (true) {
+                const ws = await fetchWorkerStatus().catch(() => ({}));
+                const body = `<div style="font-size:0.85rem;color:#cbd5e1;">
+                        ${verifyBanner(ws)}
+                        <div style="margin-bottom:9px;color:#fff;">아래를 <b>먼저 준비</b>한 뒤 누르세요:</div>${steps}
+                    </div>`;
+                const ok = await showCustomConfirm({
+                    title: '📋 캡처 준비 — 화면을 준비하세요',
+                    body,
+                    options: [
+                        { label: '취소', value: 'cancel' },
+                        { label: '🔄 다시 확인', value: 'recheck' },
+                        { label: '✓ 준비 완료', value: 'ready', kind: 'primary' },
+                    ],
+                });
+                if (ok === 'cancel' || ok == null) return false;
+                if (ok === 'recheck') continue;
+                break;  // ready
+            }
+            // Windows: 앱으로 전환할 시간 카운트다운
+            if (isWin) {
+                await _countdown(5, '⏱ 곧 캡처가 시작됩니다', (n) => `
+                    <div style="text-align:center;line-height:1.7;">
+                        지금 <b style="color:#fff;">교보 앱 화면</b>으로 전환하세요! <span style="color:#94a3b8;">(Alt+Tab)</span>
+                        <div style="font-size:2.6rem;color:#34d399;font-weight:700;margin:6px 0;">${n}</div>
+                        <div style="font-size:0.76rem;color:#94a3b8;">전환 후 건드리지 마세요. 잠시 뒤 캡처가 시작됩니다.</div>
+                    </div>`);
+            }
+            return true;
+        }
+
+        // ── 카드 위 진행 오버레이 마크업 ──
+        function buildCardOverlay(j) {
+            const pct = Math.round(j.pct || 0);
+            const stage = j.stageName || (STATUS_LABEL && STATUS_LABEL[j.status]) || j.status || '진행 중';
+            const canStop = ['pending', 'running'].includes(j.status);
+            const failClass = (j.status === 'failed') ? ' is-failed' : '';
+            return `
+                <div class="kyobo-job-overlay" data-jid="${j.jobId}">
+                    <div class="kjo-head">
+                        <span class="kjo-stage">${escapeHtml(String(stage))}</span>
+                        <span class="kjo-pct">${pct}%</span>
+                    </div>
+                    <div class="kjo-bar"><div class="kjo-bar-fill${failClass}" style="width:${Math.max(2, pct)}%"></div></div>
+                    <div class="kjo-foot">
+                        <button class="kjo-btn kjo-open" type="button">상세</button>
+                        ${canStop ? '<button class="kjo-btn kjo-btn-stop kjo-stop" type="button">⏹ 중단</button>' : ''}
+                    </div>
+                </div>`;
+        }
+
+        // 특정 카드만 오버레이 다시 그리기 (전체 재렌더링 피하기)
+        function syncCardOverlay(slug) {
+            const cards = document.querySelectorAll('.kyobo-card');
+            cards.forEach(card => {
+                const idx = +card.dataset.idx;
+                const book = _kyoboBooks[idx];
+                if (!book || slugify(book.title) !== slug) return;
+                const j = _activeJobs.get(slug);
+                const prev = card.querySelector('.kyobo-job-overlay');
+                if (j) {
+                    const html = buildCardOverlay(j);
+                    if (prev) prev.outerHTML = html;
+                    else card.insertAdjacentHTML('beforeend', html);
+                    attachOverlayHandlers(card, idx);
+                } else if (prev) {
+                    prev.remove();
+                }
+            });
+        }
+
+        function attachOverlayHandlers(card, idx) {
+            const ov = card.querySelector('.kyobo-job-overlay');
+            if (!ov) return;
+            const open = ov.querySelector('.kjo-open');
+            const stop = ov.querySelector('.kjo-stop');
+            if (open) open.onclick = (e) => {
+                e.stopPropagation();
+                openBookModal(_kyoboBooks[idx]);
+            };
+            if (stop) stop.onclick = async (e) => {
+                e.stopPropagation();
+                const jid = +ov.dataset.jid;
+                if (!jid) return;
+                stop.disabled = true; stop.textContent = '⏳ 중단 중';
+                try { await fetch(`${BRIDGE_URL}/api/jobs/${jid}`, { method: 'DELETE' }); }
+                catch (_) {}
+                // 다음 폴링 tick 이 갱신
+            };
+        }
 
         function slugify(title) {
             // book-capture 폴더명 규칙과 일치 (공백→_, prefix [..] 제거, 양끝 trim)
@@ -935,6 +1269,8 @@
                 const badge = isDone
                     ? `<span class="kyobo-badge is-analyzed">✓ 분석됨</span>`
                     : `<span class="kyobo-badge is-none">미분석</span>`;
+                const aj = _activeJobs.get(slug);
+                const overlay = aj ? buildCardOverlay(aj) : '';
                 return `
                     <div class="kyobo-card" data-idx="${idx}" title="${escapeAttr(b.title)} · 클릭하여 분석 메뉴">
                         ${badge}
@@ -942,16 +1278,19 @@
                         <div class="kyobo-title">${escapeHtml(b.title)}</div>
                         <div class="kyobo-author">${escapeHtml(b.author || '저자 미상')}</div>
                         ${b.synced_at ? `<div class="kyobo-meta">sync ${b.synced_at.slice(0,16).replace('T',' ')}</div>` : ''}
+                        ${overlay}
                     </div>
                 `;
             }).join('');
 
-            // 클릭 위임
+            // 카드 클릭 — 오버레이 영역은 자체 핸들러로 흡수
             container.querySelectorAll('.kyobo-card').forEach(el => {
-                el.addEventListener('click', () => {
-                    const idx = +el.dataset.idx;
+                const idx = +el.dataset.idx;
+                el.addEventListener('click', (e) => {
+                    if (e.target.closest('.kyobo-job-overlay')) return;
                     openBookModal(_kyoboBooks[idx]);
                 });
+                attachOverlayHandlers(el, idx);
             });
         }
 
@@ -970,6 +1309,9 @@
                     if (u.startsWith('api-cache/')) {
                         const cnt = document.getElementById('kyobo-count');
                         if (cnt) cnt.textContent += ' · 📦 snapshot';
+                    } else {
+                        // 백엔드 응답 성공한 경우만 진행 중 job 복원 시도
+                        restoreActiveJobs();
                     }
                     return;
                 } catch (e) { lastErr = String(e); }
@@ -1011,6 +1353,61 @@
                 ? `<span class="bmodal-status is-analyzed">✓ 분석 완료 · ${analyzed.pages}페이지</span>`
                 : `<span class="bmodal-status is-none" title="아래 [📊 분석 시작] 후 활성화됩니다">⏳ 미분석</span>`;
 
+            // 캡처 모드 선택 (#47/#67) — 웹뷰 차단됨, 업로드 추가
+            // OS 인식: 로컬 매크로는 macOS·Windows 지원(앱 경로 고정). 그 외 OS 는 업로드만.
+            const canWeb = !!book.can_web_view;
+            const ua = navigator.userAgent;
+            const isMac = /Macintosh|Mac OS X/i.test(ua);
+            const isWin = /Windows/i.test(ua);
+            const canMacro = isMac || isWin;
+            const osName = isMac ? 'macOS' : (isWin ? 'Windows' : '기타 OS');
+            const macOpt = canMacro
+                ? `<label class="capture-mode-opt" title="${isWin ? '교보 eLibrary 앱을 자동 설치·실행 후 화면 캡처 → NAS 백엔드가 OCR/요약/빌드 (Windows 하이브리드). 워커가 이 PC 에서 실행 중이어야 합니다.' : '교보eBook.app 자동 캡처 (macOS). 다중 모니터 권장: 책은 한 모니터, 분석 시작은 다른 모니터 브라우저에서.'}">
+                        <input type="radio" name="cap-mode" value="${isWin ? 'capture-only' : 'auto'}" checked>
+                        <span><strong>🖥 로컬 매크로</strong> <small>Recommended (${osName}) · ${isWin ? '앱 자동 실행·캡처 → 서버 처리' : '책 모니터 안 건드리고 자동 캡처'}</small></span>
+                    </label>`
+                : `<label class="capture-mode-opt is-disabled" title="로컬 매크로는 macOS·Windows 전용입니다. 현재 OS 에서는 [캡처 업로드] 를 사용하세요.">
+                        <input type="radio" name="cap-mode" value="auto" disabled>
+                        <span><strong>🖥 로컬 매크로</strong> <small>⛔ macOS·Windows 전용 — 현재 OS 에선 불가</small></span>
+                    </label>`;
+            const uploadOpt = `<label class="capture-mode-opt" title="모든 OS 지원. 본인 OS 도구로 캡처한 PNG 들을 업로드하면 서버가 OCR + AI 요약 + HTML 생성">
+                        <input type="radio" name="cap-mode" value="upload" ${canMacro ? '' : 'checked'}>
+                        <span><strong>📤 캡처 업로드</strong> <small>Mac/Windows/Linux/모바일${canMacro ? '' : ' · Recommended'}</small></span>
+                    </label>`;
+            const modeToggleHtml = `
+                <div class="capture-mode-box">
+                    <div class="capture-mode-title">캡처 방식 <small style="opacity:.6">(${osName} 감지)</small></div>
+                    ${macOpt}
+                    ${uploadOpt}
+                    <label class="capture-mode-opt is-disabled" title="교보 보안 정책으로 자동화 차단됨 (Phase #47 인프라 보존)">
+                        <input type="radio" name="cap-mode" value="auto-web" disabled>
+                        <span><strong>🌐 웹뷰</strong> <small>⛔ 교보 자동화 차단 — 사용 불가</small></span>
+                    </label>
+                </div>
+            `;
+            // 분석 절차 안내(옵저버) — 로컬 매크로(캡처) 사용자가 순서대로 따라가도록.
+            const captureGuideHtml = !canMacro ? '' : (isWin ? `
+                <div class="capture-guide">
+                    <div class="cg-title">📋 분석 절차 — 순서대로 (Windows 로컬 캡처)</div>
+                    <ol class="cg-steps">
+                        <li><b>교보 eLibrary 앱을 직접 실행</b>하세요. (웹/워커가 책을 자동으로 못 엽니다)</li>
+                        <li>분석할 <b>책을 펼치고</b> → <b>첫 페이지</b>로 이동 → 뷰어를 <b>전체화면</b>으로.</li>
+                        <li>그 <b>책 화면을 그대로</b> 두세요. (다른 창 클릭·이동 금지)</li>
+                        <li>아래 <b>[분석 시작]</b> 클릭.</li>
+                        <li>워커가 화면을 캡처하며 <b>→ 키로 자동 페이지 넘김</b>.</li>
+                        <li>캡처 끝 → 서버가 <b>OCR·요약·HTML</b> 생성 → 라이브러리 게시.</li>
+                    </ol>
+                    <div class="cg-warn">⚠️ 캡처 중에는 책 화면을 가리거나 마우스/키보드를 건드리지 마세요. <b>지금 화면에 보이는 그대로</b> 찍힙니다. 캡처가 일찍 멈추면 페이지 넘김 키(→)가 안 먹은 것 — 책 뷰어에 포커스를 두세요.</div>
+                </div>` : `
+                <div class="capture-guide">
+                    <div class="cg-title">📋 분석 절차 (macOS 로컬 캡처)</div>
+                    <ol class="cg-steps">
+                        <li><b>[분석 시작]</b> 클릭 → 교보 eBook 앱이 deep link 로 책을 자동으로 엽니다.</li>
+                        <li>다중 모니터 권장: 책은 한 모니터, 분석 시작은 다른 모니터 브라우저에서.</li>
+                        <li>워커가 자동 캡처 → 서버가 OCR·요약·HTML 처리.</li>
+                    </ol>
+                    <div class="cg-warn">⚠️ 캡처 중 책 화면을 가리지 마세요. 페이지 넘김이 멈추면 책 창에 포커스를 두세요.</div>
+                </div>`);
             document.getElementById('bmodal-body').innerHTML = `
                 ${cover}
                 <div class="bmodal-title">${escapeHtml(book.title)}</div>
@@ -1018,15 +1415,39 @@
                 ${statusHtml}
                 <div class="bmodal-meta">
                     slug: <code>${escapeHtml(slug)}</code><br>
-                    ${book.kyobo_id ? `kyobo_id: <code>${escapeHtml(book.kyobo_id)}</code><br>` : ''}
-                    sync: ${book.synced_at || '-'}
+                    ${book.salecmdtid ? `salecmdtid: <code>${escapeHtml(book.salecmdtid)}</code><br>` : ''}
+                    ${book.kyobo_id && book.kyobo_id !== book.salecmdtid ? `kyobo_id: <code>${escapeHtml(book.kyobo_id)}</code><br>` : ''}
+                    sync: ${book.synced_at || '-'}${book.progress_pct != null ? ' · 읽기 ' + book.progress_pct + '%' : ''}
                 </div>
+                ${modeToggleHtml}
+                ${captureGuideHtml}
+                ${!canMacro ? '' : `
+                <div class="capture-guide" style="background:rgba(34,211,238,0.06);border-color:rgba(34,211,238,0.3);">
+                    <label style="font-size:0.82rem;color:#cbd5e1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <b>시작 페이지</b> <span style="font-size:0.72rem;color:#94a3b8;">(앱에 표시된 도서 페이지 번호)</span>
+                        <input id="cap-start-page" type="number" min="1" value="1"
+                               style="width:78px;padding:4px 8px;background:#0a0c10;border:1px solid #2f3a4d;border-radius:5px;color:#fff;">
+                    </label>
+                    <div style="margin-top:6px;font-size:0.72rem;color:#94a3b8;line-height:1.6;">
+                        <b>1</b> = 처음부터 (기존 잔여 페이지 삭제) · <b>N</b> = 앱에서 <b>N페이지를 펼친 뒤</b> N부터 이어서.<br>
+                        📖 앱 <b>우하단</b>에 <code style="color:#cbd5e1;">21 / 757p</code> 처럼 도서 페이지 번호가 보입니다 — 그 번호를 입력하세요.<br>
+                        ✂️ 캡처 시 상단 툴바·하단 컨트롤바는 <b>자동으로 크롭</b>되어 책 본문만 OCR합니다.
+                    </div>
+                </div>`}
                 <div id="bmodal-extra"></div>
             `;
 
+            // 진행 중인 잡이 있으면 버튼은 "⏳ 분석 중" + 비활성
+            const activeJob = _activeJobs.get(slug);
+            const isRunning = activeJob && ['pending', 'running'].includes(activeJob.status);
+            const analyzeBtnLabel = isRunning
+                ? `⏳ 분석 중... (${Math.round(activeJob.pct || 0)}%)`
+                : (analyzed ? '📊 다시 분석' : '📊 분석 시작');
+            const analyzeBtnDisabled = isRunning ? 'disabled' : '';
+
             // 푸터 — 4버튼 (분석 시작 + 분석 페이지 + e-book + 검색)
             document.getElementById('bmodal-foot').innerHTML = `
-                <button class="bbtn is-primary" id="bb-analyze">${analyzed ? '📊 다시 분석' : '📊 분석 시작'}</button>
+                <button class="bbtn is-primary" id="bb-analyze" ${analyzeBtnDisabled}>${analyzeBtnLabel}</button>
 
                 ${summaryUrl
                     ? `<a class="bbtn is-go" href="${escapeAttr(summaryUrl)}" target="_blank" rel="noopener noreferrer">📊 분석 페이지</a>`
@@ -1044,45 +1465,70 @@
                 }
             `;
 
-            document.getElementById('bb-analyze').onclick = () => showAnalyzeCmd(book, slug);
+            document.getElementById('bb-analyze').onclick = async (e) => {
+                const btn = e.currentTarget;
+                if (btn.disabled) return;
+                const mode = document.querySelector('input[name="cap-mode"]:checked')?.value || 'upload';
+                if (mode === 'upload') {
+                    // 파일 선택 → 업로드 (별도 흐름)
+                    openUploadFlow(book, slug);
+                    return;
+                }
+                // 캡처(로컬 매크로) — 준비 팝업으로 사용자와 싱크 맞춘 뒤 시작
+                const sp = parseInt(document.getElementById('cap-start-page')?.value || '1', 10) || 1;
+                const ready = await showCapturePrep(book, slug, isWin, sp);
+                if (!ready) return;  // 취소 / 백드롭
+                // 준비 완료 → job 등록
+                btn.disabled = true;
+                btn.textContent = '⏳ 분석 시작 중...';
+                btn.style.opacity = '0.75';
+                btn.style.cursor = 'not-allowed';
+                document.querySelectorAll('input[name="cap-mode"]').forEach(r => r.disabled = true);
+                showAnalyzeCmd(book, slug, mode);
+            };
             document.getElementById('bmodal-bd').classList.add('open');
             document.getElementById('bmodal').classList.add('open');
         }
 
-        function closeBookModal() {
-            // 진행 중인 job 있으면 사용자에게 확인 — X 닫기는 작업 중단 아님
+        async function closeBookModal() {
             const statusEl = document.getElementById('pjob-status');
             const isRunning = statusEl && ['pending', 'running'].includes(statusEl.dataset.s);
             if (isRunning) {
-                const ok = confirm(
-                    '⚠ 작업이 백그라운드에서 계속 진행됩니다.\n' +
-                    '교보 앱 매크로가 다른 작업을 차단합니다.\n\n' +
-                    '확인 = 모달만 닫기 (작업 계속)\n' +
-                    '취소 = 모달 유지 → [⏹ 중단] 클릭으로 진짜 중단'
-                );
-                if (!ok) return;
+                const jid = +(document.querySelector('[id^="pjob-"]')?.id.replace('pjob-', '') || 0);
+                const action = await showCustomConfirm({
+                    title: '⚠ 분석 작업이 진행 중입니다',
+                    body: `
+                        <div style="margin-bottom:8px;">메인 화면 카드에서 진행률과 [⏹ 중단] 버튼을 그대로 볼 수 있습니다.</div>
+                        <div style="color:#94a3b8;font-size:0.78rem;">교보 앱 매크로 모드라면 캡처 중 마우스·키보드 입력에 주의하세요.</div>`,
+                    options: [
+                        { value: 'continue', label: '작업 계속 (창만 닫기)', kind: 'primary' },
+                        { value: 'cancel',   label: '작업 중단하고 나가기', kind: 'danger' },
+                    ],
+                });
+                if (action == null) return;  // 백드롭 클릭 = 취소
+                if (action === 'cancel' && jid) {
+                    try { await fetch(`${BRIDGE_URL}/api/jobs/${jid}`, { method: 'DELETE' }); }
+                    catch (_) {}
+                }
             }
             document.getElementById('bmodal-bd').classList.remove('open');
             document.getElementById('bmodal').classList.remove('open');
-            if (typeof stopPolling === 'function') stopPolling();
+            // 폴링은 카드 오버레이가 이어받을 수 있도록 background 폴링으로 유지
+            // (모달이 닫혀도 _activeJobs 가 살아 있으면 백그라운드 폴링 계속)
         }
 
         // ── Phase C-3 Part3: 백엔드 큐로 작업 등록 + 진행 polling ──
-        let _pollTimer = null;
 
         function backendUnreachableHint() {
             const isExternal = !(location.port === '8080' || location.hostname === '192.168.10.205');
             if (isExternal) {
                 return `
                     <div style="margin-top:14px;padding:14px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:6px;color:#fca5a5;font-size:0.82rem;line-height:1.7;">
-                        🛑 <strong>외부 환경 — 백엔드 API 가 외부 노출 안 됨</strong><br>
-                        쓰기 동작(분석 시작·동기화·설정 저장) 은 LAN 직접 접속이나
-                        <strong>DSM Reverse Proxy</strong> 설정 후 가능합니다.
-                        <div style="margin-top:8px;font-size:0.74rem;color:#8b96a8;line-height:1.6;">
-                            <strong>옵션 1</strong> · LAN 환경에서 접속 → <code style="color:#22d3ee;">http://192.168.10.205:8080/</code><br>
-                            <strong>옵션 2</strong> · DSM Reverse Proxy <strong>+</strong> 라우터 9443 포트포워딩:
-                            <code style="color:#22d3ee;">redcodeme.synology.me:9443</code> → <code style="color:#22d3ee;">localhost:9000</code>
-                            (자세히는 <code style="color:#a5b4fc;">docs/EXTERNAL_ACCESS.md</code>)
+                        🛑 <strong>백엔드 API 일시 미응답</strong> (<code style="color:#22d3ee;">${BRIDGE_URL}</code>)<br>
+                        잠시 후 새로고침해보세요. 계속 실패하면:
+                        <div style="margin-top:8px;font-size:0.78rem;color:#cbd5e1;line-height:1.7;">
+                            • 같은 네트워크(집/사무실 LAN) 라면 <code style="color:#22d3ee;">http://192.168.10.205:8080/</code> 로 직접 접속<br>
+                            • NAS 관리자라면 <code style="color:#22d3ee;">kyobo-bridge</code> 컨테이너·라우터 <code style="color:#22d3ee;">9443</code> 포트 상태 확인
                         </div>
                     </div>`;
             }
@@ -1093,16 +1539,133 @@
                 </div>`;
         }
 
-        async function showAnalyzeCmd(book, slug) {
+        // ── 파일 업로드 흐름 (#67) ────────────────────────────
+        function openUploadFlow(book, slug) {
             const extra = document.getElementById('bmodal-extra');
-            extra.innerHTML = `<div style="margin-top:14px;color:#8b96a8;font-size:0.82rem;">작업 등록 중...</div>`;
+            extra.innerHTML = `
+                <div style="margin-top:14px;padding:14px;background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.4);border-radius:6px;">
+                    <div style="font-size:0.86rem;color:#22d3ee;font-weight:600;margin-bottom:8px;">
+                        📤 캡처 파일 업로드 (어떤 OS 든 OK)
+                    </div>
+                    <div style="font-size:0.78rem;color:#cbd5e1;line-height:1.6;">
+                        본인 OS 도구로 책 페이지를 캡처 (PNG/JPG/WebP) → 모두 선택해 업로드 → 서버가 OCR + AI 요약 + HTML 생성.
+                    </div>
+                    <div style="margin-top:14px;text-align:center;">
+                        <input type="file" id="up-files" multiple accept="image/png,image/jpeg,image/webp"
+                               style="display:none;" />
+                        <button id="up-pick" class="bbtn is-primary" style="padding:9px 24px;">
+                            📁 파일 선택 (다중)
+                        </button>
+                        <button id="up-folder-pick" class="bbtn" style="padding:9px 18px;margin-left:6px;">
+                            📂 폴더 선택
+                        </button>
+                    </div>
+                    <div id="up-status" style="margin-top:12px;font-size:0.82rem;color:#94a3b8;"></div>
+                    <div id="up-progress-wrap" style="display:none;margin-top:10px;">
+                        <div style="height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;">
+                            <div id="up-progress-bar" style="width:0%;height:100%;background:linear-gradient(90deg,#22d3ee,#a855f7);transition:width 0.3s;"></div>
+                        </div>
+                        <div id="up-progress-text" style="margin-top:6px;font-size:0.74rem;color:#8b96a8;text-align:center;"></div>
+                    </div>
+                </div>
+            `;
+            const filesInput = document.getElementById('up-files');
+            document.getElementById('up-pick').onclick = () => filesInput.click();
+            document.getElementById('up-folder-pick').onclick = () => {
+                filesInput.setAttribute('webkitdirectory', '');
+                filesInput.setAttribute('directory', '');
+                filesInput.click();
+                // 파일 선택 다음 호출 위해 reset
+                setTimeout(() => {
+                    filesInput.removeAttribute('webkitdirectory');
+                    filesInput.removeAttribute('directory');
+                }, 100);
+            };
+            filesInput.onchange = () => doUpload(book, slug, filesInput.files);
+        }
+
+        async function doUpload(book, slug, files) {
+            const statusEl = document.getElementById('up-status');
+            const wrap = document.getElementById('up-progress-wrap');
+            const bar = document.getElementById('up-progress-bar');
+            const txt = document.getElementById('up-progress-text');
+            // 이미지만 필터링
+            const imgs = Array.from(files).filter(f =>
+                /^image\/(png|jpe?g|webp)$/i.test(f.type) ||
+                /\.(png|jpe?g|webp)$/i.test(f.name)
+            );
+            if (imgs.length === 0) {
+                statusEl.innerHTML = `<span style="color:#ef4444;">⚠ 이미지 파일 없음 (PNG/JPG/WebP)</span>`;
+                return;
+            }
+            statusEl.innerHTML = `📥 ${imgs.length}개 파일 업로드 중...`;
+            wrap.style.display = 'block';
+
+            const form = new FormData();
+            form.append('title', book.title || '');
+            // 파일명에서 숫자 추출해 정렬 — 백엔드도 정렬하지만 미리
+            imgs.sort((a, b) => {
+                const ai = parseInt((a.name.match(/(\d+)/) || [0])[0]) || 0;
+                const bi = parseInt((b.name.match(/(\d+)/) || [0])[0]) || 0;
+                return ai - bi;
+            });
+            imgs.forEach(f => form.append('files', f, f.name));
+
+            const url = `${BRIDGE_URL}/api/books/${encodeURIComponent(slug)}/upload`;
+            try {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', url);
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const pct = Math.round((e.loaded / e.total) * 100);
+                        bar.style.width = pct + '%';
+                        txt.textContent = `${pct}% (${(e.loaded/1024/1024).toFixed(1)}MB / ${(e.total/1024/1024).toFixed(1)}MB)`;
+                    }
+                };
+                const resp = await new Promise((resolve, reject) => {
+                    xhr.onload = () => resolve(xhr);
+                    xhr.onerror = () => reject(new Error('네트워크 오류'));
+                    xhr.send(form);
+                });
+                bar.style.width = '100%';
+                if (resp.status !== 200) {
+                    statusEl.innerHTML = `<span style="color:#ef4444;">✗ HTTP ${resp.status}: ${resp.responseText.slice(0,200)}</span>`;
+                    return;
+                }
+                const j = JSON.parse(resp.responseText);
+                statusEl.innerHTML = `<span style="color:#10b981;">✓ ${j.uploaded}개 업로드 완료 · job #${j.job.id} 등록</span>`;
+                txt.textContent = `→ 백엔드 워커가 OCR + AI 요약 + HTML 빌드 시작`;
+                // 해당 job 폴링 시작
+                _activeJobs.set(slug, { jobId: j.job.id, status: 'pending', pct: 0, stage: 1, stageName: 'ocr' });
+                ensureBgPoll();
+                renderKyoboBooks(_kyoboBooks);
+            } catch (e) {
+                statusEl.innerHTML = `<span style="color:#ef4444;">✗ ${e.message}</span>`;
+            }
+        }
+
+        async function showAnalyzeCmd(book, slug, mode) {
+            mode = mode || 'auto';
+            const extra = document.getElementById('bmodal-extra');
+            const modeLabel = mode === 'auto-web' ? '🌐 웹뷰' : '🖥 로컬뷰';
+            console.log('[KL] 📊 분석 시작 클릭', { mode, modeLabel, slug, book });
+            console.log('[KL]   라디오 선택값:', document.querySelector('input[name="cap-mode"]:checked')?.value);
+            extra.innerHTML = `<div style="margin-top:14px;color:#8b96a8;font-size:0.82rem;">${modeLabel} 모드로 작업 등록 중...</div>`;
 
             try {
+                const payload = { slug, title: book.title, mode };
+                if (book.salecmdtid) payload.salecmdtid = book.salecmdtid;  // auto-web 에 필요
+                // 시작 페이지 (capture 계열) — N>1 이면 그 번호부터 이어서
+                const _sp = parseInt(document.getElementById('cap-start-page')?.value || '1', 10);
+                if (Number.isFinite(_sp) && _sp > 1) payload.pages = String(_sp);
+                console.log('[KL] 📤 POST /api/jobs payload:', payload);
+                console.log('[KL]    BRIDGE_URL:', BRIDGE_URL);
                 const r = await fetch(`${BRIDGE_URL}/api/jobs`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ slug, title: book.title, mode: 'auto' }),
+                    body: JSON.stringify(payload),
                 });
+                console.log('[KL] 📥 응답:', r.status, r.headers.get('content-type'));
                 // 응답이 JSON 아니면 백엔드 미응답 (Synology DSM 의 기본 페이지가 답한 경우 등)
                 const ctype = r.headers.get('content-type') || '';
                 if (!ctype.toLowerCase().includes('application/json')) {
@@ -1131,8 +1694,11 @@
             failed: '실패', cancelled: '취소됨',
         };
         const STAGES_AUTO = ['capture-auto', 'ocr', 'summarize', 'merge', 'build'];
+        const STAGES_AUTO_WEB = ['wviewer capture-lib', 'ocr', 'summarize', 'merge', 'build'];
         const STAGE_LABEL = {
-            'capture-auto': '캡처', ocr: 'OCR', summarize: '요약', merge: '병합', build: 'HTML',
+            'capture-auto': '캡처 (앱)',
+            'wviewer capture-lib': '캡처 (웹)',
+            ocr: 'OCR', summarize: '요약', merge: '병합', build: 'HTML',
         };
 
         async function fetchWorkerStatus() {
@@ -1192,68 +1758,156 @@
             return 'unknown';
         }
 
-        function buildWorkerInstallHint() {
+        function buildWorkerInstallHint(ws) {
             const os = detectOS();
-            // base 는 정적 파일이 서빙되는 origin + path
-            //   LAN: http://192.168.10.205:8080
-            //   외부 (Web Station + Reverse Proxy): https://redcodeme.synology.me/kyobo
             const base = (location.origin + location.pathname.replace(/[^/]*$/, '')).replace(/\/$/, '');
+            const known = ws && ws.known;             // 이전에 본 워커 (hostname/platform/last_seen_ago_sec)
+            const seen  = ws && ws.previously_seen;
+            const isMacDefault = (os !== 'win');
 
-            // KYOBO_BASE 환경변수로 install 스크립트 안내문도 동적 URL 사용
-            const macCmd = `curl -fsSL ${base}/install/install-worker.sh | KYOBO_BASE="${base}" bash`;
-            const winCmd = `$env:KYOBO_BASE='${base}'; irm ${base}/install/install-worker.ps1 | iex`;
+            // 현재 브라우저 OS 기준으로 패널 선택 — 사용자가 보는 OS 에 맞는 패키지를 띄운다.
+            // (이전에 본 워커 platform 이 아니라. docker NAT 로 IP 가 겹쳐 known 이 엉뚱한 OS 일 수 있음)
+            const usePlat = (os === 'win') ? 'win' : 'mac';
+            const macActive = (usePlat !== 'win');
 
-            const isMacDefault = (os !== 'win');  // mac/linux/unknown 은 mac 탭 우선
+            // 이전에 본 워커 정보 — 사용자에게 "당신의 PC 에서 한 번 동작했었음" 확신 주기
+            const seenBlock = seen ? `
+                <div style="margin-bottom:12px;padding:10px 12px;background:rgba(16,185,129,0.10);border:1px solid #10b981;border-radius:6px;color:#6ee7b7;font-size:0.78rem;line-height:1.6;">
+                    💚 <strong>이 PC 에 워커가 이전에 등록되어 있습니다</strong>
+                    ${known?.hostname ? `(<code style="color:#fff;">${escapeHtml(known.hostname)}</code>)` : ''}.
+                    ${known?.last_seen_ago_sec != null ? `마지막 ping ${formatAgo(known.last_seen_ago_sec)} 전.` : ''}
+                    잠시 멈춘 듯합니다 — 아래 <strong>워커 다시 시작</strong> 한 번이면 됩니다.
+                </div>` : '';
 
-            return `
-                <div style="margin-top:10px;padding:14px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;border-radius:6px;color:#fca5a5;font-size:0.82rem;line-height:1.6;">
-                    🛑 <strong>Worker 미실행</strong> — 작업이 영원히 대기합니다.<br>
-                    <strong style="color:#fff;">한 번만 설치</strong>하면 부팅·로그온 시 자동·영구.<br>
+            // 헤더 — seen 이면 톤 부드럽게, 아니면 안내
+            const headerBg = seen ? 'rgba(34,211,238,0.10)' : 'rgba(239,68,68,0.12)';
+            const headerBorder = seen ? '#22d3ee' : '#ef4444';
+            const headerColor = seen ? '#a5f3fc' : '#fca5a5';
+            const headerTitle = seen ? '⏸ 워커가 멈춰 있어요' : '🛑 워커 미설치 — 한 번만 설치하면 끝';
+            const headerSub = seen ? '한 번 클릭으로 다시 시작합니다.' : '아래 ⬇ 인스톨러 더블클릭 한 번이면 끝.';
 
-                    <div style="margin-top:10px;display:flex;gap:6px;">
-                        <button class="os-tab ${isMacDefault?'is-active':''}" data-os="mac" onclick="switchOsTab('mac')">🍎 macOS</button>
-                        <button class="os-tab ${!isMacDefault?'is-active':''}" data-os="win" onclick="switchOsTab('win')">🪟 Windows</button>
-                        <span style="margin-left:auto;font-size:0.7rem;color:#8b96a8;align-self:center;">감지된 OS: ${os}</span>
-                    </div>
-
-                    <div id="os-panel-mac" style="margin-top:10px;display:${isMacDefault?'block':'none'};">
-                        <div style="font-size:0.78rem;color:#fff;margin-bottom:4px;">
-                            <strong>① Terminal 열고 아래 한 줄 붙여넣기</strong> (cmd+space → terminal):
+            // mac 패널
+            const macPanel = `
+                <div id="os-panel-mac" style="margin-top:10px;display:${macActive?'block':'none'};">
+                    ${seen ? `
+                        <div style="text-align:center;margin:8px 0 6px;">
+                            <a href="install/install-worker.pkg" download="install-worker.pkg"
+                               style="display:inline-block;padding:14px 28px;background:#22d3ee;color:#0a0c10;border-radius:8px;text-decoration:none;font-weight:700;font-size:1rem;box-shadow:0 4px 14px rgba(34,211,238,0.35);">
+                                ▶ 워커 다시 시작 (.pkg)
+                            </a>
+                            <div style="margin-top:10px;font-size:0.74rem;color:#22d3ee;line-height:1.6;">
+                                ✓ Apple 공증·서명 완료 — 더블클릭 → 비밀번호 1회 → 자동 재등록
+                            </div>
+                            <div style="margin-top:6px;font-size:0.7rem;color:#8b96a8;line-height:1.6;">
+                                같은 .pkg 가 멱등 처리 — 기존 등록 해제 + 새로 등록
+                            </div>
                         </div>
-                        <div class="cmd-box">
-                            <code id="mac-cmd">${escapeHtml(macCmd)}</code>
-                            <button onclick="copyText(document.getElementById('mac-cmd').textContent, this)">복사</button>
-                        </div>
-                        <div style="margin-top:6px;font-size:0.72rem;color:#8b96a8;line-height:1.6;">
-                            자동: venv · Pillow/pytesseract · tesseract(brew) · launchd 등록 + 즉시 시작<br>
-                            제거: <code style="color:#fca5a5;">~/Library/CloudStorage/OneDrive-개인/Claude/NAS/KyoboLibrary/book-capture/scripts/uninstall-worker-macos.sh</code>
-                        </div>
-                        <details style="margin-top:6px;font-size:0.72rem;color:#8b96a8;">
-                            <summary style="cursor:pointer;color:#a5b4fc;">또는: GUI 다운로드 + 더블클릭 (Gatekeeper 경고 → 우클릭 → 열기)</summary>
+                        <details style="margin-top:10px;font-size:0.72rem;color:#8b96a8;">
+                            <summary style="cursor:pointer;color:#a5b4fc;">가벼운 재시작 (.command, Gatekeeper 1회 우회 필요)</summary>
                             <div style="margin-top:6px;text-align:center;">
-                                <a href="install/install-worker.command" download="install-worker.command"
-                                   style="display:inline-block;padding:8px 18px;background:#10b981;color:#0a0c10;border-radius:6px;text-decoration:none;font-weight:700;font-size:0.85rem;">
-                                    ⬇ install-worker.command
+                                <a href="install/restart-worker.command" download="restart-worker.command"
+                                   style="display:inline-block;padding:6px 16px;background:rgba(245,158,11,0.18);color:#fbbf24;border:1px solid #f59e0b;border-radius:5px;text-decoration:none;font-size:0.8rem;">
+                                    ⬇ restart-worker.command
                                 </a>
+                                &nbsp;<a href="install.html#gatekeeper" target="_blank" style="color:#22d3ee;text-decoration:underline;font-size:0.78rem;">1회 허용 가이드</a>
                             </div>
                         </details>
-                    </div>
-
-                    <div id="os-panel-win" style="margin-top:10px;display:${!isMacDefault?'block':'none'};">
-                        <div style="font-size:0.78rem;color:#fff;margin-bottom:4px;">
-                            <strong>① PowerShell 열고 아래 한 줄 붙여넣기</strong> (Win+R → powershell):
+                        <details style="margin-top:6px;font-size:0.72rem;color:#8b96a8;">
+                            <summary style="cursor:pointer;color:#a5b4fc;">또는: Terminal 한 줄</summary>
+                            <div class="cmd-box" style="margin-top:6px;">
+                                <code id="mac-restart-cmd">launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kyobolibrary.worker.plist</code>
+                                <button onclick="copyText(document.getElementById('mac-restart-cmd').textContent, this)">복사</button>
+                            </div>
+                        </details>
+                    ` : `
+                        <div style="text-align:center;margin:8px 0 10px;">
+                            <a href="install/install-worker.pkg" download="install-worker.pkg"
+                               style="display:inline-block;padding:14px 32px;background:#10b981;color:#0a0c10;border-radius:8px;text-decoration:none;font-weight:700;font-size:1rem;box-shadow:0 4px 14px rgba(16,185,129,0.35);">
+                                ⬇ 워커 인스톨러 다운로드 (.pkg)
+                            </a>
+                            <div style="margin-top:10px;font-size:0.74rem;color:#22d3ee;line-height:1.6;">
+                                ✓ Apple 공증·서명 완료 — <strong>차단 알림 없이</strong> 더블클릭 → 비밀번호 1회 → 자동 완료
+                            </div>
+                            <div style="margin-top:8px;font-size:0.7rem;color:#8b96a8;line-height:1.6;">
+                                자동: venv · Pillow/pytesseract · tesseract(brew) · launchd 등록 + 즉시 시작
+                            </div>
+                            <details style="margin-top:10px;font-size:0.72rem;color:#8b96a8;">
+                                <summary style="cursor:pointer;color:#a5b4fc;">대체 옵션 — Terminal / .command</summary>
+                                <div style="margin-top:8px;text-align:left;">
+                                    <div style="margin-bottom:6px;">📦 GUI .command (Gatekeeper 1회 우회 필요):</div>
+                                    <div style="text-align:center;">
+                                        <a href="install/install-worker.command" download="install-worker.command"
+                                           style="display:inline-block;padding:6px 16px;background:rgba(245,158,11,0.18);color:#fbbf24;border:1px solid #f59e0b;border-radius:5px;text-decoration:none;font-size:0.8rem;">
+                                            ⬇ install-worker.command
+                                        </a>
+                                        &nbsp;
+                                        <a href="install.html#gatekeeper" target="_blank" style="color:#22d3ee;text-decoration:underline;font-size:0.78rem;">1회 허용 가이드</a>
+                                    </div>
+                                    <div style="margin-top:10px;margin-bottom:4px;">⌨ Terminal 한 줄 (전문가용):</div>
+                                    <div class="cmd-box">
+                                        <code id="mac-cmd">${escapeHtml(`curl -fsSL ${base}/install/install-worker.sh | KYOBO_BASE="${base}" bash`)}</code>
+                                        <button onclick="copyText(document.getElementById('mac-cmd').textContent, this)">복사</button>
+                                    </div>
+                                </div>
+                            </details>
                         </div>
-                        <div class="cmd-box">
-                            <code id="win-cmd">${escapeHtml(winCmd)}</code>
+                        <details style="margin-top:6px;font-size:0.72rem;color:#8b96a8;">
+                            <summary style="cursor:pointer;color:#a5b4fc;">또는: Terminal 한 줄 (전문가용)</summary>
+                            <div class="cmd-box" style="margin-top:6px;">
+                                <code id="mac-cmd">${escapeHtml(`curl -fsSL ${base}/install/install-worker.sh | KYOBO_BASE="${base}" bash`)}</code>
+                                <button onclick="copyText(document.getElementById('mac-cmd').textContent, this)">복사</button>
+                            </div>
+                        </details>
+                    `}
+                </div>`;
+
+            // win 패널 — .cmd 더블클릭(무입력) 우선. 설치 스크립트는 멱등이라 설치=재시작 동일.
+            const winPanel = `
+                <div id="os-panel-win" style="margin-top:10px;display:${!macActive?'block':'none'};">
+                    <div style="text-align:center;margin:8px 0 6px;">
+                        <a href="install/install-worker.cmd" download="install-worker.cmd"
+                           style="display:inline-block;padding:14px 28px;background:#10b981;color:#0a0c10;border-radius:8px;text-decoration:none;font-weight:700;font-size:1rem;box-shadow:0 4px 14px rgba(16,185,129,0.35);">
+                            ⬇ 워커 ${seen ? '다시 시작' : '설치'} (.cmd · 더블클릭)
+                        </a>
+                        <div style="margin-top:10px;font-size:0.74rem;color:#22d3ee;line-height:1.6;">
+                            받은 <code style="color:#fff;">install-worker.cmd</code> 더블클릭 → 자동 설치·시작.
+                            백엔드 주소 자동 감지, 명령어 입력 없음. (설치 중 권한 창은 <strong>[예]</strong>)
+                        </div>
+                        <div style="margin-top:6px;font-size:0.7rem;color:#8b96a8;line-height:1.6;">
+                            자동: Python venv · Pillow/pytesseract/pyautogui · Tesseract(winget, 한/영) · Task Scheduler 등록 + 즉시 시작<br>
+                            💡 OneDrive 동기화돼 있으면 <code style="color:#cbd5e1;">KyoboLibrary\\install\\install-worker.cmd</code> 더블클릭이 더 깔끔(다운로드·경고 없음)
+                        </div>
+                    </div>
+                    <details style="margin-top:8px;font-size:0.72rem;color:#8b96a8;">
+                        <summary style="cursor:pointer;color:#a5b4fc;">또는: PowerShell 한 줄 (전문가용)</summary>
+                        <div class="cmd-box" style="margin-top:6px;">
+                            <code id="win-cmd">${escapeHtml(`irm ${base}/install/install-worker.ps1 | iex`)}</code>
                             <button onclick="copyText(document.getElementById('win-cmd').textContent, this)">복사</button>
                         </div>
-                        <div style="margin-top:6px;font-size:0.72rem;color:#8b96a8;line-height:1.6;">
-                            자동: venv · Pillow/pytesseract/pyautogui · tesseract(winget) · Task Scheduler 등록 + 즉시 시작<br>
-                            ※ 실행 정책 차단되면: <code style="color:#fca5a5;">Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass</code> 후 다시<br>
-                            제거: <code style="color:#fca5a5;">…\\book-capture\\scripts\\uninstall-worker-windows.ps1</code>
-                        </div>
-                    </div>
+                        <div style="margin-top:6px;">실행정책 막히면: <code style="color:#fca5a5;">Set-ExecutionPolicy -Scope Process Bypass</code> 후 다시</div>
+                    </details>
                 </div>`;
+
+            return `
+                <div style="margin-top:10px;padding:14px;background:${headerBg};border:1px solid ${headerBorder};border-radius:6px;color:${headerColor};font-size:0.82rem;line-height:1.6;">
+                    <strong>${headerTitle}</strong><br>
+                    <span style="color:#cbd5e1;font-size:0.78rem;">${headerSub}</span>
+                    ${seenBlock}
+                    <div style="margin-top:10px;display:flex;gap:6px;">
+                        <button class="os-tab ${macActive?'is-active':''}" data-os="mac" onclick="switchOsTab('mac')">🍎 macOS</button>
+                        <button class="os-tab ${!macActive?'is-active':''}" data-os="win" onclick="switchOsTab('win')">🪟 Windows</button>
+                        <span style="margin-left:auto;font-size:0.7rem;color:#8b96a8;align-self:center;">감지된 OS: ${os}</span>
+                    </div>
+                    ${macPanel}
+                    ${winPanel}
+                </div>`;
+        }
+
+        function formatAgo(sec) {
+            if (sec < 60) return `${Math.round(sec)}초`;
+            if (sec < 3600) return `${Math.round(sec/60)}분`;
+            if (sec < 86400) return `${Math.round(sec/3600)}시간`;
+            return `${Math.round(sec/86400)}일`;
         }
 
         function switchOsTab(os) {
@@ -1271,23 +1925,6 @@
 
         async function renderJobBox(job, slug) {
             const extra = document.getElementById('bmodal-extra');
-            const isPending = job.status === 'pending';
-
-            // worker heartbeat 즉시 확인
-            const ws = await fetchWorkerStatus();
-            const workerHint = isPending && !ws.alive ? buildWorkerInstallHint() : '';
-            const workerOk = ws.alive ? `
-                <div style="margin-top:6px;font-size:0.72rem;color:#10b981;font-family:monospace;">
-                    ✓ worker 살아있음 (${ws.worker_ip}, ${ws.last_ping_ago_sec}s 전)
-                </div>` : '';
-
-            const captureHint = isPending && ws.alive ? `
-                <div style="margin-top:8px;padding:10px 12px;background:rgba(245,158,11,0.10);border:1px solid #f59e0b;border-radius:6px;color:#fbbf24;font-size:0.78rem;line-height:1.6;">
-                    📖 <strong>교보eBook.app 에서 이 책을 열고 첫 페이지로 가세요</strong>.<br>
-                    ⚠ <strong>캡처 중에는 마우스·키보드·다른 앱 절대 건드리지 마세요</strong> —
-                    매크로가 교보 앱을 강제로 활성화하므로 다른 작업이 차단됩니다.<br>
-                    📌 곧 <strong>웹뷰어 모드</strong>(별도 브라우저에서 wviewer URL 캡처) 가 추가되어 메인 화면이 점유되지 않게 됩니다.
-                </div>` : '';
 
             const stageBoxes = STAGES_AUTO.map(s =>
                 `<div class="pstage" data-stage="${s}">${STAGE_LABEL[s] || s}</div>`
@@ -1310,12 +1947,53 @@
                     <div class="pjob-msg" id="pjob-msg">${escapeHtml(job.progress || '대기 중...')}</div>
                     <div class="pjob-sub" id="pjob-sub"></div>
                     <div class="pjob-err" id="pjob-err"></div>
-                    ${workerOk}
+                    <div id="pjob-worker-ok"></div>
                 </div>
-                ${workerHint}
-                ${captureHint}
+                <div id="pjob-worker-box"></div>
             `;
             applyProgress(job);
+            refreshWorkerBox(job);
+        }
+
+        // 폴링 마다 호출 — 워커 안내·상태 박스 다시 그림 (status/alive 변화 반영)
+        async function refreshWorkerBox(job) {
+            const okBox = document.getElementById('pjob-worker-ok');
+            const hintBox = document.getElementById('pjob-worker-box');
+            if (!okBox || !hintBox) return;
+
+            const ws = await fetchWorkerStatus();
+            const isActive = ['pending', 'running'].includes(job.status);
+
+            if (ws.alive) {
+                const hostBit = ws.known?.hostname ? `, ${escapeHtml(ws.known.hostname)}` : '';
+                // 워커 버전 옵저버 — 최신/업데이트중 표시
+                let verBit = '';
+                if (ws.worker_version) {
+                    const v = escapeHtml(String(ws.worker_version).slice(0, 7));
+                    if (ws.up_to_date) {
+                        verBit = ` · <span style="color:#34d399;">v${v} ✓최신</span>`;
+                    } else if (ws.server_version) {
+                        const sv = escapeHtml(String(ws.server_version).slice(0, 7));
+                        verBit = ` · <span style="color:#fbbf24;">v${v} → v${sv} 업데이트 중…(최대 5분)</span>`;
+                    } else {
+                        verBit = ` · <span style="color:#94a3b8;">v${v}</span>`;
+                    }
+                }
+                okBox.innerHTML = `
+                    <div style="margin-top:6px;font-size:0.72rem;color:#10b981;font-family:monospace;">
+                        ✓ worker 살아있음 (${ws.worker_ip}${hostBit}, ${ws.last_ping_ago_sec}s 전)${verBit}
+                    </div>`;
+                hintBox.innerHTML = isActive ? `
+                    <div style="margin-top:8px;padding:10px 12px;background:rgba(245,158,11,0.10);border:1px solid #f59e0b;border-radius:6px;color:#fbbf24;font-size:0.78rem;line-height:1.6;">
+                        📖 <strong>교보eBook.app 에서 이 책을 열고 첫 페이지로 가세요</strong>.<br>
+                        ⚠ <strong>캡처 중에는 마우스·키보드·다른 앱 절대 건드리지 마세요</strong> —
+                        매크로가 교보 앱을 강제로 활성화하므로 다른 작업이 차단됩니다.<br>
+                        📌 곧 <strong>웹뷰어 모드</strong>(별도 브라우저에서 wviewer URL 캡처) 가 추가되어 메인 화면이 점유되지 않게 됩니다.
+                    </div>` : '';
+            } else {
+                okBox.innerHTML = '';
+                hintBox.innerHTML = isActive ? buildWorkerInstallHint(ws) : '';
+            }
         }
 
         function applyProgress(job) {
@@ -1354,6 +2032,33 @@
             fillEl.classList.toggle('is-done', job.status === 'done');
             fillEl.classList.toggle('is-failed', job.status === 'failed');
 
+            // 분석 시작 버튼 동기화 — 잡 진행 중이면 "분석 중", 끝나면 라벨 복귀
+            // (pct 선언 이후에 위치해야 TDZ 회피)
+            const analyzeBtn = document.getElementById('bb-analyze');
+            if (analyzeBtn) {
+                if (['pending','running','cancelling'].includes(job.status)) {
+                    analyzeBtn.disabled = true;
+                    analyzeBtn.style.opacity = '0.75';
+                    analyzeBtn.style.cursor = 'not-allowed';
+                    const lbl = job.status === 'cancelling' ? '⏳ 중단 중...'
+                              : job.status === 'pending'   ? '⏳ 대기 중...'
+                                                           : `⏳ 분석 중... (${Math.round(pct)}%)`;
+                    analyzeBtn.textContent = lbl;
+                    document.querySelectorAll('input[name="cap-mode"]').forEach(r => r.disabled = true);
+                } else {
+                    // done / failed / cancelled — 다시 누를 수 있게
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.style.opacity = '';
+                    analyzeBtn.style.cursor = '';
+                    if (job.status === 'done') analyzeBtn.textContent = '📊 다시 분석';
+                    else if (job.status === 'failed') analyzeBtn.textContent = '🔄 다시 시도';
+                    else if (job.status === 'cancelled') analyzeBtn.textContent = '📊 분석 시작';
+                    document.querySelectorAll('input[name="cap-mode"]').forEach(r => {
+                        if (!r.closest('.is-disabled')) r.disabled = false;
+                    });
+                }
+            }
+
             // 단계 박스 강조
             const stageEls = document.querySelectorAll('#pjob-stages .pstage');
             const stage = pg?.stage || 0;
@@ -1382,47 +2087,113 @@
             errEl.textContent = job.error || '';
         }
 
-        async function pollJobOnce(jid, slug) {
+        // ── 백그라운드 폴링 (모든 진행 중 job 을 한 timer 가 처리) ──
+        function updateActiveJob(slug, job) {
+            const pg = parseProgress(job.progress);
+            _activeJobs.set(slug, {
+                jobId: job.id,
+                status: job.status,
+                pct: pg?.pct ?? (job.status === 'done' ? 100 : 0),
+                stage: pg?.stage,
+                stageName: pg?.stage_name,
+                msg: pg?.msg,
+            });
+        }
+
+        // 모달이 열려 있고 같은 job 이면 모달 DOM 갱신용 jid 반환
+        function modalCurrentJobId() {
+            const el = document.querySelector('[id^="pjob-"]');
+            if (!el) return 0;
+            const m = el.id.match(/^pjob-(\d+)$/);
+            return m ? +m[1] : 0;
+        }
+
+        async function pollOneJob(slug, jid) {
             try {
                 const r = await fetch(`${BRIDGE_URL}/api/jobs/${jid}`, { cache: 'no-store' });
-                if (!r.ok) return false;
+                if (!r.ok) return;
                 const j = await r.json();
                 const job = j.job;
-                applyProgress(job);
+                updateActiveJob(slug, job);
+                syncCardOverlay(slug);
+                if (modalCurrentJobId() === job.id) {
+                    applyProgress(job);
+                    refreshWorkerBox(job);
+                }
 
-                // cancelling 은 아직 종료 안 됨 — 계속 polling
                 if (['done', 'failed', 'cancelled'].includes(job.status)) {
-                    stopPolling();
-                    if (job.status === 'done') {
-                        await loadAnalyzed();
-                        renderKyoboBooks(_kyoboBooks);
-                        setTimeout(() => {
-                            const book = _kyoboBooks.find(b => slugify(b.title) === slug);
-                            if (book) openBookModal(book);
-                        }, 600);
-                    }
-                    return true;
+                    // 결과 잠시 보여준 뒤 카드에서 오버레이 제거
+                    setTimeout(async () => {
+                        _activeJobs.delete(slug);
+                        if (job.status === 'done') {
+                            await loadAnalyzed();
+                            renderKyoboBooks(_kyoboBooks);
+                        } else {
+                            syncCardOverlay(slug);
+                        }
+                    }, 2500);
                 }
             } catch (e) {
-                console.warn('poll fail:', e);
+                console.warn('poll fail:', slug, jid, e);
             }
-            return false;
         }
 
+        let _bgPollTimer = null;
+        async function pollAllActive() {
+            if (_activeJobs.size === 0) {
+                clearInterval(_bgPollTimer); _bgPollTimer = null;
+                return;
+            }
+            const snap = [..._activeJobs.entries()];
+            for (const [slug, j] of snap) {
+                await pollOneJob(slug, j.jobId);
+            }
+        }
+        function ensureBgPoll() {
+            if (_bgPollTimer) return;
+            _bgPollTimer = setInterval(pollAllActive, 3000);
+        }
+
+        // 기존 인터페이스 유지 (모달 측 호출용)
+        async function pollJobOnce(jid, slug) {
+            if (slug) await pollOneJob(slug, jid);
+            return true;
+        }
         function startPolling(jid, slug) {
-            stopPolling();
-            _pollTimer = setInterval(() => pollJobOnce(jid, slug), 3000);
-            pollJobOnce(jid, slug);
+            if (slug) _activeJobs.set(slug, { jobId: jid, status: 'pending', pct: 0 });
+            pollOneJob(slug, jid);
+            ensureBgPoll();
         }
         function stopPolling() {
-            if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+            // 모달이 닫혀도 백그라운드 폴링은 유지. 종료 잡이 빠지면 ensureBgPoll 가 자동 해제.
         }
 
         async function cancelCurrentJob(jid) {
             try {
                 await fetch(`${BRIDGE_URL}/api/jobs/${jid}`, { method: 'DELETE' });
-                await pollJobOnce(jid, '');
+                // 다음 tick 이 갱신. 즉시 반영을 위해 모달에서 호출 시 slug 알 수 있는 entry 찾기
+                for (const [slug, j] of _activeJobs) {
+                    if (j.jobId === jid) { await pollOneJob(slug, jid); break; }
+                }
             } catch (e) {}
+        }
+
+        // 페이지 로드 시 백엔드에서 진행 중 job 복원 (다른 탭/디바이스에서 시작한 작업도 카드에 표시)
+        async function restoreActiveJobs() {
+            try {
+                const r = await fetch(`${BRIDGE_URL}/api/jobs?limit=20`, { cache: 'no-store' });
+                if (!r.ok) return;
+                const j = await r.json();
+                (j.jobs || []).forEach(job => {
+                    if (['pending', 'running', 'cancelling'].includes(job.status)) {
+                        updateActiveJob(job.slug, job);
+                    }
+                });
+                if (_activeJobs.size > 0) {
+                    renderKyoboBooks(_kyoboBooks);
+                    ensureBgPoll();
+                }
+            } catch (_) {}
         }
 
         function tryParseJson(s) {

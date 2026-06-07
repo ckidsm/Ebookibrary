@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyobo e-Library → NAS Sync
 // @namespace    https://192.168.10.205/
-// @version      0.5.0
+// @version      0.7.3
 // @description  교보 e-Library 페이지에서 내 도서 목록을 NAS Kyobo Bridge(9000)로 동기화 (스크롤 컨테이너 자동 감지)
 // @author       YUNDEOKSOO
 // @match        https://elibrary.kyobobook.co.kr/*
@@ -12,15 +12,40 @@
 // @connect      192.168.10.205
 // @connect      redcodeme.synology.me
 // @run-at       document-idle
-// @updateURL    http://192.168.10.205:8080/userscript/sync-kyobo-library.user.js
-// @downloadURL  http://192.168.10.205:8080/userscript/sync-kyobo-library.user.js
+// @updateURL    https://redcodeme.synology.me/kyobo/userscript/sync-kyobo-library.user.js
+// @downloadURL  https://redcodeme.synology.me/kyobo/userscript/sync-kyobo-library.user.js
 // ==/UserScript==
 
 (() => {
     'use strict';
 
-    const DEFAULTS = { backend: 'http://192.168.10.205:9000' };
-    const backendUrl = () => GM_getValue('backendUrl', DEFAULTS.backend);
+    // 패널·로그에 표시할 버전 (@version 과 일치시켜야 함)
+    const SCRIPT_VERSION = (typeof GM_info !== 'undefined' && GM_info?.script?.version) || '0.7.0';
+
+    // 환경 자동 분기:
+    //  · 외부 도메인 또는 일반 인터넷 환경 → https://redcodeme.synology.me:9443 (Reverse Proxy)
+    //  · LAN(VPN) 환경에서 LAN IP 원하면 패널 [URL 저장] 으로 변경 가능
+    const DEFAULTS = {
+        backend_external: 'https://redcodeme.synology.me:9443',
+        backend_lan: 'http://192.168.10.205:9000',
+    };
+    function pickDefaultBackend() {
+        const saved = GM_getValue('backendUrl', null);
+        if (saved) return saved;
+        // 사용자가 외부망(공유 IP=NAS 외부) 인지 LAN(공유기 안) 인지 자동 판단은 어렵다.
+        // 보수적으로: 외부 도메인 우선 (LAN VPN 도 외부 도메인 동작 OK).
+        return DEFAULTS.backend_external;
+    }
+    const backendUrl = () => GM_getValue('backendUrl', pickDefaultBackend());
+
+    // v0.6.1 마이그레이션: 옛 LAN IP 가 저장돼 있으면 외부 도메인으로 자동 갱신
+    (function migrateBackend() {
+        const saved = GM_getValue('backendUrl', null);
+        if (saved && saved.startsWith('http://192.168.10.205')) {
+            console.log('[NVK] 옛 LAN backend URL 감지 → 외부 도메인으로 자동 갱신');
+            GM_setValue('backendUrl', DEFAULTS.backend_external);
+        }
+    })();
 
     // ── UI ──────────────────────────────────────────────
     function injectPanel() {
@@ -39,7 +64,7 @@
         ].join(';');
         panel.innerHTML = `
             <div style="font-weight:700;color:#22d3ee;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
-                <span>📚 NAS Sync <span style="opacity:0.6;font-weight:400;font-family:monospace;font-size:11px;">v0.5.0</span></span>
+                <span>📚 NAS Sync <span style="opacity:0.6;font-weight:400;font-family:monospace;font-size:11px;">v${SCRIPT_VERSION}</span></span>
                 <span id="nvk-close" style="cursor:pointer;opacity:0.5;font-size:16px;">×</span>
             </div>
             <div id="nvk-status" style="color:#8b96a8;font-size:12px;margin-bottom:10px;line-height:1.5;">
@@ -65,7 +90,7 @@
 
         document.getElementById('nvk-close').onclick = () => panel.remove();
         document.getElementById('nvk-preview').onclick = () => doExtract({ preview: true, scroll: false });
-        document.getElementById('nvk-sync').onclick = () => doExtract({ preview: false, scroll: true });
+        document.getElementById('nvk-sync').onclick = () => doExtract({ preview: false, allPages: true });
         document.getElementById('nvk-save').onclick = () => {
             const v = document.getElementById('nvk-url').value.trim();
             if (v) {
@@ -290,7 +315,65 @@
             || card.dataset.sno || card.dataset.prdno || card.dataset.isbn || null,
     };
 
+    // ── v0.6: ul#myBookList 정확한 추출 (Phase #47) ─────────
+    function extractBookCard_v06(li) {
+        const checkbox = li.querySelector('input[name="mybookChk"]');
+        if (!checkbox) return null;
+
+        const goPrdDetail = li.querySelector('.goPrdDetail');
+        const directBtn = li.querySelector('button.clickDirectView');
+        const downloadBtn = li.querySelector('button.clickDownload');
+        const seriesBtn = li.querySelector('button.btnGoSris');
+        const anyBtn = directBtn || downloadBtn || seriesBtn;
+
+        const titleEl = li.querySelector('.info strong');
+        const title = titleEl?.textContent?.trim();
+        if (!title) return null;
+
+        const infoSpans = li.querySelectorAll('.info > span');
+        const coverImg = li.querySelector('.img img');
+        const progressEm = li.querySelector('.img > em');
+        const ownEm = li.querySelector('.info .own em');
+
+        const salecmdtid = checkbox.value || checkbox.dataset.rprssalecmdtid || null;
+        const progressText = progressEm?.textContent?.trim() || '';
+        const progress_pct = parseInt(progressText) || 0;
+
+        return {
+            salecmdtid,
+            kyobo_id: salecmdtid,            // 안정 ID 로 kyobo_id 도 동일 사용
+            bkscmdtcode: goPrdDetail?.dataset?.bkscmdtcode || null,
+            rprssalecmdtid: checkbox.dataset?.rprssalecmdtid || null,
+            dgctsalecmdtdvsncode: goPrdDetail?.dataset?.dgctsalecmdtdvsncode || null,
+            title,
+            author: infoSpans[0]?.textContent?.trim() || null,
+            publisher: infoSpans[1]?.textContent?.trim() || null,
+            cover_url: coverImg?.src || null,
+            progress_pct,
+            can_web_view: !!directBtn,        // ★ wviewer 가능 여부 = clickDirectView 버튼 존재
+            status: ownEm?.textContent?.trim() === '소장' ? 'available' : (ownEm?.textContent?.trim() || 'available'),
+            // viewer 호출 메타 (Playwright 자동화에 필요)
+            ordrid: anyBtn?.dataset?.ordrid || null,
+            dgctelbcmdtcdtncode: anyBtn?.dataset?.dgctelbcmdtcdtncode || null,
+            dgctsalefrdvsncode: directBtn?.dataset?.dgctsalefrdvsncode || null,
+            dgctordrcmdtsrmb: anyBtn?.dataset?.dgctordrcmdtsrmb || null,
+        };
+    }
+
     function extractBooks() {
+        // v0.6 우선: ul#myBookList 직접 추출 (100% 매칭)
+        const list = document.querySelector('ul#myBookList');
+        if (list) {
+            const cards = list.querySelectorAll(':scope > li');
+            if (cards.length > 0) {
+                const books = Array.from(cards).map(extractBookCard_v06).filter(Boolean);
+                if (books.length > 0) {
+                    return { books, selector: 'ul#myBookList > li', tried: [`${cards.length}× ul#myBookList > li (v0.6)`] };
+                }
+            }
+        }
+
+        // fallback: v0.5 추측 로직 (다른 페이지·구조용)
         let bestSelector = null;
         let bestCount = 0;
         const triedResults = [];
@@ -323,8 +406,162 @@
         return { books, selector: bestSelector, tried: triedResults };
     }
 
+    // ── v0.7: 전체 페이지 자동 순회 (Phase #47) ──────────
+    // 교보 e-library 는 SPA — fetch 한 page=N HTML 에는 빈 ul#myBookList 만 들어있을 가능성.
+    // 그래서 페이지네이션 버튼 클릭으로 SPA navigate + DOM mutation 대기 방식.
+
+    function findPaginationContainer() {
+        return document.querySelector('div.pagination#pagi')
+            || document.querySelector('div.pagination')
+            || document.querySelector('#pagi');
+    }
+
+    function findCurrentPageNum() {
+        const pag = findPaginationContainer();
+        if (!pag) return 1;
+        const active = pag.querySelector('.on, .active, [aria-current="page"]');
+        const t = active?.textContent?.trim();
+        return parseInt(t) || 1;
+    }
+
+    function findNextPageElement() {
+        const pag = findPaginationContainer();
+        if (!pag) return null;
+        // 1) 활성 페이지의 다음 형제
+        const active = pag.querySelector('.on, .active, [aria-current="page"]');
+        if (active) {
+            let sib = active.nextElementSibling;
+            while (sib) {
+                if (sib.tagName === 'A' || sib.tagName === 'BUTTON') return sib;
+                sib = sib.nextElementSibling;
+            }
+        }
+        // 2) "다음" 라벨
+        const next = pag.querySelector('[aria-label="다음"], .next, .btn_next, [class*="next"]');
+        return next || null;
+    }
+
+    function firstBookIdInList() {
+        return document.querySelector('ul#myBookList input[name="mybookChk"]')?.value || '';
+    }
+
+    // v0.7.3: 페이지 번호 + 첫 책 ID 둘 다 변화해야 진짜 페이지 로딩 완료
+    async function waitPageChange(beforePageNum, beforeFirstId, timeoutMs = 10000) {
+        const t0 = Date.now();
+        while (Date.now() - t0 < timeoutMs) {
+            await new Promise(r => setTimeout(r, 120));
+            const curPage = findCurrentPageNum();
+            const curFirstId = firstBookIdInList();
+            // 핵심: 첫 책 ID 가 실제로 바뀌어야 새 데이터 로드 완료
+            if (curFirstId && curFirstId !== beforeFirstId) {
+                // 추가 안정화 (다른 li 들도 로드 완료)
+                await new Promise(r => setTimeout(r, 300));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    async function extractAllPages(onProgress) {
+        const allBooks = [];
+        const seen = new Set();
+
+        const addBooks = (books, page) => {
+            let added = 0;
+            for (const b of books) {
+                const key = b.salecmdtid || `${b.title}|${b.author}`;
+                if (!seen.has(key)) { seen.add(key); allBooks.push(b); added++; }
+            }
+            if (onProgress) onProgress({ page, total_books: allBooks.length, page_books: books.length, added });
+            return added;
+        };
+
+        // 1) 현재(=1) 페이지: 직접 추출
+        let curPage = findCurrentPageNum();
+        const firstBooks = extractBooks().books;
+        addBooks(firstBooks, curPage);
+        console.log('[NVK] v0.7 page', curPage, 'extracted:', firstBooks.length);
+
+        // 2) 페이지네이션 컨테이너 확인 + 진단
+        const pag = findPaginationContainer();
+        if (!pag) {
+            console.warn('[NVK] pagination 컨테이너 못 찾음 — 단일 페이지로 종료');
+            return allBooks;
+        }
+        console.log('[NVK] pagination 발견:', pag.outerHTML.slice(0, 500));
+
+        // 3) 페이지네이션 클릭 순회 (SPA — DOM mutation 으로 대기)
+        const MAX_PAGES = 60;
+        let consecutiveEmpty = 0;
+        let consecutiveTimeout = 0;
+        for (let i = 0; i < MAX_PAGES; i++) {
+            const nextEl = findNextPageElement();
+            if (!nextEl) {
+                console.log('[NVK] 다음 페이지 요소 없음 — 종료');
+                break;
+            }
+            const nextText = nextEl.textContent?.trim() || '';
+            const beforePage = findCurrentPageNum();
+            const beforeFirstId = firstBookIdInList();
+            console.log('[NVK] click next:', nextText, '(현재 page', beforePage, 'firstBook:', beforeFirstId.slice(0,12) + ')');
+            nextEl.click();
+
+            const ok = await waitPageChange(beforePage, beforeFirstId, 10000);
+            if (!ok) {
+                consecutiveTimeout++;
+                console.warn('[NVK] page change timeout (', consecutiveTimeout, '/3 ) — page', beforePage, 'firstBook:', firstBookIdInList().slice(0,12));
+                if (consecutiveTimeout >= 3) {
+                    console.warn('[NVK] timeout 3회 연속 — 종료');
+                    break;
+                }
+                await new Promise(r => setTimeout(r, 500));
+                continue;
+            }
+            consecutiveTimeout = 0;
+
+            curPage = findCurrentPageNum();
+            const books = extractBooks().books;
+            const added = addBooks(books, curPage);
+
+            if (added === 0) {
+                consecutiveEmpty++;
+                if (consecutiveEmpty >= 3) {
+                    console.warn('[NVK] 신규 0건 3회 연속 — 종료');
+                    break;
+                }
+            } else {
+                consecutiveEmpty = 0;
+            }
+        }
+        return allBooks;
+    }
+
     // ── 메인: 추출 + (선택)전송 ──────────────────────────
-    async function doExtract({ preview = false, scroll = false } = {}) {
+    async function doExtract({ preview = false, scroll = false, allPages = false } = {}) {
+        // v0.7: 전체 페이지 자동 순회 (myBookList 가 있는 페이지에서만)
+        if (allPages && document.querySelector('ul#myBookList')) {
+            setStatus('전체 페이지 수집 중...', '#22d3ee');
+            const allBooks = await extractAllPages(({ page, total_books, page_books }) => {
+                setStatus(`📥 page ${page} 처리 · 누적 <b>${total_books}</b>권 (이번 페이지 ${page_books})`, '#22d3ee');
+            });
+            console.log(`[NVK] === v0.7 전체 페이지 순회 완료: ${allBooks.length}권 ===`);
+            if (allBooks.length === 0) {
+                setStatus('⚠ 0건 — 도서함 페이지인지 확인하세요', '#f59e0b');
+                return;
+            }
+            if (preview) {
+                const canWebCount = allBooks.filter(b => b.can_web_view).length;
+                setStatus(
+                    `🔍 미리보기 <b>${allBooks.length}권</b> 수집 (전송 X)<br>` +
+                    `<small>웹뷰 가능: ${canWebCount}권 · 로컬뷰만: ${allBooks.length - canWebCount}권</small>`,
+                    '#8b96a8'
+                );
+                return;
+            }
+            // 백엔드 sync
+            return sendBooks(allBooks, 'allPages');
+        }
+
         if (scroll) {
             try { await autoScroll(); } catch (e) { console.warn('[NVK] autoScroll error:', e); }
         }
@@ -361,7 +598,11 @@
             return;
         }
 
-        setStatus(`전송 중 · <b>${books.length}건</b>...`, '#8b96a8');
+        return sendBooks(books, 'single');
+    }
+
+    function sendBooks(books, mode) {
+        setStatus(`전송 중 · <b>${books.length}건</b>... <small style="color:#8b96a8;">(${mode})</small>`, '#8b96a8');
         const url = backendUrl() + '/api/library/sync';
         GM_xmlhttpRequest({
             method: 'POST',
@@ -373,7 +614,7 @@
                 try { json = JSON.parse(resp.responseText); } catch (_) {}
                 if (resp.status === 200 && json) {
                     setStatus(
-                        `✓ 동기화 · 신규 <b>${json.inserted}</b> · 갱신 <b>${json.updated}</b> · 전체 <b>${json.total}</b>건`,
+                        `✓ 동기화 · 신규 <b>${json.inserted}</b> · 갱신 <b>${json.updated}</b> · 전체 <b>${json.total}</b>권`,
                         '#10b981'
                     );
                     console.log('[NVK] sync OK:', json);

@@ -85,6 +85,35 @@ def report(bridge: str, jid: int, **fields) -> None:
         print(f"[worker] report 실패 ({jid}): {e}")
 
 
+def _lookup_salecmdtid(bridge: str, slug: str) -> str | None:
+    """books 테이블에서 slug 매칭되는 책의 salecmdtid 조회.
+
+    slug 형식이 다양해서 여러 방식 시도:
+      1) salecmdtid 가 slug 와 동일 (E000... 형태)
+      2) title 가공 = slug 매칭
+    """
+    if slug.startswith("E") and len(slug) > 10:
+        return slug  # slug 자체가 salecmdtid 인 경우
+    try:
+        r = _http("GET", f"{bridge}/api/library/books", timeout=10.0)
+        for b in r.get("books", []):
+            if not b.get("salecmdtid"):
+                continue
+            if b.get("kyobo_id") == slug or _norm_slug(b.get("title", "")) == slug:
+                return b["salecmdtid"]
+    except Exception as e:
+        print(f"[worker] salecmdtid 조회 실패: {e}")
+    return None
+
+
+def _norm_slug(title: str) -> str:
+    """index.html 의 slugify() 와 같은 정규화."""
+    import re
+    s = re.sub(r"^\[[^\]]+\]\s*", "", title).strip()  # [epub3.0] 접두 제거
+    s = re.sub(r"\s+", "_", s)
+    return s
+
+
 def is_cancelling(bridge: str, jid: int) -> bool:
     """job 의 현재 status 가 cancelling/cancelled 인지 확인."""
     try:
@@ -114,12 +143,24 @@ def progress_payload(
     }, ensure_ascii=False)
 
 
+# 현재 처리 중인 job — graceful 종료(SIGTERM/Ctrl+C) 시 failed 보고용.
+_CURRENT_JID: int | None = None
+
+
 def run_one(bridge: str, job: dict) -> None:
+    global _CURRENT_JID
     jid = job["id"]
+    _CURRENT_JID = jid
     slug = job["slug"]
     mode = job.get("mode") or "auto"
     pages = job.get("pages")
-    print(f"\n[worker] === job #{jid} 시작 (slug={slug}, mode={mode}) ===")
+    print(f"\n[worker] ╔════════════════════════════════════════════════")
+    print(f"[worker] ║ 🚀 job #{jid} 시작")
+    print(f"[worker] ║   slug={slug!r}")
+    print(f"[worker] ║   mode={mode!r}")
+    print(f"[worker] ║   pages={pages!r}")
+    print(f"[worker] ║   raw job={job!r}")
+    print(f"[worker] ╚════════════════════════════════════════════════")
 
     s = load_settings(bridge_url=bridge)
     books_dir = Path(s.output.books_dir).expanduser().resolve()
@@ -141,17 +182,89 @@ def run_one(bridge: str, job: dict) -> None:
             ["merge", "--book-dir", str(book_dir)],
             ["build", "--book-dir", str(book_dir)],
         ]
-    elif mode == "capture-only":
-        steps = [["capture-auto", "--slug", slug, "--count", "300", "--interval", "2"]]
-    else:  # auto = capture + ocr + summarize + merge + build (5단계)
+    elif mode == "upload-process":
+        # Phase #67: 사용자가 업로드한 PNG 들을 처리 — capture 스킵
+        # 업로드된 파일은 백엔드가 LIBRARY_BOOKS_DIR/<slug>/ 에 저장.
+        # Mac 워커는 OneDrive 안 book-capture/books/<slug>/ 로 처리 — 백엔드 books_dir 와 워커 book_dir 가 다름.
+        # 해결: 백엔드 books_dir 의 파일을 워커가 SCP/sync 또는 직접 접근.
+        # 가장 단순: 워커가 백엔드 books_dir 에서 직접 처리.
+        # 다만 worker 가 NAS books_dir 에 직접 접근 못 함 (다른 머신).
+        # 대안: 백엔드 → worker 로 파일 전송 endpoint, 또는 OneDrive 동기화 활용.
+        # 가장 빠른 길: 사용자 업로드를 NAS 정적 폴더에 저장하고,
+        # worker 가 직접 OCR/요약/HTML 처리 (이미 만들어진 도구 그대로 사용).
+        # → 다만 책 폴더가 NAS 안에 있어야 — Mac 워커가 NAS SMB 또는 비슷한 방법으로 접근.
+        # 일단 단순화: 백엔드에서 처리 (워커가 백엔드 안에서 실행되거나, 백엔드가 ocr/summarize/merge/build 직접).
+        # 현재 워커는 Mac local 이라 직접 처리는 OneDrive 동기화 폴더에서만 가능.
+        # → upload-process 는 일단 book-capture/books/<slug>/ 에 미리 파일 있다고 가정.
         steps = [
-            ["capture-auto", "--slug", slug, "--count", "300", "--interval", "2"],
+            ["ocr", "--book-dir", str(book_dir)],
+            ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
+            ["merge", "--book-dir", str(book_dir)],
+            ["build", "--book-dir", str(book_dir)],
+        ]
+    elif mode == "capture-only":
+        # 하이브리드(#67): 캡처만 워커가 하고, PNG 를 백엔드로 업로드 →
+        # 백엔드가 upload-process 로 OCR/요약/빌드. 원격(Windows) 에 최적.
+        cap = ["capture-auto", "--slug", slug, "--count", "300", "--interval", "2"]
+        sale_id = job.get("salecmdtid") or _lookup_salecmdtid(bridge, slug)
+        if sale_id:
+            cap += ["--book-id", sale_id]
+        # 시작 페이지(job.pages 가 숫자면) — N>1 이면 그 번호부터 이어서 캡처
+        _sp = str(job.get("pages") or "").strip()
+        if _sp.isdigit() and int(_sp) > 1:
+            cap += ["--start-page", _sp]
+        steps = [
+            cap,
+            ["upload", "--slug", slug, "--title", (job.get("title") or slug)],
+        ]
+    elif mode == "auto-web":
+        # Phase #47: e-library 통과 → wviewer 캡처 (화면 점유 X)
+        print(f"[worker] 🌐 mode=auto-web 분기 진입")
+        salecmdtid = job.get("salecmdtid")
+        if salecmdtid:
+            print(f"[worker] ✓ job 안에 salecmdtid 있음: {salecmdtid}")
+        else:
+            print(f"[worker] 📖 job 에 salecmdtid 없음 → books 테이블 조회 (slug={slug})")
+            salecmdtid = _lookup_salecmdtid(bridge, slug)
+            print(f"[worker] 조회 결과: salecmdtid={salecmdtid!r}")
+        if not salecmdtid:
+            msg = f"auto-web 모드인데 salecmdtid 없음 (slug={slug}). books 테이블에 등록됐는지 확인."
+            print(f"[worker] {msg}")
+            report(bridge, jid, status="failed", error=msg)
+            return
+        steps = [
+            ["wviewer", "capture-lib",
+             "--salecmdtid", salecmdtid,
+             "--slug", slug,
+             "--out-dir", str(book_dir),
+             "--max-pages", "300", "--delay", "1.5"],
+            ["ocr", "--book-dir", str(book_dir)],
+            ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
+            ["merge", "--book-dir", str(book_dir)],
+            ["build", "--book-dir", str(book_dir)],
+        ]
+    else:  # auto = capture + ocr + summarize + merge + build (5단계, 로컬 매크로)
+        print(f"[worker] 🖥 mode={mode!r} (로컬 매크로 분기) — capture-auto 실행 예정")
+        # #68 재검증 — 30장 임시
+        cap = ["capture-auto", "--slug", slug, "--count", "30", "--interval", "1.5"]
+        # salecmdtid 가 있으면 deep link 책 자동 열기 (kyoboebook://book/<id>)
+        sale_id = job.get("salecmdtid") or _lookup_salecmdtid(bridge, slug)
+        if sale_id:
+            print(f"[worker] ✓ salecmdtid={sale_id} → deep link 책 자동 열기 시도")
+            cap += ["--book-id", sale_id]
+        else:
+            print(f"[worker] ⚠ salecmdtid 없음 — 사용자가 책 직접 펼친 상태 가정")
+        steps = [
+            cap,
             ["ocr", "--book-dir", str(book_dir)],
             ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
             ["merge", "--book-dir", str(book_dir)],
             ["build", "--book-dir", str(book_dir)],
         ]
 
+    print(f"[worker] 📋 실행할 steps ({len(steps)}개):")
+    for idx, s in enumerate(steps, 1):
+        print(f"[worker]   {idx}. {' '.join(map(str, s))}")
     stdout_buf: list[str] = []
     n = len(steps)
     last_report_ts = 0.0
@@ -177,6 +290,8 @@ def run_one(bridge: str, job: dict) -> None:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",       # 자식이 UTF-8 로 출력(cp949 콘솔 무관)
+                errors="replace",
                 bufsize=1,
             )
             assert proc.stdout
@@ -242,27 +357,196 @@ def run_one(bridge: str, job: dict) -> None:
     print(f"[worker] ✓ job #{jid} 완료")
 
 
+_PING_META: dict | None = None
+
+def _ping_meta() -> dict:
+    """첫 호출 시만 계산. hostname/platform 은 변하지 않음."""
+    global _PING_META
+    if _PING_META is None:
+        import socket, platform as _pf
+        try:
+            hn = socket.gethostname()
+        except Exception:
+            hn = ''
+        s = _pf.system().lower()
+        plat = 'mac' if s == 'darwin' else 'windows' if s.startswith('win') else 'linux' if s == 'linux' else s
+        _PING_META = {"hostname": hn, "platform": plat, "version": _local_version()}
+    return _PING_META
+
+
+def _app_window_title() -> str:
+    """Windows 면 교보 앱 창 제목(열린 책 확인용). 그 외엔 빈 문자열."""
+    try:
+        import platform as _pf
+        if _pf.system() == "Windows":
+            from . import win_app
+            return win_app.get_app_window_title()
+    except Exception:
+        pass
+    return ""
+
+
 def ping(bridge: str) -> None:
     try:
-        _http("POST", f"{bridge}/api/worker/ping", body={}, timeout=3.0)
+        body = dict(_ping_meta())
+        body["app_title"] = _app_window_title()   # 동적(열린 책에 따라 변함)
+        _http("POST", f"{bridge}/api/worker/ping", body=body, timeout=3.0)
     except Exception:
         pass  # silent — heartbeat 실패해도 worker 자체는 계속
 
 
+def _fail_current_job(bridge: str, reason: str) -> None:
+    """종료 신호를 받았을 때, 처리 중이던 job 이 아직 running 이면 failed 로 정리.
+
+    이렇게 안 하면 워커가 죽은 자리에 job 이 'running' 으로 박제돼
+    (어제 #51 처럼) 큐가 막힌다. 백엔드 reaper 가 결국 회수하지만,
+    graceful 종료 땐 즉시 표시되도록 워커가 먼저 알린다.
+    """
+    if _CURRENT_JID is None:
+        return
+    try:
+        r = _http("GET", f"{bridge}/api/jobs/{_CURRENT_JID}", timeout=3.0)
+        st = (r.get("job") or {}).get("status")
+        if st in ("running", "cancelling"):
+            report(bridge, _CURRENT_JID, status="failed", error=reason)
+            print(f"[worker] ⚠ job #{_CURRENT_JID} → failed ({reason})")
+    except Exception as e:
+        print(f"[worker] 종료 중 job 정리 실패: {e}")
+
+
+def _start_caffeinate():
+    """job 실행 동안만 macOS 절전(유휴 시스템 슬립)을 막는다.
+
+    어제 #51 좀비의 원인 후보가 Mac 슬립이었다. job 단위로만 켜고
+    끝나면 바로 끄므로 평소 전력엔 영향 없다.
+      -i 유휴 시스템 슬립 방지 · -m 디스크 슬립 방지 · -s AC 전원 시 슬립 방지
+      -w <pid> 워커가 죽으면 caffeinate 도 따라 종료(orphan 방지 안전망)
+    macOS 가 아니거나 caffeinate 가 없으면 조용히 무시.
+    """
+    import os
+    import shutil
+    caf = shutil.which("caffeinate")
+    if not caf:
+        return None
+    try:
+        return subprocess.Popen(
+            [caf, "-i", "-m", "-s", "-w", str(os.getpid())],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except Exception as e:
+        print(f"[worker] caffeinate 시작 실패(무시): {e}")
+        return None
+
+
+def _stop_caffeinate(proc) -> None:
+    if proc is None:
+        return
+    try:
+        proc.terminate()
+        proc.wait(timeout=3)
+    except Exception:
+        try: proc.kill()
+        except Exception: pass
+
+
+# ── 자동 업데이트 ────────────────────────────────────────────
+_LAST_UPDATE_CHECK = 0.0
+_UPDATE_INTERVAL = 300.0   # 5분마다 서버 버전 확인
+
+
+def _static_base(bridge: str) -> str:
+    """정적 사이트(zip·버전 파일) base 를 bridge(api) 로부터 추론."""
+    if "192.168.10.205" in bridge:
+        return "http://192.168.10.205:8080"
+    if "redcodeme" in bridge:
+        return "https://redcodeme.synology.me/kyobo"
+    return "http://192.168.10.205:8080"
+
+
+def _local_version() -> str:
+    try:
+        from pathlib import Path as _P
+        p = _P(__file__).parent / "_version.txt"
+        return p.read_text(encoding="utf-8").strip() if p.exists() else ""
+    except Exception:
+        return ""
+
+
+def _maybe_self_update(bridge: str) -> None:
+    """서버 버전이 다르면 워커 코드 자동 다운로드·교체 후 재시작.
+    재시작은 os._exit → Task Scheduler(Win)/launchd(Mac) KeepAlive 가 되살림.
+    job 사이(idle)에서만 호출되므로 진행 중 작업을 끊지 않는다."""
+    global _LAST_UPDATE_CHECK
+    import os as _os, io as _io, zipfile as _zip
+    now = time.monotonic()
+    if (now - _LAST_UPDATE_CHECK) < _UPDATE_INTERVAL:
+        return
+    _LAST_UPDATE_CHECK = now
+    lv = _local_version()
+    if not lv:
+        return  # 버전 파일 없는 구버전 — 다음 수동 설치 때 생성됨
+    static = _static_base(bridge)
+    try:
+        with urllib.request.urlopen(f"{static}/install/worker-version.txt", timeout=8) as r:
+            sv = r.read().decode("utf-8").strip()
+    except Exception:
+        return
+    if not sv or sv == lv:
+        return
+    print(f"[worker] 🔄 새 버전 감지: {lv} → {sv} — 코드 갱신(워커는 계속 실행)")
+    try:
+        from pathlib import Path as _P
+        bc_dir = _P(__file__).parent.parent  # book-capture/
+        with urllib.request.urlopen(f"{static}/install/bookcapture.zip?t={sv}", timeout=60) as r:
+            data = r.read()
+        with _zip.ZipFile(_io.BytesIO(data)) as z:
+            z.extractall(str(bc_dir))
+        # ⚠️ 워커를 종료하지 않는다. capture-auto/ocr/upload 는 매번 새 subprocess 라
+        #    디스크의 새 코드를 즉시 사용. worker.py 자체 변경만 다음 재시작 때 반영.
+        #    (os._exit 로 재시작하면 Windows 작업스케줄러가 정상종료=재시작안함 → 워커 죽음)
+        print("[worker] ✓ 코드 갱신 완료 — 다음 작업부터 새 코드 적용 (재시작 없음)")
+    except Exception as e:
+        print(f"[worker] 자동 업데이트 실패(다음 주기 재시도): {e}")
+
+
 def run_worker(bridge: str | None = None, interval: float = 2.0) -> int:
+    global _CURRENT_JID
     bridge = (bridge or DEFAULT_BRIDGE_URL).rstrip("/")
-    print(f"[worker] 시작 · bridge={bridge} · {interval}s polling")
+    print(f"[worker] 시작 · bridge={bridge} · {interval}s polling · v={_local_version() or '?'}")
     print(f"[worker] Ctrl+C 로 종료")
+
+    # launchctl 이 보내는 SIGTERM 에도 in-flight job 을 정리하고 나간다.
+    import signal
+
+    def _on_term(signum, frame):
+        print(f"\n[worker] 종료 신호({signum}) 수신 — 정리 후 종료")
+        _fail_current_job(bridge, f"워커 종료(signal {signum})로 중단됨")
+        raise SystemExit(0)
+
+    try:
+        signal.signal(signal.SIGTERM, _on_term)
+    except Exception:
+        pass  # 일부 환경(비메인 스레드 등)에서는 등록 불가 — 백엔드 reaper 가 커버
+
     while True:
         try:
             ping(bridge)
             job = claim_one(bridge)
             if job:
-                run_one(bridge, job)
+                caf = _start_caffeinate()   # job 도는 동안만 절전 차단
+                if caf:
+                    print(f"[worker] ☕ caffeinate ON (job #{job.get('id')} 동안 슬립 차단)")
+                try:
+                    run_one(bridge, job)
+                finally:
+                    _stop_caffeinate(caf)    # 모든 종료 경로에서 해제
+                _CURRENT_JID = None   # 정상 종료된 job — 더는 우리 책임 아님
             else:
+                _maybe_self_update(bridge)   # idle 일 때만 자동 업데이트 확인
                 time.sleep(interval)
-        except KeyboardInterrupt:
-            print("\n[worker] 사용자 종료")
+        except (KeyboardInterrupt, SystemExit):
+            print("\n[worker] 사용자/시스템 종료")
+            _fail_current_job(bridge, "워커 종료(Ctrl+C)로 중단됨")
             return 0
         except Exception as e:
             print(f"[worker] loop 오류: {e}")

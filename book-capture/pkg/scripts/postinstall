@@ -1,0 +1,66 @@
+#!/bin/bash
+# .pkg postinstall — KyoboLibrary worker 자동 설치
+# 실행 컨텍스트: root 권한.
+# 진짜 작업(venv·plist·launchd) 은 사용자 컨텍스트에서 install-worker-macos.sh 가 처리.
+# 이 스크립트는 단지 "콘솔 사용자 찾기 + OneDrive 안 스크립트 찾기 + 그 사용자로 실행".
+
+set -e
+
+LOG="/tmp/kyobo-postinstall.log"
+exec > >(tee -a "$LOG") 2>&1
+
+echo "==========================="
+echo "KyoboLibrary postinstall"
+echo "$(date)"
+echo "==========================="
+
+# 1) 콘솔 사용자 (실제 GUI 로그인 사용자)
+CONSOLE_USER=$(stat -f "%Su" /dev/console)
+if [[ -z "$CONSOLE_USER" || "$CONSOLE_USER" == "root" ]]; then
+    osascript -e 'display alert "KyoboLibrary 설치 실패" message "콘솔 사용자를 확인할 수 없습니다. 데스크탑 로그인 상태에서 다시 시도하세요." as critical' 2>/dev/null || true
+    echo "✗ console user 미확인"; exit 1
+fi
+USER_HOME=$(dscl . -read /Users/"$CONSOLE_USER" NFSHomeDirectory | awk '{print $2}')
+echo "▶ 콘솔 사용자: $CONSOLE_USER (home: $USER_HOME)"
+
+# 2) OneDrive 안 install-worker-macos.sh 검색
+INSTALLER=""
+CANDIDATES=(
+    "$USER_HOME/Library/CloudStorage/OneDrive-개인/Claude/NAS/KyoboLibrary/book-capture/scripts/install-worker-macos.sh"
+    "$USER_HOME/Library/CloudStorage/OneDrive-Personal/Claude/NAS/KyoboLibrary/book-capture/scripts/install-worker-macos.sh"
+    "$USER_HOME/OneDrive/Claude/NAS/KyoboLibrary/book-capture/scripts/install-worker-macos.sh"
+    "$USER_HOME/OneDrive - Personal/Claude/NAS/KyoboLibrary/book-capture/scripts/install-worker-macos.sh"
+)
+for c in "${CANDIDATES[@]}"; do
+    if [[ -f "$c" ]]; then INSTALLER="$c"; break; fi
+done
+
+if [[ -z "$INSTALLER" ]]; then
+    osascript -e 'display alert "KyoboLibrary 설치 실패" message "OneDrive 안의 NAS/KyoboLibrary 폴더를 찾지 못했어요. OneDrive 동기화가 완료된 후 다시 시도해주세요." as critical' 2>/dev/null || true
+    echo "✗ install-worker-macos.sh 미발견"
+    for c in "${CANDIDATES[@]}"; do echo "    시도: $c"; done
+    exit 1
+fi
+echo "▶ installer: $INSTALLER"
+
+# 3) 실행권 보장 (OneDrive rsync 후 권한 손실 가능)
+chmod +x "$INSTALLER" 2>/dev/null || true
+
+# 4) 사용자 권한으로 install-worker-macos.sh 실행
+echo "▶ 사용자 권한으로 인스톨러 실행"
+sudo -u "$CONSOLE_USER" -H bash -c "
+    export HOME='$USER_HOME'
+    export PATH='/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
+    '$INSTALLER'
+"
+RC=$?
+
+if [[ $RC -ne 0 ]]; then
+    osascript -e "display alert \"KyoboLibrary 설치 부분 실패\" message \"인스톨러가 코드 $RC 로 종료. 로그: /tmp/kyobo-postinstall.log\" as critical" 2>/dev/null || true
+    exit $RC
+fi
+
+# 5) 성공 알림
+osascript -e 'display notification "워커가 백그라운드에서 시작됐어요. 메인 페이지에서 [📊 분석 시작] 가능합니다." with title "KyoboLibrary 설치 완료"' 2>/dev/null || true
+echo "✓ 완료"
+exit 0

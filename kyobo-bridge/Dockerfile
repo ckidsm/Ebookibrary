@@ -8,9 +8,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# 시스템 패키지 (httpx HTTP/2 등 일부 의존성)
+# 시스템 패키지: curl(헬스체크) + tesseract(업로드 처리 OCR · 한국어/영어)
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl ca-certificates \
+ && apt-get install -y --no-install-recommends \
+      curl ca-certificates \
+      tesseract-ocr tesseract-ocr-kor tesseract-ocr-eng \
  && rm -rf /var/lib/apt/lists/*
 
 # 의존성 먼저 (캐시)

@@ -10,7 +10,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -19,6 +19,8 @@ from .db import (
     clear_books, count_books, init_db, list_books, upsert_books,
     get_all_settings, get_setting, set_all_settings,
     create_job, list_jobs, get_job, claim_next_job, update_job, cancel_job,
+    reap_stale_jobs,
+    upsert_worker_client, get_worker_client_by_ip, list_worker_clients,
 )
 
 import ipaddress
@@ -38,7 +40,11 @@ def _is_lan(client_ip: str) -> bool:
         return False
 
 log = logging.getLogger("kyobo-bridge")
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%H:%M:%S',
+)
 
 
 @asynccontextmanager
@@ -46,7 +52,11 @@ async def lifespan(app: FastAPI):
     log.info("Kyobo Bridge starting · version=%s", __version__)
     init_db()
     log.info("DB ready · books=%d", count_books())
+    # 업로드(upload-process) 백엔드 처리기 — 멀티 OS (#67)
+    from .upload_processor import start_processor, stop_processor
+    start_processor()
     yield
+    stop_processor()
     log.info("Kyobo Bridge shutdown")
 
 
@@ -248,20 +258,50 @@ def put_settings(payload: SettingsUpdate) -> dict:
 # ── Worker heartbeat (Phase C-3 Part3 보강) ─────────────────
 _worker_last_seen: dict[str, float] = {}  # ip → timestamp
 
+class WorkerPing(BaseModel):
+    hostname: str | None = None
+    platform: str | None = None  # "mac" | "windows" | "linux"
+    version: str | None = None   # 워커 코드 버전(_version.txt)
+    app_title: str | None = None # 교보 앱 창 제목(열린 책 확인용)
+
+
+_last_worker_version: str | None = None  # 최근 ping 한 워커의 버전
+_last_app_title: str | None = None       # 최근 ping 한 워커가 본 교보 창 제목
+
+
+def _read_server_version() -> str:
+    """배포된 워커 최신 버전(install/worker-version.txt). 컨테이너의 ro 마운트에서 읽음."""
+    for p in ("/mnt/library/install/worker-version.txt",):
+        try:
+            with open(p, encoding="utf-8") as f:
+                return f.read().strip()
+        except Exception:
+            pass
+    return ""
+
+
 @app.post("/api/worker/ping")
-def worker_ping(request: Request) -> dict:
-    """worker 가 polling 마다 호출. 프론트가 /api/worker/status 로 확인."""
+def worker_ping(request: Request, body: WorkerPing | None = None) -> dict:
+    """worker 가 polling 마다 호출. hostname/platform 도 받아 worker_clients 에 영구 기록."""
     client = request.client.host if request.client else "unknown"
     if not _is_lan(client):
         raise HTTPException(403, "LAN 전용")
     import time as _t
+    global _last_worker_version, _last_app_title
     _worker_last_seen[client] = _t.time()
+    hostname = (body.hostname if body else None) or ''
+    platform = body.platform if body else None
+    if body and body.version:
+        _last_worker_version = body.version
+    if body is not None:
+        _last_app_title = body.app_title or ""   # 매 ping 갱신(책 바뀌면 반영)
+    upsert_worker_client(client, hostname=hostname, platform=platform)
     return {"ok": True, "client": client}
 
 
 @app.get("/api/worker/status")
-def worker_status() -> dict:
-    """가장 최근 ping 으로부터 N초 이내면 alive."""
+def worker_status(request: Request) -> dict:
+    """alive 여부 + (요청자 IP 와 매칭되는) 전에 본 워커 정보."""
     import time as _t
     now = _t.time()
     alive = False
@@ -269,14 +309,43 @@ def worker_status() -> dict:
     last_ago = None
     for ip, ts in _worker_last_seen.items():
         ago = now - ts
-        if ago < 30:  # 30초 이내 ping = alive
+        if ago < 30:
             alive = True
             if last_ago is None or ago < last_ago:
                 last_ago = ago; last_ip = ip
+
+    # 요청자 IP 로 워커 등록 이력 매칭 — 같은 LAN/NAT 출구 IP 의 사용자에게
+    # "전에 본 워커가 있다" 안내 가능. 외부 사용자도 OK (자기 hostname 의 워커만 매칭).
+    requester_ip = request.client.host if request.client else None
+    known = None
+    if requester_ip:
+        row = get_worker_client_by_ip(requester_ip)
+        if row:
+            # last_seen → 몇 분 전인지 계산
+            from datetime import datetime as _dt
+            try:
+                ls = _dt.strptime(row['last_seen'], '%Y-%m-%d %H:%M:%S')
+                ago_sec = (_dt.utcnow() - ls).total_seconds()
+            except Exception:
+                ago_sec = None
+            known = {
+                "hostname": row['hostname'] or None,
+                "platform": row['platform'],
+                "ping_count": row['ping_count'],
+                "last_seen_ago_sec": round(ago_sec, 1) if ago_sec is not None else None,
+            }
+    server_ver = _read_server_version()
+    wv = _last_worker_version
     return {
         "alive": alive,
         "worker_ip": last_ip,
         "last_ping_ago_sec": round(last_ago, 1) if last_ago is not None else None,
+        "previously_seen": bool(known),
+        "known": known,
+        "worker_version": wv,
+        "server_version": server_ver or None,
+        "up_to_date": bool(wv and server_ver and wv == server_ver),
+        "app_title": _last_app_title or None,
     }
 
 
@@ -284,8 +353,9 @@ def worker_status() -> dict:
 class JobCreate(BaseModel):
     slug: str
     title: str | None = None
-    mode: str = "auto"          # auto | capture-only | summarize-only
+    mode: str = "auto"          # auto | auto-web | capture-only | summarize-only
     pages: str | None = None    # "127-155"
+    salecmdtid: str | None = None  # auto-web 모드에서 worker 가 사용
 
 class JobPatch(BaseModel):
     status: str | None = None
@@ -294,23 +364,188 @@ class JobPatch(BaseModel):
     error: str | None = None
 
 
+# ── 파일 업로드 (#67 Phase) ─────────────────────────
+@app.post("/api/books/{slug}/upload")
+async def upload_book_pages(
+    slug: str,
+    files: list[UploadFile] = File(...),
+    title: str | None = Form(default=None),
+) -> dict:
+    """사용자가 본인 OS 도구로 캡처한 PNG/JPG 다수 업로드.
+    저장 위치: <LIBRARY_BOOKS_DIR>/<slug>/page_NNN.png
+    저장 후 mode='upload-process' job 자동 등록 → worker 가 OCR + AI 요약 + HTML.
+    """
+    import os as _os
+    import shutil as _sh
+    from pathlib import Path as _Path
+
+    if not slug.strip():
+        raise HTTPException(400, "slug 필수")
+    if not files:
+        raise HTTPException(400, "files 필수")
+
+    root = _Path(_os.environ.get("LIBRARY_BOOKS_DIR", "/mnt/library/books"))
+    # 컨테이너 안에서 ro 마운트일 수 있어 별도 쓰기 경로 시도
+    write_root = _Path(_os.environ.get("LIBRARY_BOOKS_WRITE_DIR", str(root)))
+    book_dir = write_root / slug.strip()
+    book_dir.mkdir(parents=True, exist_ok=True)
+
+    # 새 분석 = 깨끗이 새로: 기존 page 이미지·썸네일·요약 산출물 제거(잔여 페이지 섞임 방지).
+    # (업로드는 책 1권 전체 캡처를 통째로 올리는 것이므로 항상 새로 시작)
+    cleared = 0
+    for _ext in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
+        for _p in book_dir.glob(_ext):
+            try: _p.unlink(); cleared += 1
+            except Exception: pass
+    for _sub in ("thumbs", "summary"):
+        _d = book_dir / _sub
+        if _d.exists():
+            try: _sh.rmtree(_d)
+            except Exception: pass
+    log.info("📤 업로드 전 정리: slug=%s 기존 %d장 + thumbs/summary 삭제", slug, cleared)
+
+    # 정렬 — 사용자가 보낸 순서 보존, 단 파일명에서 숫자 추출해 정렬 시도
+    import re as _re
+    def _natural_key(f: UploadFile):
+        name = f.filename or ""
+        m = _re.search(r'(\d+)', name)
+        return (int(m.group(1)) if m else 999999, name)
+    sorted_files = sorted(files, key=_natural_key)
+
+    saved = []
+    for i, up in enumerate(sorted_files, 1):
+        # 이미지 형식 검사
+        ctype = (up.content_type or "").lower()
+        if not (ctype.startswith("image/") or (up.filename or "").lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))):
+            continue
+        # 저장 확장자 — 원본 유지
+        ext = ".png"
+        if (up.filename or "").lower().endswith((".jpg", ".jpeg")): ext = ".jpg"
+        elif (up.filename or "").lower().endswith(".webp"): ext = ".webp"
+        dst = book_dir / f"page_{i:03d}{ext}"
+        with dst.open("wb") as fp:
+            _sh.copyfileobj(up.file, fp)
+        saved.append({"index": i, "name": dst.name, "size": dst.stat().st_size, "orig": up.filename})
+
+    log.info("📤 업로드 완료: slug=%s files=%d dir=%s", slug, len(saved), book_dir)
+
+    # 자동으로 job 등록 (mode=upload-process: capture 스킵, ocr부터)
+    job = create_job(slug=slug.strip(), title=title, mode="upload-process", pages=None)
+    log.info("✓ upload-process job 생성: #%s", job["id"])
+
+    return {
+        "ok": True,
+        "slug": slug,
+        "uploaded": len(saved),
+        "files": saved,
+        "book_dir": str(book_dir),
+        "job": job,
+    }
+
+
+def _parse_ua(ua: str) -> tuple[str, str]:
+    """User-Agent → (os, browser) 대략 판별 (외부 의존성 없음)."""
+    import re as _re
+    u = ua or ""
+    if "Windows NT 10" in u or "Windows NT 11" in u:
+        os_ = "Windows 10/11"
+    elif "Windows NT" in u:
+        os_ = "Windows"
+    elif "Mac OS X" in u or "Macintosh" in u:
+        m = _re.search(r"Mac OS X (\d+[_.]\d+)", u)
+        os_ = "macOS " + (m.group(1).replace("_", ".") if m else "")
+    elif "iPhone" in u or "iPad" in u:
+        os_ = "iOS/iPadOS"
+    elif "Android" in u:
+        os_ = "Android"
+    elif "Linux" in u:
+        os_ = "Linux"
+    else:
+        os_ = "unknown"
+    if "Edg/" in u:
+        br = "Edge"
+    elif "OPR/" in u or "Opera" in u:
+        br = "Opera"
+    elif "Chrome/" in u and "Chromium" not in u:
+        br = "Chrome"
+    elif "Firefox/" in u:
+        br = "Firefox"
+    elif "Safari/" in u and "Chrome" not in u:
+        br = "Safari"
+    else:
+        br = "unknown"
+    return os_, br
+
+
+def _best_effort_mac(ip: str) -> str | None:
+    """LAN IP 면 컨테이너 ARP 테이블에서 MAC 조회 시도.
+
+    Docker bridge 라 클라이언트가 게이트웨이 IP 로 보이면 못 잡는다 → None.
+    그래도 host-net/일부 경로에서 잡힐 수 있어 best-effort 로 시도.
+    """
+    import re as _re
+    if not ip or not _re.match(r"^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)", ip):
+        return None
+    try:
+        with open("/proc/net/arp") as f:
+            for line in f.readlines()[1:]:
+                p = line.split()
+                if len(p) >= 4 and p[0] == ip and p[3] != "00:00:00:00:00:00":
+                    return p[3]
+    except Exception:
+        pass
+    return None
+
+
+def _client_info(request: Request) -> dict:
+    """분석을 시작한 웹 클라이언트의 접속 정보 수집."""
+    h = request.headers
+    xff = h.get("x-forwarded-for", "")
+    peer = request.client.host if request.client else ""
+    real_ip = (xff.split(",")[0].strip() if xff else "") or h.get("x-real-ip", "") or peer
+    ua = h.get("user-agent", "")
+    os_, br = _parse_ua(ua)
+    return {
+        "ip": real_ip,                 # 추정 실제 클라이언트 IP (XFF 우선)
+        "peer_ip": peer,               # 직접 소켓 상대 (Docker 면 게이트웨이일 수 있음)
+        "x_forwarded_for": xff,
+        "os": os_,
+        "browser": br,
+        "lang": h.get("accept-language", "").split(",")[0],
+        "mac": _best_effort_mac(real_ip),   # 대개 None (HTTP 로는 MAC 수집 불가)
+        "user_agent": ua[:300],
+    }
+
+
 @app.post("/api/jobs", status_code=status.HTTP_201_CREATED)
-def post_job(payload: JobCreate) -> dict:
+def post_job(payload: JobCreate, request: Request) -> dict:
+    import json as _j
+    ci = _client_info(request)
+    log.info("🆕 POST /api/jobs slug=%r mode=%r ▸ 접속: os=%s browser=%s ip=%s peer=%s mac=%s lang=%s",
+             payload.slug, payload.mode, ci["os"], ci["browser"],
+             ci["ip"], ci["peer_ip"], ci["mac"], ci["lang"])
+    log.info("   └ UA=%r", ci["user_agent"])
     if not payload.slug.strip():
+        log.warning("✗ POST /api/jobs 400 — slug 빈 값")
         raise HTTPException(400, "slug 필수")
     job = create_job(
         slug=payload.slug.strip(),
         title=payload.title,
         mode=payload.mode,
         pages=payload.pages,
+        client_info=_j.dumps(ci, ensure_ascii=False),
     )
-    log.info("job created: #%s slug=%s mode=%s", job["id"], job["slug"], job["mode"])
+    log.info("✓ job 생성: #%s slug=%s mode=%s status=%s ▸ 시작 OS=%s/%s",
+             job["id"], job["slug"], job["mode"], job["status"], ci["os"], ci["browser"])
     return {"job": job}
 
 
 @app.get("/api/jobs")
 def get_jobs(status_: str | None = None, limit: int = 50) -> dict:
     # FastAPI 가 ?status= 으로 받기 위해 query 파라미터 이름 매핑
+    # 좀비(heartbeat 끊긴 running) 회수 — UI 가 살아있는 잡으로 오인하지 않도록
+    for j in reap_stale_jobs():
+        log.warning("☠ stale job #%s 자동 failed (heartbeat 끊김) slug=%s", j["id"], j.get("slug"))
     return {"jobs": list_jobs(status=status_, limit=limit)}
 
 
@@ -328,10 +563,15 @@ def claim_next(request: Request) -> dict:
     client = request.client.host if request.client else ""
     if not _is_lan(client):
         raise HTTPException(403, f"LAN 전용 (요청 IP: {client})")
+    # 워커가 2s 마다 호출 → 좀비 회수의 주 트리거. claim 전에 정리해서
+    # 죽은 잡이 큐를 막거나 같은 책 중복 running 으로 남지 않게 한다.
+    for j in reap_stale_jobs():
+        log.warning("☠ stale job #%s 자동 failed (heartbeat 끊김) slug=%s", j["id"], j.get("slug"))
     job = claim_next_job()
     if not job:
         return {"job": None}
-    log.info("job claimed: #%s by %s", job["id"], client)
+    log.info("👷 job claimed: #%s slug=%s mode=%s by %s",
+             job["id"], job["slug"], job.get("mode"), client)
     return {"job": job}
 
 
@@ -344,6 +584,19 @@ def patch_job(jid: int, payload: JobPatch, request: Request) -> dict:
     job = update_job(jid, **fields)
     if not job:
         raise HTTPException(404, f"job #{jid} 없음")
+    # progress·status 변경 시 로그 (verbose)
+    log_msg = f"📊 job #{jid} update"
+    if "status" in fields: log_msg += f" status={fields['status']}"
+    if "error" in fields: log_msg += f" error={fields['error'][:100]!r}"
+    if "progress" in fields:
+        prog = fields["progress"]
+        try:
+            import json as _j
+            pg = _j.loads(prog) if isinstance(prog, str) else prog
+            log_msg += f" progress[{pg.get('stage_name')}]={pg.get('pct')}% {pg.get('msg','')[:60]}"
+        except Exception:
+            log_msg += f" progress={str(prog)[:80]}"
+    log.info(log_msg)
     return {"job": job}
 
 

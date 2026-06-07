@@ -39,17 +39,26 @@ class KyoboAppScreenshot:
 
         self.system = platform.system()
 
+    # 교보eBook deep link URL scheme (Info.plist 의 CFBundleURLSchemes 에서 확인)
+    KYOBO_URL_SCHEME = "kyoboebook"
+    KYOBO_BUNDLE_ID = "kr.co.kyobobook.iPadB2C"
+
     def is_app_running(self):
-        """교보문고 ebook 앱이 실행 중인지 확인"""
+        """교보eBook 앱 본체가 실행 중인지 확인.
+        Notifications helper(.appex) 만으로는 False 반환 — 본체 필수.
+        """
         if self.system == "Darwin":  # macOS
             try:
-                # 교보문고 앱은 iPadB2C 프로세스로 실행됨
+                # pgrep -fl 로 전체 명령행 확인, Notifications 제외
                 result = subprocess.run(
-                    ["pgrep", "-f", "iPadB2C"],
-                    capture_output=True,
-                    text=True
+                    ["pgrep", "-fl", "iPadB2C"],
+                    capture_output=True, text=True,
                 )
-                return result.returncode == 0
+                if result.returncode != 0:
+                    return False
+                lines = [l for l in (result.stdout or '').strip().split('\n') if l]
+                main_only = [l for l in lines if 'Notifications' not in l and 'PlugIns' not in l]
+                return len(main_only) > 0
             except Exception:
                 return False
         elif self.system == "Windows":
@@ -64,23 +73,88 @@ class KyoboAppScreenshot:
                 return False
         return False
 
-    def launch_app(self):
-        """교보문고 ebook 앱 실행 (이미 실행 중이면 스킵)"""
-        # 이미 실행 중인지 확인
-        if self.is_app_running():
-            print("✓ 교보문고 ebook 앱이 이미 실행 중입니다.")
+    def has_app_window(self):
+        """교보eBook 의 사용 가능한 큰 창이 있는지 확인 (Quartz).
+        본체는 떠있지만 창이 hide 된 상태도 False 반환.
+        """
+        return self._find_kyobo_window_id() is not None
+
+    def open_deep_link(self, url):
+        """Deep link 호출 (`kyoboebook://...`).
+        창 hide 상태에서 새 창 띄우거나 책 열기 시도.
+        Returns: True 호출 성공 (앱 응답 여부는 별도).
+        """
+        if self.system != "Darwin":
+            return False
+        try:
+            subprocess.run(["open", url], check=False, timeout=5)
             return True
+        except subprocess.TimeoutExpired:
+            return False
+        except Exception:
+            return False
 
-        print("📱 교보문고 ebook 앱 실행 중...")
+    def open_book_by_id(self, sale_cmdt_id):
+        """salecmdtid 로 책 자동 열기 (Deep link 패턴 best-effort).
+        교보eBook 앱이 책 deep link 받으면 그 책 viewer 열림.
+        URL 패턴은 교보가 내부 정의 — 흔한 후보 순차 시도.
+        Returns: True 호출했음 (성공 보장 X), False 아예 못 시도.
+        """
+        if self.system != "Darwin" or not sale_cmdt_id:
+            return False
+        # 흔한 deep link URL 패턴 후보 — 가장 표준적인 것부터
+        candidates = [
+            f"{self.KYOBO_URL_SCHEME}://book/{sale_cmdt_id}",
+            f"{self.KYOBO_URL_SCHEME}://open/{sale_cmdt_id}",
+            f"{self.KYOBO_URL_SCHEME}://view/{sale_cmdt_id}",
+            f"{self.KYOBO_URL_SCHEME}://ebook/{sale_cmdt_id}",
+            f"{self.KYOBO_URL_SCHEME}://detail/{sale_cmdt_id}",
+        ]
+        for url in candidates:
+            self.open_deep_link(url)
+            time.sleep(1.5)
+            if self.has_app_window():
+                print(f"   ✓ Deep link 책 열기 성공: {url}")
+                return True
+        # 후보 모두 실패 — 단순 앱 activate 라도
+        self.open_deep_link(f"{self.KYOBO_URL_SCHEME}://")
+        return False
 
+    def launch_app(self, deep_link_first=True):
+        """교보eBook 앱 launch + activate.
+        Quartz CGWindowList 의 창 확인은 best-effort (System Events 와 불일치 가능).
+        무조건 True 반환 — 진짜 캡처 실패는 capture_app_window 의 폴백으로 처리.
+        """
         if self.system == "Darwin":  # macOS
-            app_path = "/Applications/교보eBook.app"
-            if not os.path.exists(app_path):
-                print(f"❌ 앱을 찾을 수 없습니다: {app_path}")
-                return False
+            # 본체 + 큰 창 다 있으면 deep link / open -a 안 함
+            if self.is_app_running() and self.has_app_window():
+                print("✓ 교보eBook 앱이 정상 실행 중 (창 있음)")
+                return True
 
-            subprocess.run(["open", app_path], check=True)
-            print("✓ 앱 실행 완료 (macOS)")
+            print("📱 교보eBook 앱 실행 / activate 시도...")
+
+            # Deep link (창 hide 복구 효과 있을 수 있음)
+            if deep_link_first:
+                self.open_deep_link(f"{self.KYOBO_URL_SCHEME}://")
+                time.sleep(2)
+
+            # open -a (이미 떠있으면 activate, 아니면 launch)
+            app_path = "/Applications/교보eBook.app"
+            if os.path.exists(app_path):
+                subprocess.run(["open", app_path], check=False)
+                # 짧은 대기 — fresh launch 면 7초, 이미 떠있으면 즉시 OK
+                wait_s = 7 if not self.is_app_running() else 2
+                print(f"✓ open -a 호출 — {wait_s}초 대기")
+                time.sleep(wait_s)
+            else:
+                print(f"⚠ 앱 경로 없음: {app_path}")
+
+            # 창 확인은 안내용 (실패해도 진행)
+            if self.has_app_window():
+                print("✓ 창 확보 (Quartz 확인됨)")
+            else:
+                print("ℹ Quartz 창 확인 X — capture_app_window 가 폴백 캡처로 진행")
+            return True  # 무조건 진행 (창 hide 정책 우회)
 
         elif self.system == "Windows":
             # Windows의 일반적인 설치 경로들
@@ -246,15 +320,24 @@ class KyoboAppScreenshot:
                 print("⚠️  pyautogui가 필요합니다: pip install pyautogui")
 
     def activate_app(self):
-        """교보문고 앱을 활성화(포커스)"""
+        """교보eBook 앱 활성화 (포커스).
+        iPadB2C 프로세스가 없어도 crash 하지 않고 silent fail.
+        """
         if self.system == "Darwin":
             script = '''
             tell application "System Events"
-                set appName to name of first application process whose name contains "iPadB2C"
-                set frontmost of application process appName to true
+                set procs to (every application process whose name contains "iPadB2C")
+                if (count of procs) > 0 then
+                    set frontmost of item 1 of procs to true
+                end if
             end tell
             '''
-            subprocess.run(["osascript", "-e", script], check=True)
+            try:
+                subprocess.run(["osascript", "-e", script],
+                               check=False, timeout=5,
+                               capture_output=True)
+            except subprocess.TimeoutExpired:
+                pass
             time.sleep(0.5)
 
     def get_current_book_title(self):
@@ -497,35 +580,179 @@ class KyoboAppScreenshot:
 
         return None
 
+    def _find_kyobo_window_id(self, retries=3, retry_delay=0.7, debug=False):
+        """Quartz CGWindowList 로 교보eBook 메인 창의 WindowID 찾기.
+        frontmost / 디스플레이 / Space 무관. retry + 2-tier fallback.
+        Returns: int WID, 또는 못 찾으면 None.
+        """
+        if self.system != "Darwin":
+            return None
+        try:
+            import Quartz  # type: ignore
+        except ImportError:
+            return None
+
+        # macOS OnScreenOnly 옵션이 onScreen=True 인 창을 가끔 누락하는 버그/이슈가 있음
+        # → 1차 OnScreenOnly (정확) → 2차 OptionAll + onScreen 필드 필터 (확실한 우회)
+        opt_passes = [
+            ('OnScreenOnly',
+             Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements,
+             False),  # 추가 onScreen 필터 X (OnScreenOnly 가 이미 함)
+            ('OptionAll',
+             Quartz.kCGWindowListOptionAll | Quartz.kCGWindowListExcludeDesktopElements,
+             True),   # onScreen=True 필드 명시 필터 (stale 캐시 제외)
+        ]
+        for pass_label, opts, require_onscreen in opt_passes:
+            for attempt in range(retries):
+                cands = []
+                for w in Quartz.CGWindowListCopyWindowInfo(opts, Quartz.kCGNullWindowID):
+                    owner = w.get('kCGWindowOwnerName', '') or ''
+                    if '교보' not in owner and 'iPadB2C' not in owner:
+                        continue
+                    if w.get('kCGWindowLayer', 99) != 0:
+                        continue
+                    if require_onscreen and not w.get('kCGWindowIsOnscreen', False):
+                        continue
+                    b = w.get('kCGWindowBounds', {})
+                    if int(b.get('Width', 0)) < 800 or int(b.get('Height', 0)) < 500:
+                        continue
+                    cands.append(w)
+                if debug:
+                    print(f"   [DEBUG] pass={pass_label} attempt={attempt+1} cands={len(cands)}")
+                if cands:
+                    main = max(cands,
+                               key=lambda x: x['kCGWindowBounds']['Width']
+                                             * x['kCGWindowBounds']['Height'])
+                    return int(main['kCGWindowNumber'])
+                if attempt < retries - 1:
+                    time.sleep(retry_delay)
+        return None
+
+    def _get_bounds_via_system_events(self):
+        """System Events 로 교보eBook 창 좌표 가져옴.
+        Quartz CGWindowList 가 못 잡을 때 폴백 (실제 검증: System Events 는 잡음).
+        Returns: (x, y, w, h) 또는 None.
+        """
+        if self.system != "Darwin":
+            return None
+        script = '''
+        tell application "System Events"
+            try
+                set p to first process whose name contains "iPadB2C"
+                if (count of windows of p) > 0 then
+                    set pos to position of window 1 of p
+                    set sz to size of window 1 of p
+                    return ((item 1 of pos) as string) & "," & ((item 2 of pos) as string) & "," & ((item 1 of sz) as string) & "," & ((item 2 of sz) as string)
+                end if
+            end try
+            return ""
+        end tell
+        '''
+        try:
+            result = subprocess.run(
+                ['osascript', '-e', script],
+                capture_output=True, text=True, timeout=5,
+            )
+            out = (result.stdout or '').strip()
+            if out and ',' in out:
+                parts = out.split(',')
+                if len(parts) == 4:
+                    x, y, w, h = (int(p) for p in parts)
+                    if w >= 500 and h >= 300:  # 의미 있는 크기
+                        return x, y, w, h
+        except Exception:
+            pass
+        return None
+
+    def _find_kyobo_window_bounds(self):
+        """Quartz 로 교보eBook 창의 좌표 (x, y, w, h) 반환.
+        screencapture -R 영역 캡처 폴백 용도. 못 찾으면 None.
+        """
+        if self.system != "Darwin":
+            return None
+        try:
+            import Quartz  # type: ignore
+        except ImportError:
+            return None
+        opts = (Quartz.kCGWindowListOptionAll
+                | Quartz.kCGWindowListExcludeDesktopElements)
+        cands = []
+        for w in Quartz.CGWindowListCopyWindowInfo(opts, Quartz.kCGNullWindowID):
+            owner = w.get('kCGWindowOwnerName', '') or ''
+            if '교보' not in owner and 'iPadB2C' not in owner:
+                continue
+            if w.get('kCGWindowLayer', 99) != 0:
+                continue
+            b = w.get('kCGWindowBounds', {})
+            if int(b.get('Width', 0)) < 800 or int(b.get('Height', 0)) < 500:
+                continue
+            cands.append(w)
+        if not cands:
+            return None
+        main = max(cands,
+                   key=lambda x: x['kCGWindowBounds']['Width']
+                                 * x['kCGWindowBounds']['Height'])
+        b = main['kCGWindowBounds']
+        return int(b['X']), int(b['Y']), int(b['Width']), int(b['Height'])
+
     def capture_app_window(self, filepath):
-        """교보문고 앱 윈도우만 캡처 (macOS)"""
+        """교보eBook 앱 창만 캡처 (Quartz WID + screencapture -l).
+        외장 모니터·다른 Space 도 OK. frontmost 무관.
+        """
         if self.system == "Darwin":
-            # 앱 활성화
+            # 1. 앱 활성화 (캡처는 frontmost 무관이지만, 직후 키 입력을 위해 활성화 유지)
             self.activate_app()
+            time.sleep(0.5)  # activate 완전 반영 대기 — Quartz 검색 신뢰성 ↑
 
-            # AppleScript로 앱 윈도우 캡처
-            script = f'''
-            tell application "System Events"
-                set appName to name of first application process whose name contains "iPadB2C"
-                set frontmost of application process appName to true
-            end tell
+            # 2. Quartz 로 창 WID 찾기 → screencapture -l 로 정밀 캡처 (최선)
+            wid = self._find_kyobo_window_id()
+            if wid:
+                try:
+                    subprocess.run([
+                        "/usr/sbin/screencapture", "-l", str(wid),
+                        "-x", "-o", "-t", "png", str(filepath),
+                    ], check=True)
+                    if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
+                        return True
+                except subprocess.CalledProcessError as e:
+                    print(f"⚠️  WID({wid}) 캡처 실패: {e}")
 
-            delay 0.3
+            # 3. 폴백 1 — Quartz 좌표 + screencapture -R 영역 캡처
+            bounds = self._find_kyobo_window_bounds()
+            source = "Quartz"
 
-            do shell script "screencapture -o -l$(osascript -e 'tell app \\"System Events\\" to get id of window 1 of application process \\"iPadB2C\\"') {filepath}"
-            '''
+            # 4. 폴백 2 — System Events 좌표 (Quartz 못 잡을 때도 SE 는 잡음)
+            if not bounds:
+                bounds = self._get_bounds_via_system_events()
+                source = "SystemEvents"
+
+            if bounds:
+                x, y, w, h = bounds
+                # macOS 표준 타이틀바 (빨강/노랑/초록 + 제목) ~28px 자동 크롭
+                TITLE_BAR_H = 28
+                if h > TITLE_BAR_H + 200:  # 의미 있는 책 영역 남도록 sanity check
+                    y += TITLE_BAR_H
+                    h -= TITLE_BAR_H
+                print(f"   ℹ {source} 영역 캡처(타이틀바 -{TITLE_BAR_H}px): ({x},{y}) {w}x{h}")
+                try:
+                    subprocess.run([
+                        "/usr/sbin/screencapture", "-R", f"{x},{y},{w},{h}",
+                        "-x", "-t", "png", str(filepath),
+                    ], check=True)
+                    if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
+                        return True
+                except subprocess.CalledProcessError as e:
+                    print(f"⚠️  영역 캡처 실패: {e}")
+
+            # 5. 폴백 3 — 전체 화면 (메인 디스플레이). 메뉴바·다른 창 포함 가능.
+            print("⚠️  WID/영역 다 실패 → 전체 화면 폴백")
             try:
-                subprocess.run(["osascript", "-e", script], check=True)
-                return True
-            except:
-                # 실패하면 전체 화면 캡처로 폴백
-                print("⚠️  윈도우 캡처 실패, 전체 화면 캡처로 전환...")
                 subprocess.run([
-                    "screencapture",
-                    "-x",
-                    str(filepath)
+                    "/usr/sbin/screencapture", "-x", "-t", "png", str(filepath)
                 ], check=True)
                 return True
+            except subprocess.CalledProcessError:
+                return False
         else:
             # Windows
             try:
@@ -588,8 +815,12 @@ class KyoboAppScreenshot:
                 print("   전체 화면 모드에서 좌하단 페이지 정보가 보여야 합니다!")
 
             if noninteractive:
-                print("📚 비대화형 모드: 도서가 이미 열려있다고 가정. 3초 후 시작...")
-                time.sleep(3)
+                # 권한 다이얼로그 / 알림 등 floating UI 닫을 시간 충분히 확보
+                print("📚 비대화형 모드: 10초 후 캡처 시작 — 권한 다이얼로그/알림 다 닫으세요")
+                for i in range(10, 0, -1):
+                    print(f"   ⏳ {i}초 남음...", end='\r', flush=True)
+                    time.sleep(1)
+                print("                                       ")  # 한 줄 비우기
             else:
                 input(f"📚 도서를 열고 시작 페이지로 이동한 후 엔터를 누르세요...")
             print("\n⏳ 앱을 활성화하는 중...")
@@ -598,30 +829,15 @@ class KyoboAppScreenshot:
             self.activate_app()
             time.sleep(1)
 
-            # 전체 화면 확인
+            # 전체 화면 확인 — Phase #68 (WID 캡처) 이후엔 fullscreen 불필요·역효과
+            # (fullscreen 시 Quartz CGWindowList 에서 일반 창 목록 빠짐 → 검색 실패)
             if not self.is_fullscreen():
-                print("\n⚠️  경고: 교보문고 앱이 전체 화면 모드가 아닙니다!")
                 if use_ocr:
-                    print("      OCR 모드에서는 전체 화면 필수입니다!")
+                    print("ℹ️  OCR 사용 — 좌하단 페이지 정보가 보이는 큰 창 상태 권장")
                 else:
-                    print("      윈도우 창 자체가 캡처될 수 있습니다.")
-                if noninteractive:
-                    print("🖥️  비대화형 모드: 자동으로 전체 화면 전환 시도...")
-                    if self.set_fullscreen(True):
-                        print("✅ 전체 화면으로 전환되었습니다.")
-                    else:
-                        print("⚠️  전체 화면 전환 실패 — 현재 상태로 계속 진행")
-                else:
-                    user_input = input("전체 화면으로 전환하시겠습니까? (y/n, 기본값=y): ").strip().lower()
-                    if user_input != 'n':
-                        print("🖥️  전체 화면으로 전환 중...")
-                        if self.set_fullscreen(True):
-                            print("✅ 전체 화면으로 전환되었습니다.")
-                        else:
-                            print("❌ 전체 화면 전환에 실패했습니다. 수동으로 전환해주세요.")
-                            input("전체 화면으로 전환 후 엔터를 누르세요...")
+                    print("ℹ️  창 상태로 진행 (WID 캡처는 창 영역만 정밀 캡처)")
             else:
-                print("✅ 전체 화면 모드 확인 완료")
+                print("ℹ️  fullscreen 모드 — WID 캡처 안 잡힐 수 있음 → ESC 로 일반 창 모드 권장")
 
             print("\n⏳ 3초 후 캡처를 시작합니다...")
             time.sleep(3)

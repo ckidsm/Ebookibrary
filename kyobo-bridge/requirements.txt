@@ -1,3 +1,7 @@
 fastapi==0.115.5
 uvicorn[standard]==0.34.0
 httpx==0.27.2
+python-multipart==0.0.20
+# 업로드 처리(#67): OCR 이미지 처리. tesseract 바이너리는 Dockerfile apt 로 설치.
+Pillow==11.0.0
+pytesseract==0.3.13

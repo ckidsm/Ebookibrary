@@ -15,8 +15,8 @@
 # 옛 가이드·구버전 스크립트 (보존만, NAS에 안 보냄)
 /_archive/
 
-# 설계·기획 문서 (NAS에 안 보냄)
-/docs/
+# 설계·기획 문서 — 내부용만 제외 (가이드는 배포 OK)
+/docs/PHASE_B_PROPOSAL.md
 /install-img/README.md
 
 # 백엔드는 별도 컨테이너로 빌드·배포 — 정적 rsync에는 안 보냄
@@ -31,13 +31,12 @@
 **/verification_report.json
 **/verification_report.md
 **/batch_*.json
-**/pages_data.json
-**/chapters_data.json
 **/*.py
 **/__pycache__/
-**/thumbs/
 **/*.BAK
 **/*.bak
+# pages_data.json / chapters_data.json — analyzed endpoint 페이지 카운트용 (NAS 동기화 허용)
+# thumbs/ — UI 의 페이지별 미리보기 (NAS 동기화 허용)
 
 # 시스템·임시
 .DS_Store

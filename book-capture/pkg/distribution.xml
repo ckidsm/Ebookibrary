@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="1">
+    <title>KyoboLibrary Worker</title>
+    <organization>com.kyobolibrary</organization>
+    <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
+    <options customize="never" require-scripts="true" rootVolumeOnly="true" hostArchitectures="x86_64,arm64"/>
+
+    <welcome    file="welcome.html"    mime-type="text/html"/>
+    <conclusion file="conclusion.html" mime-type="text/html"/>
+
+    <choices-outline>
+        <line choice="default">
+            <line choice="worker"/>
+        </line>
+    </choices-outline>
+
+    <choice id="default"/>
+    <choice id="worker" title="KyoboLibrary Worker" description="백그라운드 워커 자동 등록 (launchd KeepAlive)">
+        <pkg-ref id="com.kyobolibrary.worker"/>
+    </choice>
+
+    <pkg-ref id="com.kyobolibrary.worker" version="1.0.0" onConclusion="none">install-worker-component.pkg</pkg-ref>
+</installer-gui-script>

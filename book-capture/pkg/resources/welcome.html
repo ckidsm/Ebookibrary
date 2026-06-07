@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><style>
+:root { color-scheme: light dark; }
+html, body { background: transparent; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    padding: 16px; line-height: 1.55;
+}
+h2 { margin-top: 0; color: #10b981; font-weight: 700; }
+ul { padding-left: 20px; }
+li { margin-bottom: 6px; }
+code {
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    padding: 1px 6px; border-radius: 4px;
+    font-family: ui-monospace, SF Mono, Menlo, monospace;
+    font-size: 0.92em;
+}
+.note {
+    background: color-mix(in srgb, #f59e0b 15%, transparent);
+    border-left: 3px solid #f59e0b;
+    padding: 10px 14px; margin: 12px 0;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+strong { font-weight: 700; }
+</style></head><body>
+<h2>📚 KyoboLibrary Worker 설치</h2>
+<p>이 인스톨러는 다음을 자동으로 처리합니다:</p>
+<ul>
+  <li>OneDrive 안의 <code>NAS/KyoboLibrary/book-capture</code> 자동 탐색</li>
+  <li>Python 가상환경 생성 (Pillow, pytesseract)</li>
+  <li>Homebrew 있으면 tesseract OCR 자동 설치</li>
+  <li>macOS launchd 등록 — Mac 부팅/로그인 시 워커 자동 시작</li>
+  <li>즉시 백그라운드 시작</li>
+</ul>
+<div class="note">
+설치 후 메인 페이지에서 도서 카드 → <strong>[📊 분석 시작]</strong> 누르면 워커가 자동으로 잡아 처리합니다.<br>
+정지·제거: <code>~/.../book-capture/scripts/uninstall-worker-macos.sh</code>
+</div>
+<p>[계속] 을 눌러 진행하세요.</p>
+</body></html>

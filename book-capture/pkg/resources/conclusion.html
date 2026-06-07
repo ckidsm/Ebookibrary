@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><style>
+:root { color-scheme: light dark; }
+html, body { background: transparent; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    padding: 16px; line-height: 1.55;
+}
+h2 { margin-top: 0; color: #10b981; font-weight: 700; }
+h3 { margin-top: 18px; margin-bottom: 6px; font-size: 1em; }
+ul { padding-left: 20px; }
+li { margin-bottom: 6px; }
+code {
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    padding: 1px 6px; border-radius: 4px;
+    font-family: ui-monospace, SF Mono, Menlo, monospace;
+    font-size: 0.9em;
+}
+.ok {
+    background: color-mix(in srgb, #10b981 18%, transparent);
+    border-left: 3px solid #10b981;
+    padding: 12px 16px; margin: 12px 0;
+    border-radius: 4px;
+}
+strong { font-weight: 700; }
+</style></head><body>
+<h2>✓ 설치 완료</h2>
+<div class="ok">
+KyoboLibrary 워커가 백그라운드에서 동작 중입니다.<br>
+Mac 재부팅/로그인 시에도 자동 시작됩니다.
+</div>
+<h3>다음 단계</h3>
+<ul>
+  <li>메인 페이지(KyoboLibrary) 새로고침</li>
+  <li>도서 카드 클릭 → <strong>[📊 분석 시작]</strong></li>
+  <li>워커가 자동으로 잡아서 처리 (캡처 → OCR → AI 요약 → HTML)</li>
+</ul>
+<h3>나중에 제거</h3>
+<p><code>~/.../book-capture/scripts/uninstall-worker-macos.sh</code></p>
+<p>설치 로그: <code>/tmp/kyobo-postinstall.log</code></p>
+</body></html>

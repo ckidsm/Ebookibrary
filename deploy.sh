@@ -131,6 +131,9 @@ ssh -o StrictHostKeyChecking=no "$NAS_HOST" \
     "mkdir -p $COMPOSE_DIR $BRIDGE_DATA_PATH"
 scp -O -o StrictHostKeyChecking=no docker-compose.yml \
     "$NAS_HOST:$COMPOSE_DIR/docker-compose.yml"
+# nginx 커스텀 conf (책 HTML/JSON no-cache) — compose 가 ./ 로 마운트
+scp -O -o StrictHostKeyChecking=no nginx-default.conf \
+    "$NAS_HOST:$COMPOSE_DIR/nginx-default.conf"
 ssh "$NAS_HOST" bash <<EOF
 set -euo pipefail
 cd $COMPOSE_DIR
