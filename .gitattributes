@@ -1,0 +1,18 @@
+# Windows 배치파일은 CRLF 유지 — LF 면 cmd.exe 가 파싱 실패함
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# PowerShell: LF 허용 (BOM 은 파일 내용이라 git eol 과 무관)
+*.ps1 text
+
+# 셸 스크립트는 LF
+*.sh text eol=lf
+
+# 바이너리 (eol 변환 금지)
+*.zip binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.pkg binary
+*.exe binary
