@@ -1399,7 +1399,12 @@
                         <li>각 페이지를 <b>스크린샷</b>으로 찍으세요${isIOS ? ' (전원+볼륨↑ 동시)' : ''}. 페이지 넘기며 필요한 만큼.</li>
                         <li>아래 <b>[분석 시작]</b> → <b>찍은 스크린샷들을 업로드</b> → 서버가 OCR·요약·HTML 처리.</li>
                     </ol>
-                    <div class="cg-warn">⚠️ ${isIOS ? 'iPad/아이폰' : '이 기기'}는 iOS 보안(샌드박스)으로 <b>앱 자동 열기·자동 캡처가 불가</b>합니다. Mac/Windows만 자동 캡처가 되고, 모바일은 <b>스크린샷 → 업로드</b> 방식만 됩니다.</div>
+                    <div style="margin-top:10px;padding:9px 11px;border-radius:6px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-size:0.78rem;line-height:1.65;">
+                        💡 <b>준자동 꿀팁</b> — iOS <b>단축어</b>로 「1초마다 자동 스크린샷 N회」를 만들면 버튼 안 눌러도 됩니다.<br>
+                        ① 교보 앱에서 <b>화면 탭해 툴바 숨기기</b>(본문만) → ② 단축어 실행 → ③ <b>1초에 한 번씩 페이지만 넘기기</b> → ④ 사진앱 스샷들을 여기 업로드.<br>
+                        <span style="color:#94a3b8;">(참고: joons.pe.kr/527 — "스크린샷 반복" 단축어)</span>
+                    </div>
+                    <div class="cg-warn">⚠️ ${isIOS ? 'iPad/아이폰' : '이 기기'}는 iOS 보안(샌드박스)으로 <b>앱 자동 열기·완전 자동 캡처가 불가</b>합니다(페이지 넘김은 수동). Mac/Windows만 페이지넘김까지 자동.</div>
                 </div>` : (isWin ? `
                 <div class="capture-guide">
                     <div class="cg-title">📋 분석 절차 — 순서대로 (Windows 로컬 캡처)</div>
