@@ -95,6 +95,44 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_worker_clients_last_seen
                 ON worker_clients(last_seen);
+
+            -- 차량 정비/주행 기록 (portal '내 차 정보' DB 관리, 추후 조회용)
+            CREATE TABLE IF NOT EXISTS car_log (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                category    TEXT NOT NULL,        -- odometer | oil_change | consumable
+                event_date  TEXT,                 -- YYYY-MM-DD
+                odo_km      INTEGER,              -- 주행거리(km)
+                item        TEXT,                 -- 소모품명 등
+                value       TEXT,                 -- 비고/수치
+                created_at  TEXT DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_car_log_cat ON car_log(category, event_date);
+
+            -- 관리자/접근 이벤트 로그 (모니터링용)
+            CREATE TABLE IF NOT EXISTS admin_log (
+                id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts      TEXT DEFAULT (datetime('now','localtime')),
+                user    TEXT,
+                action  TEXT,          -- login | logout | code_change | car_view | car_auth_fail ...
+                detail  TEXT,
+                ip      TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_admin_log_id ON admin_log(id DESC);
+
+            -- 전체 접속 로그 (모든 페이지 beacon) — 누가/언제/어디서/무엇을
+            CREATE TABLE IF NOT EXISTS access_log (
+                id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts      TEXT DEFAULT (datetime('now','localtime')),
+                ip      TEXT,
+                page    TEXT,
+                os      TEXT,
+                browser TEXT,
+                device  TEXT,          -- PC | 모바일
+                mac     TEXT,
+                lan     INTEGER,
+                ua      TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_access_log_id ON access_log(id DESC);
             """
         )
         # 기존 books/jobs 테이블에 신규 컬럼 멱등 추가 (Phase #47, heartbeat)
@@ -116,6 +154,77 @@ def init_db() -> None:
             cur.execute("CREATE INDEX IF NOT EXISTS idx_books_salecmdtid ON books(salecmdtid)")
         except Exception:
             pass
+
+
+# ── 차량 정비/주행 기록 ─────────────────────────────────────
+def car_log_add(category: str, event_date: str | None = None,
+                odo_km: int | None = None, item: str | None = None,
+                value: str | None = None) -> dict:
+    with cursor() as cur:
+        cur.execute(
+            "INSERT INTO car_log(category, event_date, odo_km, item, value) VALUES(?,?,?,?,?)",
+            (category, event_date, odo_km, item, value),
+        )
+        row = cur.execute("SELECT * FROM car_log WHERE id = ?", (cur.lastrowid,)).fetchone()
+        return dict(row) if row else {}
+
+
+def car_log_list(category: str | None = None, limit: int = 500) -> list[dict]:
+    with cursor() as cur:
+        if category:
+            rows = cur.execute(
+                "SELECT * FROM car_log WHERE category = ? "
+                "ORDER BY COALESCE(event_date,'') DESC, id DESC LIMIT ?",
+                (category, limit),
+            ).fetchall()
+        else:
+            rows = cur.execute(
+                "SELECT * FROM car_log ORDER BY COALESCE(event_date,'') DESC, id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def car_log_delete(rec_id: int) -> bool:
+    with cursor() as cur:
+        cur.execute("DELETE FROM car_log WHERE id = ?", (rec_id,))
+        return cur.rowcount > 0
+
+
+def admin_log_add(user: str, action: str, detail: str = "", ip: str = "") -> None:
+    try:
+        with cursor() as cur:
+            cur.execute("INSERT INTO admin_log(user, action, detail, ip) VALUES(?,?,?,?)",
+                        (user or "", action, detail, ip))
+    except Exception:
+        pass
+
+
+def admin_log_list(limit: int = 100) -> list[dict]:
+    with cursor() as cur:
+        rows = cur.execute("SELECT * FROM admin_log ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def access_log_add(ip, page, os_, browser, device, mac, lan, ua) -> None:
+    try:
+        with cursor() as cur:
+            cur.execute(
+                "INSERT INTO access_log(ip,page,os,browser,device,mac,lan,ua) "
+                "VALUES(?,?,?,?,?,?,?,?)",
+                (ip or "", (page or "")[:200], os_, browser, device, mac or "",
+                 1 if lan else 0, (ua or "")[:300]))
+            # 최근 5000건만 유지
+            cur.execute("DELETE FROM access_log WHERE id < "
+                        "(SELECT MAX(id) FROM access_log) - 5000")
+    except Exception:
+        pass
+
+
+def access_log_list(limit: int = 200) -> list[dict]:
+    with cursor() as cur:
+        rows = cur.execute("SELECT * FROM access_log ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
 
 
 def upsert_worker_client(client_ip: str, hostname: str | None = None, platform: str | None = None) -> dict:
@@ -291,6 +400,18 @@ def update_job(jid: int, **fields) -> dict | None:
     with cursor() as cur:
         cur.execute(f"UPDATE jobs SET {', '.join(cols)} WHERE id = ?", vals)
     return get_job(jid)
+
+
+def touch_heartbeat(jid: int) -> None:
+    """장시간 단일 호출(OCR/요약 등) 중에도 heartbeat 를 살려 watchdog 회수를 막는다.
+    running 상태일 때만 갱신(끝난 잡은 건드리지 않음)."""
+    try:
+        with cursor() as cur:
+            cur.execute(
+                "UPDATE jobs SET heartbeat = datetime('now') "
+                "WHERE id = ? AND status = 'running'", (jid,))
+    except Exception:
+        pass
 
 
 def cancel_job(jid: int) -> dict | None:

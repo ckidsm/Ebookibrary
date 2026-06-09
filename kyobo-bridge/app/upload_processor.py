@@ -70,6 +70,15 @@ def process_upload_job(job: dict) -> None:
     N = 4  # ocr, summarize, merge, build (capture 는 업로드라 스킵)
     log.info("📥 upload-process job #%s 시작 slug=%s dir=%s", jid, slug, book_dir)
 
+    # 장시간 OCR/요약(단일 호출, 수~수십 분) 동안 60초마다 heartbeat 갱신 →
+    # 600s watchdog(reap_stale_jobs)이 진행 중인 잡을 죽이지 않도록.
+    _hb_stop = threading.Event()
+    def _hb_keeper():
+        while not _hb_stop.wait(60):
+            db.touch_heartbeat(jid)
+    _hbt = threading.Thread(target=_hb_keeper, name=f"hb-{jid}", daemon=True)
+    _hbt.start()
+
     try:
         pngs = sorted(book_dir.glob("*.png")) + sorted(book_dir.glob("*.jpg")) \
                + sorted(book_dir.glob("*.jpeg")) + sorted(book_dir.glob("*.webp"))
@@ -124,6 +133,8 @@ def process_upload_job(job: dict) -> None:
         tb = traceback.format_exc()
         log.error("✗ upload-process job #%s 실패: %s\n%s", jid, e, tb[-800:])
         db.update_job(jid, status="failed", error=f"{type(e).__name__}: {e}")
+    finally:
+        _hb_stop.set()
 
 
 _stop = threading.Event()
