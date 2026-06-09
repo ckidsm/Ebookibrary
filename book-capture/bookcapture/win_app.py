@@ -80,6 +80,29 @@ def _grab_frame(bbox, prefer_dxcam: bool = True):
     return ImageGrab.grab(bbox=bbox)
 
 
+def _content_crop(im):
+    """브라우저 웹뷰어 캡처에서 Chrome 크롬(탭·주소·북마크)·창 그림자·여백 제거
+    → 책 본문 글씨가 프레임을 꽉 채우게. (같은 페이지→결정적 같은 결과라 해시 끝감지 안정)
+    Windows 브라우저는 보통 F11 미적용(상단 ~100px 크롬)이라 상단 고정 크롭 후 bbox 트림."""
+    try:
+        W, H = im.size
+        im = im.crop((0, int(H * 0.11), W, H))                   # 상단 브라우저 크롬
+        W2, H2 = im.size
+        ex, ey = int(W2 * 0.035), int(H2 * 0.03)
+        im = im.crop((ex, ey, W2 - ex, H2 - ey))                 # 창 그림자/배경 비침
+        bw = im.convert("L").point(lambda p: 255 if p < 115 else 0)  # 어두운 글자만(워터마크 제외)
+        bbox = bw.getbbox()
+        if bbox:
+            pad = 18
+            l, t, r, b = bbox
+            im = im.crop((max(0, l - pad), max(0, t - pad),
+                          min(im.size[0], r + pad), min(im.size[1], b + pad)))
+        return im.convert("RGB")
+    except Exception as e:
+        print(f"[win] content-crop 실패(원본 유지): {e}", file=sys.stderr)
+        return im
+
+
 def is_installed() -> bool:
     return os.path.isfile(KYOBO_WIN_EXE)
 
@@ -316,6 +339,8 @@ class KyoboWinCapture:
                 break
             if img.mode != "RGB":
                 img = img.convert("RGB")
+            if no_crop:                      # 브라우저 웹뷰어 → 크롬·여백 제거(책 본문만)
+                img = _content_crop(img)
             h = hashlib.md5(img.tobytes()).hexdigest()
             if h == last_hash:
                 print(f"[win] 직전과 동일 화면 — 책 끝으로 보고 중단 (p.{n})")
