@@ -1004,3 +1004,9 @@ powershell -ExecutionPolicy Bypass -File .\install-worker-windows.ps1 -BridgeUrl
 - ✅ **(B) heartbeat watchdog 수정**(대용량 책이 OCR/요약 >600s 라 reap_stale_jobs에 죽던 것): `db.touch_heartbeat` + `upload_processor` 60s keeper 스레드. 컨테이너 cp 적용·동작확인(#95,#97 생존). **이미지 영구 재빌드는 #97 끝난 뒤**(실행 중 compose recreate 방지).
 - **검증**: Mac=비디오코덱(366p) capture-browser→OCR→요약 전권 성공($2.86). Windows=LLM(400p) 성공. 둘 다 dxcam/창ID + ArrowRight(확장키) + 천천히(anti-bot 회피).
 - **다음**: #97(LLM) 끝나면 (a) 요약에 chrome 노이즈 정도 확인 (b) 이미지 재빌드 (c) OpenCV 책 capture-browser.
+
+### 2026-06-09 (Mac 마무리 완료)
+- ✅ **#97(LLM 400p) 완료** — summary 743KB, chrome 노이즈 **0**(AI가 북마크바 무시, 책 내용만 요약: 트랜스포머·어텐션·토큰·임베딩 정상). → #2 오염패턴 불필요 재확인.
+- ✅ **비디오코덱(194장)·LLM(400장) 이미지 재크롭** — 컨테이너 내 `_content_crop`(상단11%+그림자+bbox) in-place 적용 + 썸네일 재생성 + summary HTML 이미지 URL `?v=2` 캐시버스트. 둘 다 크롬·여백 제거 확인. (Windows 캡처도 Mac 크롭 그대로 동작)
+- ✅ **이미지 재빌드 완료** — `deploy.sh --backend`. heartbeat(touch_heartbeat)·ffmpeg 이미지에 baking 확인. health 200.
+- **남은 것**: OpenCV 책 capture-browser(Windows, ~400p). 이젠 워커가 크롭(7573b5a) 자동 반영하니 깨끗하게 캡처됨.
