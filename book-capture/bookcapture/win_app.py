@@ -132,9 +132,15 @@ class KyoboWinCapture:
     # ── 앱 상태 ──────────────────────────────────────────────
     def is_app_running(self) -> bool:
         try:
-            out = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {_EXE_NAME}"],
-                                 capture_output=True, text=True, timeout=10)
-            return _EXE_NAME.lower() in out.stdout.lower()
+            # 한국어 Windows 에서 tasklist 는 CP949 출력 + PYTHONUTF8=1 이면 text=True 가
+            # UTF-8 로 디코드하다 한글 바이트(0xc1 등)에서 크래시 → 앱이 켜져 있어도 False 오판.
+            # → bytes 로 받고(/FO CSV /NH 로 한글 헤더 제거), errors='ignore' 로 디코드.
+            #   exe 이름은 ASCII 라 안전하게 매칭됨.
+            out = subprocess.run(
+                ["tasklist", "/FI", f"IMAGENAME eq {_EXE_NAME}", "/FO", "CSV", "/NH"],
+                capture_output=True, timeout=10)
+            txt = (out.stdout or b"").decode("utf-8", "ignore")
+            return _EXE_NAME.lower() in txt.lower()
         except Exception:
             return False
 
