@@ -1,3 +1,14 @@
+
+- 2026.06.08 [로그] access_log(전체 접속 비콘)·admin_log(보안이벤트) 테이블+API(`/api/track` 공개, `/api/admin/access-log·log` 관리자). _client_info 재사용(IP/OS/브라우저/MAC best-effort), 기기 PC/모바일 판별. 이미지 재빌드 영구반영.
+
+- 2026.06.08 [이미지/env] kyobo-bridge 이미지 재빌드(buildx amd64)로 car/admin 코드 영구 반영(그동안 docker cp 였음 — 재생성 위험 해소). client_secret 을 `/volume1/docker/kyobo-stack/.env`(OIDC_CLIENT_SECRET, 600, git제외) → compose env 주입. `_oidc_cfg` env>파일>DB. DB secret 빈값, /data 파일은 폴백 유지.
+
+- 2026.06.08 [admin SSO] Synology SSO Server(OIDC) 관리자 로그인 — `/api/admin/sso/login·callback·me·logout` + `/api/admin/car-code`(세션필요). well-known 5560 엔드포인트, client_id/secret/admin_users=settings, 세션 인메모리8h. CORS allow_credentials=True. main.py cp+restart.
+
+- 2026.06.08 [car API] `/api/car/profile` GET/POST(키필요, settings car_profile) 추가 + `_check_car_key` IP rate-limit(5분8회 429)·실패로깅. redcodeme-nas-portal 내차정보 민감데이터(차량번호·차대번호·할부) 백엔드 이전용. main.py cp+restart 배포.
+
+- 2026.06.08 [car API] kyobo-bridge 에 `car_log` 테이블 + `/api/car/log` GET/POST/DELETE 추가 (redcodeme-nas-portal portal '내 차 정보' 엔진오일 기록 DB 저장용). `CAR_API_KEY` 옵션 토큰(_check_car_key). docker cp+restart 배포(소스 db.py/main.py 갱신, 미커밋). 현재 키 미설정=개방.
+
 # Kyobo Library (정적 도서 라이브러리 + 교보 e-Library 연동 예정)
 
 교보문고에서 구매한 e-book을 페이지별 PNG → OCR → JSON → HTML 빌드 파이프라인으로
@@ -207,6 +218,14 @@ DSM의 docker가 PATH 밖이라 `/usr/local/bin/docker` 절대경로 사용
 ---
 
 ## 8. 작업 로그
+
+### 2026-06-09: iPad 인식 버그 + 팝업 z-index 수정
+
+- **버그1(핵심)**: iPadOS Safari UA 가 'Macintosh' 로 표기 → `isMac` 오인 → 로컬 매크로(macOS 전용)가 기본 선택돼 분석 시작 시 앱 안 열림·캡처 안 됨. → `isIOS = /iPhone|iPad|iPod/ || (Macintosh && maxTouchPoints>1)`, `isMac = Macintosh && !isIOS`. iPad → canMacro=false → 캡처 업로드 기본·Recommended + iPad 업로드 안내(스크린샷→업로드, 자동캡처 불가 명시).
+- **버그2(공통)**: `.confirm-bd/.confirm`(캡처-준비·confirm 다이얼로그) z-index 250/251 < 책모달(bmodal) 920/921 → 팝업이 책 모달 뒤로 숨음. → 950/951 로 상향.
+- iPad는 iOS 샌드박스로 앱 자동열기·자동캡처 불가(Mac/Win 만 로컬워커). 모바일은 스크린샷→업로드(openUploadFlow, bmodal-extra 주입이라 안 숨음).
+- 배포: /volume1/web/kyobo + docker(8080) scp.
+
 
 ### 2026-05-28: Phase A — 폴더 이동·인프라 정비
 

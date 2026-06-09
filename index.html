@@ -492,7 +492,7 @@
         /* 커스텀 confirm 다이얼로그 */
         .confirm-bd {
             display: none; position: fixed; inset: 0;
-            background: rgba(0,0,0,0.72); z-index: 250;
+            background: rgba(0,0,0,0.72); z-index: 950;
         }
         .confirm-bd.open { display: block; }
         .confirm {
@@ -501,7 +501,7 @@
             width: 92%; max-width: 480px;
             background: #0f172a; border: 1px solid #334155;
             border-radius: 10px; color: #e2e8f0;
-            z-index: 251; box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+            z-index: 951; box-shadow: 0 18px 60px rgba(0,0,0,0.55);
         }
         .confirm.open { display: block; }
         .confirm-head {
@@ -1357,10 +1357,12 @@
             // OS 인식: 로컬 매크로는 macOS·Windows 지원(앱 경로 고정). 그 외 OS 는 업로드만.
             const canWeb = !!book.can_web_view;
             const ua = navigator.userAgent;
-            const isMac = /Macintosh|Mac OS X/i.test(ua);
+            // iPad/iPadOS Safari 는 UA 에 'Macintosh' 로 표기됨 → 터치포인트로 구분(진짜 Mac=0, iPad>1)
+            const isIOS = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && (navigator.maxTouchPoints||0) > 1);
+            const isMac = (/Macintosh|Mac OS X/i.test(ua)) && !isIOS;
             const isWin = /Windows/i.test(ua);
-            const canMacro = isMac || isWin;
-            const osName = isMac ? 'macOS' : (isWin ? 'Windows' : '기타 OS');
+            const canMacro = isMac || isWin;   // 로컬 워커 자동 캡처는 Mac/Windows 만 (iOS 샌드박스 불가)
+            const osName = isIOS ? 'iPad/iOS' : (isMac ? 'macOS' : (isWin ? 'Windows' : '기타 OS'));
             const macOpt = canMacro
                 ? `<label class="capture-mode-opt" title="${isWin ? '교보 eLibrary 앱을 자동 설치·실행 후 화면 캡처 → NAS 백엔드가 OCR/요약/빌드 (Windows 하이브리드). 워커가 이 PC 에서 실행 중이어야 합니다.' : '교보eBook.app 자동 캡처 (macOS). 다중 모니터 권장: 책은 한 모니터, 분석 시작은 다른 모니터 브라우저에서.'}">
                         <input type="radio" name="cap-mode" value="${isWin ? 'capture-only' : 'auto'}" checked>
@@ -1386,7 +1388,16 @@
                 </div>
             `;
             // 분석 절차 안내(옵저버) — 로컬 매크로(캡처) 사용자가 순서대로 따라가도록.
-            const captureGuideHtml = !canMacro ? '' : (isWin ? `
+            const captureGuideHtml = !canMacro ? `
+                <div class="capture-guide">
+                    <div class="cg-title">📋 분석 절차 — ${isIOS ? 'iPad/iOS' : '모바일'} (캡처 업로드)</div>
+                    <ol class="cg-steps">
+                        <li>교보 eBook 앱(또는 위 <b>[e-book 보기]</b>)에서 <b>이 책을 직접 펼치세요</b>.</li>
+                        <li>각 페이지를 <b>스크린샷</b>으로 찍으세요${isIOS ? ' (전원+볼륨↑ 동시)' : ''}. 페이지 넘기며 필요한 만큼.</li>
+                        <li>아래 <b>[분석 시작]</b> → <b>찍은 스크린샷들을 업로드</b> → 서버가 OCR·요약·HTML 처리.</li>
+                    </ol>
+                    <div class="cg-warn">⚠️ ${isIOS ? 'iPad/아이폰' : '이 기기'}는 iOS 보안(샌드박스)으로 <b>앱 자동 열기·자동 캡처가 불가</b>합니다. Mac/Windows만 자동 캡처가 되고, 모바일은 <b>스크린샷 → 업로드</b> 방식만 됩니다.</div>
+                </div>` : (isWin ? `
                 <div class="capture-guide">
                     <div class="cg-title">📋 분석 절차 — 순서대로 (Windows 로컬 캡처)</div>
                     <ol class="cg-steps">
