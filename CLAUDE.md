@@ -958,3 +958,49 @@ powershell -ExecutionPolicy Bypass -File .\install-worker-windows.ps1 -BridgeUrl
 **배포·검증**
 - `./deploy.sh --backend` (buildx amd64 → load → compose up) 8080·9000 200.
 - reaper 라이브 테스트 OK, done job 은 미회수 확인. 워커 새 코드로 재시작(launchctl kickstart -k, PID 83011, ping 정상).
+
+---
+
+### 2026-06-09: Windows capture-browser end-to-end 검증 (→ Mac 인계 메모)
+
+**환경**: Windows 원격(host=yundeoksoo, 외부망 — LAN 192.168.10.205 미접근, SSH 22 미개방). 백엔드 외부 노출 `:9443`만 사용.
+
+**한 일**
+- `irm .../update-worker.ps1 | iex` 로 워커 `cfc3ceb8533b → 851be57ce586` 갱신, `up_to_date=true` 확인.
+- 책 "밑바닥부터 만들면서 배우는 LLM" (`kyobo_id=E000012061590`, 세바스찬 라시카) 분석: 사용자가 Chrome wviewer에 책 펼치고 웹 UI에서 분석 시작.
+  - job #96 (`capture-browser`) → done, **400p 캡처+업로드 OK** (dxcam/ArrowRight 동작)
+  - job #97 (`upload-process`) → OCR stage 1/4 끝(약 15분), summarize stage 2/4 진행 시작. 끝까지 가면 ~$4.4 예상.
+- OpenCV 책("C#과 파이썬을 활용한 OpenCV 4 프로그래밍") Chrome에 펼쳐둠 — LLM 끝나고 진행 예정.
+
+**캡처 PNG 검증 (위치: `%LOCALAPPDATA%\KyoboLibrary\book-capture\books\밑바닥부터_만들면서_배우는_LLM\`, 400장 avg 295KB)**
+- ✓ page_001(표지), 050/200(코드+한글 본문): 정상
+- △ page_036/129/259(빈+푸터 챕터명), 184/398/399(짧은 한 줄): 챕터 시작·끝 페이지로 정상 (푸터 챕터명 OCR 가능)
+- 🚨 **page_400 = 빈 회색 화면(책 끝 모달도 사라진 상태)** → 명확 노이즈. 외부에서 백엔드 폴더 접근 불가라 OCR 시작 전 못 지움.
+- ⚠️ **모든 400장 상단 ~100px에 Chrome UI(탭/주소창/북마크 바 "NAVER, Replit, GitHub, android, 기획, 서버, blazor, 개발, 교육, 자료, Component, cloud, 문서작성, ChatGPT, 모든 북마크")**가 박힘 — F11 전체화면 미적용. `is_contaminated_ocr` 패턴에 안 걸려 매 페이지 OCR/AI에 노이즈로 섞임.
+
+**Mac에서 수정 후보 (우선순위)**
+1. **dxcam 캡처 영역에 top crop 추가** (`book-capture/bookcapture/win_app.py` 또는 capture-browser 분기) — Chrome 상단 ~100-150px 크롭. 하단 푸터(챕터명)는 유지. `_WIN_CROP` 패턴 참고.
+2. **`is_contaminated_ocr` 패턴 보강** (`bookcapture/summarize.py` + `kyobo-bridge/app/processing/summarize.py` 둘 다) — "NAVER  Replit  GitHub" 연속 북마크 시그너처, "wviewer.kyobobook.co.kr" URL 등. 책 본문엔 절대 안 나타나는 지문만. 콘솔 패턴(`/Users/deoksooyun` 등)과 같은 자리에 추가.
+3. **"마지막 페이지입니다" 모달 자동 감지 → 캡처 중단 + 마지막 1장 폐기** — capture-browser 동일 해시 감지 외에 모달 시그너처(예: 특정 영역 회색 단색) 추가하면 page_400 자동 제외.
+4. **(선택) capture-browser 시작 전 Chrome F11 자동 전송** — 워커가 Chrome 포커스 후 F11 SendInput. 단, 사용자가 이미 풀스크린이면 토글로 풀스크린 해제되는 부작용 — 라이브 토글 체크 필요.
+
+**현재 진행 중 (Mac에서 결과 확인 필요)**
+- `#97 upload-process` 백그라운드 진행. 끝나면 `books/밑바닥부터_만들면서_배우는_LLM/summary/index.html` 생성, `/api/books/analyzed` 등록.
+- Mac에서 LAN/SSH로 직접 OCR txt(`<book>/summary/ocr_text/page_NNN.txt`) 확인 가능 — Windows에선 불가했음.
+- 결과 보면 (a) Chrome UI 텍스트가 AI 요약에 얼마나 들어갔는지 (b) page_400 요약이 노이즈인지 판단.
+
+**Windows 워커 상태**: alive, 851be57ce586, last_ping 정상. Mac에서 작업 중에도 Windows 워커는 계속 살아있어 `capture-only/capture-browser` 잡 가능. 멈추고 싶으면 `Stop-ScheduledTask -TaskName KyoboBookcaptureWorker`.
+
+**미해결 후속**
+- OpenCV 책 분석 — LLM 끝나고 동일 흐름(capture-browser, ~400p 예상)
+- 위 4개 수정 후보 코드 작업
+- (선택) `/api/books/<slug>/ocr/<page>` 같은 LAN-only debug endpoint — 외부망에서도 OCR 결과 확인 가능하게
+
+### 2026-06-09 (Mac 응답): Windows 인계 메모 4개 + 마무리 2개 반영
+- ✅ **#1 dxcam top crop** → `win_app._content_crop`(상단11% 크롬 + 가장자리 그림자 + 어두운 글자 bbox 트림). no_crop(브라우저) 경로에 적용. worker zip **7573b5a** 배포 → Windows 워커 자동 반영. Mac 스크립트(`scripts/mac_wviewer_capture.py`)도 동일.
+- ⚠️ **#2 is_contaminated_ocr 북마크 패턴 → 안 함**. 북마크바가 **책 본문과 같은 페이지**라 패턴 매칭 시 그 페이지(본문 포함) 전체가 스킵돼 본문 손실. #1 크롭이 근본 해법이라 불필요/해로움.
+- (#3 마지막페이지 모달 / #4 F11 자동 — 미적용. 크롭+동일해시중단으로 대부분 커버. page_400 같은 빈장은 크롭 후 OCR 빈텍스트로 약하게 걸러짐. 필요시 후속.)
+- ✅ **(A) 분석본 자동 서빙**: `/volume1/web/kyobo/books` → `/volume1/docker/web-apps/kyobo-library/books` **심링크**. 새 책 수동복사 불필요(이전엔 docker에만 생겨 외부 404). HTTP·비디오코덱 200 확인. (CLI는 summary 비어 원래 404)
+- ✅ **(B) heartbeat watchdog 수정**(대용량 책이 OCR/요약 >600s 라 reap_stale_jobs에 죽던 것): `db.touch_heartbeat` + `upload_processor` 60s keeper 스레드. 컨테이너 cp 적용·동작확인(#95,#97 생존). **이미지 영구 재빌드는 #97 끝난 뒤**(실행 중 compose recreate 방지).
+- **검증**: Mac=비디오코덱(366p) capture-browser→OCR→요약 전권 성공($2.86). Windows=LLM(400p) 성공. 둘 다 dxcam/창ID + ArrowRight(확장키) + 천천히(anti-bot 회피).
+- **다음**: #97(LLM) 끝나면 (a) 요약에 chrome 노이즈 정도 확인 (b) 이미지 재빌드 (c) OpenCV 책 capture-browser.
