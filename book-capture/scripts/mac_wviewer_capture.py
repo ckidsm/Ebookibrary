@@ -27,14 +27,30 @@ def osa(s): subprocess.run(['osascript', '-e', s], capture_output=True)
 def activate(): osa('tell application "Google Chrome" to activate')
 def key(code): osa(f'tell application "System Events" to key code {code}')
 
+def _content_crop(im):
+    """브라우저 크롬·창 그림자·여백 제거 → 본문 글씨가 프레임을 꽉 채우게.
+    1) 상단 크롬(탭·주소·북마크) 고정 제거 2) 가장자리 그림자/배경비침 제거
+    3) 어두운 글자 기준 bounding box 로 사방 여백 트림.
+    (같은 페이지→결정적 같은 결과라 해시 끝감지 안정)"""
+    W, H = im.size
+    im = im.crop((0, int(H * 0.11), W, H))                  # 상단 브라우저 크롬
+    W2, H2 = im.size
+    ex, ey = int(W2 * 0.035), int(H2 * 0.03)
+    im = im.crop((ex, ey, W2 - ex, H2 - ey))                # 창 그림자/배경 비침
+    bw = im.convert("L").point(lambda p: 255 if p < 115 else 0)  # 어두운 글자만(워터마크 제외)
+    bbox = bw.getbbox()
+    if bbox:
+        pad = 18; l, t, r, b = bbox
+        im = im.crop((max(0, l - pad), max(0, t - pad),
+                      min(im.size[0], r + pad), min(im.size[1], b + pad)))
+    return im.convert("RGB")
+
 def grab_crop(wid):
     raw = OUT / "_raw.png"
     subprocess.run(['screencapture', f'-l{wid}', '-x', str(raw)], capture_output=True)
     if not raw.exists() or raw.stat().st_size < 2000:
         return None
-    im = Image.open(raw); W, H = im.size
-    top = int(H * 0.075); b = 16
-    return im.crop((b, top, W - b, H - b)).convert("RGB")
+    return _content_crop(Image.open(raw))
 
 def h_of(im): return hashlib.md5(im.tobytes()).hexdigest()
 
