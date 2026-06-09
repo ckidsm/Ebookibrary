@@ -1578,6 +1578,13 @@
                         <button id="up-folder-pick" class="bbtn" style="padding:9px 18px;margin-left:6px;">
                             📂 폴더 선택
                         </button>
+                        <input type="file" id="up-video" accept="video/*" style="display:none;" />
+                        <button id="up-vpick" class="bbtn" style="padding:9px 18px;margin-left:6px;background:rgba(168,85,247,0.15);border-color:rgba(168,85,247,0.5);color:#d8b4fe;">
+                            📹 화면녹화 영상 (iPad)
+                        </button>
+                    </div>
+                    <div style="margin-top:8px;font-size:0.74rem;color:#94a3b8;line-height:1.55;">
+                        💡 <b style="color:#d8b4fe;">화면녹화 영상</b>: iPad에서 교보 책 넘기며 <b>화면 녹화</b> → 그 영상 1개만 올리면 서버가 <b>페이지별로 잘라</b> OCR. (스샷 장마다 안 찍어도 됨 · 페이지 넘김은 1~2초에 한 번씩 천천히)
                     </div>
                     <div id="up-status" style="margin-top:12px;font-size:0.82rem;color:#94a3b8;"></div>
                     <div id="up-progress-wrap" style="display:none;margin-top:10px;">
@@ -1601,6 +1608,53 @@
                 }, 100);
             };
             filesInput.onchange = () => doUpload(book, slug, filesInput.files);
+            const vInput = document.getElementById('up-video');
+            document.getElementById('up-vpick').onclick = () => vInput.click();
+            vInput.onchange = () => { if (vInput.files && vInput.files[0]) doUploadVideo(book, slug, vInput.files[0]); };
+        }
+
+        async function doUploadVideo(book, slug, file) {
+            const statusEl = document.getElementById('up-status');
+            const wrap = document.getElementById('up-progress-wrap');
+            const bar = document.getElementById('up-progress-bar');
+            const txt = document.getElementById('up-progress-text');
+            if (!file) return;
+            statusEl.innerHTML = `📹 영상 업로드 중... (${(file.size/1024/1024).toFixed(1)}MB)`;
+            wrap.style.display = 'block';
+            const form = new FormData();
+            form.append('title', book.title || '');
+            form.append('file', file, file.name);
+            const url = `${BRIDGE_URL}/api/books/${encodeURIComponent(slug)}/upload-video`;
+            try {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', url);
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const pct = Math.round((e.loaded / e.total) * 100);
+                        bar.style.width = pct + '%';
+                        txt.textContent = pct < 100
+                            ? `업로드 ${pct}% (${(e.loaded/1024/1024).toFixed(1)}/${(e.total/1024/1024).toFixed(1)}MB)`
+                            : `업로드 완료 · 서버가 프레임 추출 중... (잠시)`;
+                    }
+                };
+                const resp = await new Promise((resolve, reject) => {
+                    xhr.onload = () => resolve(xhr);
+                    xhr.onerror = () => reject(new Error('네트워크 오류'));
+                    xhr.send(form);
+                });
+                if (resp.status !== 200) {
+                    statusEl.innerHTML = `<span style="color:#ef4444;">✗ HTTP ${resp.status}: ${resp.responseText.slice(0,200)}</span>`;
+                    return;
+                }
+                const j = JSON.parse(resp.responseText);
+                statusEl.innerHTML = `<span style="color:#10b981;">✓ 영상 → ${j.pages}페이지 추출 · job #${j.job.id}</span>`;
+                txt.textContent = `→ 워커가 OCR + AI 요약 + HTML 빌드 시작`;
+                _activeJobs.set(slug, { jobId: j.job.id, status: 'pending', pct: 0, stage: 1, stageName: 'ocr' });
+                ensureBgPoll();
+                renderKyoboBooks(_kyoboBooks);
+            } catch (e) {
+                statusEl.innerHTML = `<span style="color:#ef4444;">✗ ${e.message}</span>`;
+            }
         }
 
         async function doUpload(book, slug, files) {

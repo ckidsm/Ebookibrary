@@ -17,14 +17,39 @@ from pydantic import BaseModel, Field
 from . import __version__
 from .db import (
     clear_books, count_books, init_db, list_books, upsert_books,
-    get_all_settings, get_setting, set_all_settings,
+    get_all_settings, get_setting, set_setting, set_all_settings,
     create_job, list_jobs, get_job, claim_next_job, update_job, cancel_job,
     reap_stale_jobs,
     upsert_worker_client, get_worker_client_by_ip, list_worker_clients,
+    car_log_add, car_log_list, car_log_delete,
+    admin_log_add, admin_log_list,
+    access_log_add, access_log_list,
 )
 
+import os
+import time as _time
+import json as _json
+import secrets as _secrets
 import ipaddress
+from urllib import request as _urlreq, parse as _urlparse
 from fastapi import Request
+from fastapi.responses import RedirectResponse
+
+# 차량 기록 API 키 (portal '내 차 정보' 보호). 미설정 시 개방.
+CAR_API_KEY = os.environ.get("CAR_API_KEY", "")
+
+# ── Synology SSO Server (OIDC) — 관리자 로그인 ──
+OIDC_AUTH     = "https://redcodeme.synology.me:5560/webman/sso/SSOOauth.cgi"
+OIDC_TOKEN    = "https://redcodeme.synology.me:5560/webman/sso/SSOAccessToken.cgi"
+OIDC_USERINFO = "https://redcodeme.synology.me:5560/webman/sso/SSOUserInfo.cgi"
+OIDC_REDIRECT = "https://redcodeme.synology.me:9443/api/admin/sso/callback"
+ADMIN_PAGE    = "https://redcodeme.synology.me/docs/admin.html"
+_admin_sessions: dict = {}   # sid -> {user, exp}
+_oidc_states: dict = {}      # state -> exp
+# 무차별 대입 방지: IP 별 최근 실패 타임스탬프
+_car_fails: dict[str, list[float]] = {}
+_CAR_FAIL_WINDOW = 300   # 5분
+_CAR_FAIL_MAX = 8        # 5분 내 8회 실패 시 차단
 
 
 def _is_lan(client_ip: str) -> bool:
@@ -81,9 +106,9 @@ app.add_middleware(
         "https://ebook.kyobobook.co.kr",
         "https://mmbr.kyobobook.co.kr",
     ],
-    allow_credentials=False,
+    allow_credentials=True,   # 관리자 세션 쿠키 전송 허용
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "X-Car-Key", "Authorization"],
 )
 
 
@@ -443,6 +468,76 @@ async def upload_book_pages(
     }
 
 
+@app.post("/api/books/{slug}/upload-video")
+async def upload_book_video(
+    slug: str,
+    file: UploadFile = File(...),
+    title: str | None = Form(default=None),
+    fps: float = Form(default=1.5),
+    diff: int = Form(default=8),
+) -> dict:
+    """화면녹화 영상 1개 업로드 → ffmpeg 로 페이지 프레임 추출 → upload-process job.
+    iPad/모바일: 교보 책 넘기며 화면녹화 → 이 영상만 올리면 서버가 페이지별로 잘라 OCR."""
+    import os as _os, shutil as _sh, tempfile as _tf
+    from pathlib import Path as _Path
+    from .video_frames import extract_pages, has_ffmpeg
+
+    if not slug.strip():
+        raise HTTPException(400, "slug 필수")
+    if not has_ffmpeg():
+        raise HTTPException(503, "서버에 ffmpeg 미설치 — 이미지 업로드를 사용하세요")
+
+    root = _Path(_os.environ.get("LIBRARY_BOOKS_DIR", "/mnt/library/books"))
+    write_root = _Path(_os.environ.get("LIBRARY_BOOKS_WRITE_DIR", str(root)))
+    book_dir = write_root / slug.strip()
+    book_dir.mkdir(parents=True, exist_ok=True)
+
+    # 새 분석 = 기존 산출물 정리(이미지 업로드와 동일)
+    cleared = 0
+    for _ext in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
+        for _p in book_dir.glob(_ext):
+            try: _p.unlink(); cleared += 1
+            except Exception: pass
+    for _sub in ("thumbs", "summary"):
+        _d = book_dir / _sub
+        if _d.exists():
+            try: _sh.rmtree(_d)
+            except Exception: pass
+
+    # 영상 임시 저장 (스트리밍)
+    suffix = _os.path.splitext(file.filename or "")[1].lower() or ".mov"
+    tmp = _tf.NamedTemporaryFile(prefix="kyovid_", suffix=suffix, delete=False)
+    tmp_path = tmp.name
+    try:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk: break
+            tmp.write(chunk)
+        tmp.close()
+        sz = _os.path.getsize(tmp_path)
+        log.info("📹 영상 업로드: slug=%s size=%.1fMB", slug, sz / 1e6)
+        # 프레임 추출 (블로킹 — threadpool 에서)
+        import asyncio as _asyncio
+        res = await _asyncio.get_event_loop().run_in_executor(
+            None, lambda: extract_pages(tmp_path, book_dir, fps=fps, diff_thresh=diff))
+    finally:
+        try: _os.unlink(tmp_path)
+        except Exception: pass
+
+    if not res.get("ok"):
+        raise HTTPException(500, "프레임 추출 실패: " + str(res.get("error")))
+    pages = res.get("pages", 0)
+    if pages < 1:
+        raise HTTPException(422, "추출된 페이지가 없습니다 (영상이 너무 짧거나 페이지 변화 미감지)")
+
+    log.info("📹 영상→페이지 %d장 추출 완료: slug=%s", pages, slug)
+    job = create_job(slug=slug.strip(), title=title, mode="upload-process", pages=None)
+    return {
+        "ok": True, "slug": slug, "pages": pages,
+        "frames_raw": res.get("frames_raw"), "book_dir": str(book_dir), "job": job,
+    }
+
+
 def _parse_ua(ua: str) -> tuple[str, str]:
     """User-Agent → (os, browser) 대략 판별 (외부 의존성 없음)."""
     import re as _re
@@ -642,3 +737,291 @@ def kyobo_login(_: LoginRequest) -> dict:
         ),
         "alternative": "POST /api/library/sync (Userscript 사용 권장)",
     }
+
+
+# ── 차량 정비/주행 기록 (portal '내 차 정보') ────────────────
+class CarLogIn(BaseModel):
+    category: str                       # odometer | oil_change | consumable
+    event_date: str | None = None       # YYYY-MM-DD
+    odo_km: int | None = None
+    item: str | None = None
+    value: str | None = None
+
+
+def _real_ip(request: Request) -> str:
+    """실제 클라이언트 IP — 리버스프록시 X-Forwarded-For 우선(도커 게이트웨이 172.x 대신)."""
+    h = request.headers
+    xff = h.get("x-forwarded-for", "")
+    peer = request.client.host if request.client else ""
+    return (xff.split(",")[0].strip() if xff else "") or h.get("x-real-ip", "") or peer
+
+
+def _check_car_key(request: Request) -> None:
+    """env CAR_API_KEY 또는 DB settings('car_api_key') 와 X-Car-Key 헤더 비교.
+    무차별 대입 방지(IP별 rate-limit) 포함. 둘 다 없으면 개방."""
+    ip = request.client.host if request.client else "?"   # rate-limit 키(peer, 스푸핑 불가)
+    rip = _real_ip(request)                                # 로그용 실제 IP
+    now = _time.time()
+    fails = [t for t in _car_fails.get(ip, []) if now - t < _CAR_FAIL_WINDOW]
+    _car_fails[ip] = fails
+    if len(fails) >= _CAR_FAIL_MAX:
+        admin_log_add("", "car_blocked", f"rate-limit {len(fails)}회", rip)
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail="too many attempts — 잠시 후 다시 시도")
+    expected = CAR_API_KEY or (get_setting("car_api_key", "") or "")
+    if expected and request.headers.get("X-Car-Key") != expected:
+        fails.append(now)
+        _car_fails[ip] = fails
+        log.warning("car API 인증 실패 ip=%s (%d/%d)", rip, len(fails), _CAR_FAIL_MAX)
+        admin_log_add("", "car_auth_fail", f"{len(fails)}/{_CAR_FAIL_MAX}", rip)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invalid car key")
+
+
+@app.get("/api/car/profile")
+def car_profile_get(request: Request) -> dict:
+    _check_car_key(request)
+    admin_log_add("", "car_view", "내 차 정보 조회", _real_ip(request))
+    return {"profile": get_setting("car_profile", {})}
+
+
+@app.post("/api/car/profile")
+def car_profile_set(payload: dict, request: Request) -> dict:
+    _check_car_key(request)
+    set_setting("car_profile", payload)
+    return {"ok": True}
+
+
+@app.get("/api/car/log")
+def car_log_get(request: Request, category: str | None = None) -> dict:
+    _check_car_key(request)
+    return {"records": car_log_list(category)}
+
+
+@app.post("/api/car/log", status_code=status.HTTP_201_CREATED)
+def car_log_post(payload: CarLogIn, request: Request) -> dict:
+    _check_car_key(request)
+    if not payload.category:
+        raise HTTPException(status_code=400, detail="category 필수")
+    rec = car_log_add(payload.category, payload.event_date, payload.odo_km,
+                      payload.item, payload.value)
+    return {"record": rec}
+
+
+@app.delete("/api/car/log/{rec_id}")
+def car_log_del(rec_id: int, request: Request) -> dict:
+    _check_car_key(request)
+    return {"deleted": car_log_delete(rec_id)}
+
+
+# ── 관리자: Synology SSO(OIDC) 로그인 + 관리 기능 ────────────
+def _read_secret(fname: str, env_key: str) -> str:
+    """민감 비밀은 DB가 아닌 env 또는 /data 의 별도 파일에서 읽음 (DB 분리 저장)."""
+    v = os.environ.get(env_key, "")
+    if v:
+        return v.strip()
+    try:
+        p = os.path.join(os.path.dirname(os.environ.get("KYOBO_BRIDGE_DB", "/data/library.db")), fname)
+        if os.path.exists(p):
+            return open(p, encoding="utf-8").read().strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _oidc_cfg():
+    cid = (os.environ.get("OIDC_CLIENT_ID", "") or get_setting("oidc_client_id", "") or "").strip()
+    # client_secret: env > /data/oidc_client_secret 파일 > (폴백) DB
+    csec = _read_secret("oidc_client_secret", "OIDC_CLIENT_SECRET") or (get_setting("oidc_client_secret", "") or "")
+    admins = get_setting("admin_users", []) or []
+    return cid, csec, admins
+
+def _gc(d: dict) -> None:
+    now = _time.time()
+    for k in [k for k, v in list(d.items())
+              if (v.get("exp", 0) if isinstance(v, dict) else v) < now]:
+        d.pop(k, None)
+
+def _admin_user(request: Request):
+    _gc(_admin_sessions)
+    s = _admin_sessions.get(request.cookies.get("admin_session", ""))
+    return s["user"] if s else None
+
+def _require_admin(request: Request) -> str:
+    u = _admin_user(request)
+    if not u:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="관리자 로그인 필요")
+    return u
+
+
+@app.get("/api/admin/sso/login")
+def admin_sso_login() -> RedirectResponse:
+    cid, _, _ = _oidc_cfg()
+    if not cid:
+        raise HTTPException(500, "OIDC client_id 미설정")
+    state = _secrets.token_urlsafe(16)
+    _oidc_states[state] = _time.time() + 600
+    qs = _urlparse.urlencode({
+        "response_type": "code", "client_id": cid, "redirect_uri": OIDC_REDIRECT,
+        "scope": "openid email groups", "state": state,
+    })
+    return RedirectResponse(OIDC_AUTH + "?" + qs, status_code=302)
+
+
+@app.get("/api/admin/sso/callback")
+def admin_sso_callback(request: Request, code: str = "", state: str = "") -> RedirectResponse:
+    _gc(_oidc_states)
+    if not state or state not in _oidc_states:
+        raise HTTPException(400, "invalid state")
+    _oidc_states.pop(state, None)
+    cid, csec, admins = _oidc_cfg()
+    # 1) code → access_token
+    body = _urlparse.urlencode({
+        "grant_type": "authorization_code", "code": code, "redirect_uri": OIDC_REDIRECT,
+        "client_id": cid, "client_secret": csec,
+    }).encode()
+    try:
+        tok = _json.loads(_urlreq.urlopen(
+            _urlreq.Request(OIDC_TOKEN, data=body,
+                            headers={"Content-Type": "application/x-www-form-urlencoded"}),
+            timeout=15).read())
+    except Exception as e:
+        raise HTTPException(403, f"token 교환 실패: {e}")
+    at = tok.get("access_token")
+    if not at:
+        raise HTTPException(403, "access_token 없음")
+    # 2) userinfo
+    try:
+        info = _json.loads(_urlreq.urlopen(
+            _urlreq.Request(OIDC_USERINFO, headers={"Authorization": "Bearer " + at}),
+            timeout=15).read())
+    except Exception as e:
+        raise HTTPException(403, f"userinfo 실패: {e}")
+    user = info.get("username") or info.get("preferred_username") or info.get("email") or info.get("sub") or ""
+    if admins and user not in admins and info.get("email") not in admins:
+        raise HTTPException(403, f"허용되지 않은 계정입니다: {user}")
+    # 3) 세션 발급
+    sid = _secrets.token_urlsafe(24)
+    _admin_sessions[sid] = {"user": user, "exp": _time.time() + 3600 * 8}
+    log.info("admin 로그인: %s", user)
+    admin_log_add(user, "login", "관리자 로그인", _real_ip(request))
+    resp = RedirectResponse(ADMIN_PAGE, status_code=302)
+    resp.set_cookie("admin_session", sid, httponly=True, secure=True,
+                    samesite="lax", max_age=3600 * 8, path="/")
+    return resp
+
+
+@app.get("/api/admin/me")
+def admin_me(request: Request) -> dict:
+    return {"user": _require_admin(request)}
+
+
+@app.post("/api/admin/logout")
+def admin_logout(request: Request) -> dict:
+    u = _admin_user(request)
+    _admin_sessions.pop(request.cookies.get("admin_session", ""), None)
+    if u:
+        admin_log_add(u, "logout", "", _real_ip(request))
+    return {"ok": True}
+
+
+@app.get("/api/admin/log")
+def admin_log_get(request: Request, limit: int = 100) -> dict:
+    _require_admin(request)
+    return {"events": admin_log_list(min(max(limit, 1), 500))}
+
+
+@app.get("/api/admin/access-log")
+def admin_access_log(request: Request, limit: int = 200) -> dict:
+    _require_admin(request)
+    return {"events": access_log_list(min(max(limit, 1), 1000))}
+
+
+@app.post("/api/admin/exec")
+def admin_exec(payload: dict, request: Request) -> dict:
+    """읽기 전용 진단 콘솔 — 허용목록(고정 ID)만 실행. 자유 명령/호스트 제어 불가."""
+    _require_admin(request)
+    import subprocess
+    cmd = (payload.get("cmd") or "").strip()
+
+    def sh(args):
+        try:
+            return subprocess.run(args, capture_output=True, text=True, timeout=8).stdout.strip()
+        except Exception as e:
+            return f"(실행 오류: {e})"
+
+    if cmd == "health":
+        out = f"service = kyobo-bridge\nversion = {__version__}\nbooks   = {count_books()}"
+    elif cmd == "date":
+        try:
+            up = open("/proc/uptime").read().split()[0]
+            up = f"{float(up)/3600:.1f} 시간"
+        except Exception:
+            up = "?"
+        out = sh(["date", "+%Y-%m-%d %H:%M:%S %Z"]) + f"\n컨테이너 가동: {up}"
+    elif cmd == "disk":
+        out = sh(["df", "-h", "/data", "/"])
+    elif cmd == "mem":
+        try:
+            out = "\n".join(open("/proc/meminfo").read().splitlines()[:4])
+        except Exception as e:
+            out = str(e)
+    elif cmd == "dbstat":
+        out = (f"books       {count_books()}\n"
+               f"access_log  {len(access_log_list(100000))}\n"
+               f"admin_log   {len(admin_log_list(100000))}\n"
+               f"car_log     {len(car_log_list(None, 100000))}")
+    elif cmd == "recent":
+        rows = access_log_list(12)
+        out = "\n".join(f"{r['ts']}  {(r['ip'] or ''):<15} {(r['device'] or ''):<4} "
+                        f"{(r['os'] or ''):<12} {r['page']}" for r in rows) or "(없음)"
+    elif cmd == "events":
+        rows = admin_log_list(12)
+        out = "\n".join(f"{r['ts']}  {(r['action'] or ''):<14} {(r.get('user') or '-'):<10} "
+                        f"{(r.get('ip') or '')} {(r.get('detail') or '')}" for r in rows) or "(없음)"
+    elif cmd == "code":
+        out = "현재 인증번호: " + (get_setting("car_api_key", "") or "(미설정)")
+    elif cmd == "env":
+        sec = os.environ.get("OIDC_CLIENT_SECRET") or _read_secret("oidc_client_secret", "OIDC_CLIENT_SECRET")
+        out = (f"TZ = {os.environ.get('TZ')}\nDB = {os.environ.get('KYOBO_BRIDGE_DB')}\n"
+               f"OIDC client_id = {(get_setting('oidc_client_id','') or '')[:8]}…\n"
+               f"OIDC secret 설정됨 = {'예' if sec else '아니오'}\n"
+               f"admin_users = {get_setting('admin_users', [])}")
+    else:
+        raise HTTPException(400, "허용되지 않은 명령입니다 (읽기 전용 진단만 가능)")
+
+    admin_log_add(_admin_user(request), "exec", cmd, _real_ip(request))
+    return {"cmd": cmd, "out": out}
+
+
+class TrackIn(BaseModel):
+    page: str = ""
+
+
+@app.post("/api/track")
+def track(payload: TrackIn, request: Request) -> dict:
+    """모든 포털 페이지가 로드 시 호출하는 접속 비콘 (공개)."""
+    ci = _client_info(request)
+    ua = ci.get("user_agent", "")
+    device = "모바일" if any(x in ua for x in ("iPhone", "iPad", "Android", "Mobile")) else "PC"
+    access_log_add(ci["ip"], payload.page, ci["os"], ci["browser"], device,
+                   ci.get("mac"), _is_lan(ci["ip"]), ua)
+    return {"ok": True}
+
+
+@app.get("/api/admin/car-code")
+def admin_get_code(request: Request) -> dict:
+    _require_admin(request)
+    return {"code": get_setting("car_api_key", "")}
+
+
+@app.post("/api/admin/car-code")
+def admin_set_code(payload: dict, request: Request) -> dict:
+    _require_admin(request)
+    code = (payload.get("code") or "").strip()
+    if len(code) < 4:
+        raise HTTPException(400, "코드는 4자 이상이어야 합니다")
+    set_setting("car_api_key", code)
+    u = _admin_user(request)
+    log.info("car 접근코드 변경 by %s", u)
+    admin_log_add(u, "code_change", "인증번호 변경", _real_ip(request))
+    return {"ok": True, "code": code}
