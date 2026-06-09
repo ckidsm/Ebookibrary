@@ -34,6 +34,51 @@ _VK = {"right": 0x27, "left": 0x25, "space": 0x20, "pagedown": 0x22, "pageup": 0
 # 해상도/배율 다르면 조정 필요(여유 있게 잡아도 책 본문은 가운데라 안 잘림).
 _WIN_CROP = {"top": 80, "bottom": 70, "left": 0, "right": 0}
 
+# ── 캡처 백엔드 ─────────────────────────────────────────────
+# 교보 wviewer 는 GDI BitBlt(PIL ImageGrab)만 '화면캡처 불가' 파란화면으로 오염시킨다.
+# dxcam(DXGI Desktop Duplication)은 GPU 합성 출력을 캡처 → Snipping Tool(WGC)처럼 우회됨.
+_dxcam_cam = None
+_dxcam_ok = None   # None=미시도, True=가용, False=실패(→ImageGrab 폴백)
+
+
+def _ensure_dxcam() -> bool:
+    global _dxcam_cam, _dxcam_ok
+    if _dxcam_ok is not None:
+        return _dxcam_ok
+    try:
+        import dxcam
+        _dxcam_cam = dxcam.create(output_color="RGB")
+        _dxcam_ok = _dxcam_cam is not None
+        print("[win] 캡처 백엔드: dxcam(DXGI) — 교보 GDI 오염 우회" if _dxcam_ok
+              else "[win] dxcam.create() 실패 → ImageGrab 폴백")
+    except Exception as e:
+        print(f"[win] dxcam 미사용({e}) → ImageGrab 폴백")
+        _dxcam_ok = False
+    return _dxcam_ok
+
+
+def _grab_frame(bbox, prefer_dxcam: bool = True):
+    """캡처 한 장(PIL.Image). dxcam(DXGI) 우선, 안 되면 ImageGrab(GDI).
+    반환 None = dxcam 가용한데 ~2초간 화면 변화 없음(책 끝/넘김 실패) → 상위에서 중단."""
+    if prefer_dxcam and _ensure_dxcam():
+        try:
+            from PIL import Image
+            region = (int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])) if bbox else None
+            frame = None
+            for _ in range(40):   # grab()은 직전 동일 프레임이면 None → 잠깐 재시도
+                frame = _dxcam_cam.grab(region=region) if region else _dxcam_cam.grab()
+                if frame is not None:
+                    break
+                time.sleep(0.05)
+            if frame is not None:
+                return Image.fromarray(frame)
+            return None
+        except Exception as e:
+            print(f"[win] dxcam grab 오류 → ImageGrab 폴백: {e}", file=sys.stderr)
+            globals()["_dxcam_ok"] = False
+    from PIL import ImageGrab
+    return ImageGrab.grab(bbox=bbox)
+
 
 def is_installed() -> bool:
     return os.path.isfile(KYOBO_WIN_EXE)
@@ -189,9 +234,10 @@ class KyoboWinCapture:
         auto_page_turn: bool = True, start_page: int = 1,
         continue_from_last: bool = False, use_ocr: bool = False,
         noninteractive: bool = True, region: dict | None = None,
-        next_key: str = "right",
+        next_key: str = "right", no_crop: bool = False,
     ) -> int:
-        """ImageGrab 으로 count 장 캡처. 직전과 동일 해시면 책 끝으로 보고 중단."""
+        """dxcam(DXGI)→ImageGrab 으로 count 장 캡처. 직전과 동일 해시면 책 끝으로 보고 중단.
+        no_crop=True(브라우저 웹뷰어 전체화면) 면 크롬 크롭 없이 전체화면 캡처."""
         try:
             from PIL import ImageGrab
         except ImportError:
@@ -199,7 +245,10 @@ class KyoboWinCapture:
             return 0
 
         bbox = None
-        if region and region.get("w") and region.get("h"):
+        if no_crop:
+            # 브라우저 웹뷰어 전체화면(F11) — 크롬 없으니 전체화면 그대로 캡처
+            print("[win] no_crop(브라우저 웹뷰어) — 크롬 크롭 없이 전체화면 캡처")
+        elif region and region.get("w") and region.get("h"):
             # 절대 좌표 region 명시 시 그대로 사용(고급)
             x, y, w, h = region["x"], region["y"], region["w"], region["h"]
             bbox = (x, y, x + w, y + h)
@@ -248,10 +297,15 @@ class KyoboWinCapture:
         saved = 0
         for i in range(count):
             try:
-                img = ImageGrab.grab(bbox=bbox)
+                img = _grab_frame(bbox)   # dxcam(DXGI) 우선 → ImageGrab 폴백
             except Exception as e:
                 print(f"[win] 캡처 실패({i}): {e}", file=sys.stderr)
                 break
+            if img is None:
+                print(f"[win] 화면 변화 없음(~2초) — 책 끝/페이지넘김 실패로 보고 중단 (p.{n})")
+                break
+            if img.mode != "RGB":
+                img = img.convert("RGB")
             h = hashlib.md5(img.tobytes()).hexdigest()
             if h == last_hash:
                 print(f"[win] 직전과 동일 화면 — 책 끝으로 보고 중단 (p.{n})")

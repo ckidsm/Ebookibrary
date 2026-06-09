@@ -12,3 +12,8 @@ keyring==25.5.0
 # Phase #68 — 매크로 WID 방식 (CGWindowList API)
 # 디스플레이/Space/frontmost 무관 정확한 창만 캡처
 pyobjc-framework-Quartz==12.2 ; sys_platform == "darwin"
+
+# 2026-06-09 — 교보 wviewer 브라우저 캡처용 (Windows)
+# PIL ImageGrab(GDI BitBlt)은 교보가 '화면캡처 불가' 파란화면으로 오염시킴.
+# dxcam(DXGI Desktop Duplication)은 GPU 합성 출력을 캡처 → Snipping Tool(WGC)처럼 우회.
+dxcam==0.0.5 ; sys_platform == "win32"

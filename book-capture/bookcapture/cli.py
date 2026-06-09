@@ -99,7 +99,9 @@ def cmd_capture_auto(args) -> int:
             count=args.count, interval=args.interval, auto_page_turn=True,
             start_page=args.start_page, continue_from_last=args.continue_from_last,
             use_ocr=not args.no_ocr, noninteractive=True,
-            region=s.capture.region, next_key=s.capture.next_key,
+            region=s.capture.region,
+            next_key=(getattr(args, "next_key", None) or s.capture.next_key),
+            no_crop=getattr(args, "no_app", False),   # 브라우저 전체화면 → 크롭 없이
         )
         return 0
 
@@ -458,6 +460,8 @@ def build_parser() -> argparse.ArgumentParser:
     pca.add_argument("--no-app", action="store_true",
                      help="데스크탑 앱 검증/실행 스킵 → 포그라운드(브라우저 웹뷰어) 캡처. "
                           "교보 데스크탑 앱은 화면캡처 DRM 차단이지만 wviewer 웹뷰어는 캡처됨.")
+    pca.add_argument("--next-key", default=None,
+                     help="페이지 넘김 키 (right/left/space/pagedown/pageup/down). 미지정 시 설정값.")
     pca.set_defaults(func=cmd_capture_auto)
 
     pu = sub.add_parser("upload", help="책 폴더 PNG 를 백엔드로 업로드(원격 캡처→백엔드 처리)")
