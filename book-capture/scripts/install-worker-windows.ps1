@@ -186,9 +186,12 @@ $trigger = New-ScheduledTaskTrigger -AtLogOn
 # 5분마다 반복 트리거 — 워커가 어떤 이유로 죽어도(정상종료 포함) 5분 내 자동 부활.
 # (이미 실행 중이면 MultipleInstances=IgnoreNew 로 중복 안 띄움)
 try {
+    # RepetitionDuration 에 [TimeSpan]::MaxValue 를 주면 P99999999DT.. 로 직렬화돼
+    # Register-ScheduledTask 가 "범위를 벗어난 값"(0x80041318)으로 거부함.
+    # → 유한한 큰 값(10년)으로. 워커가 죽어도 5분 내 부활은 동일.
     $rep = New-ScheduledTaskTrigger -Once -At (Get-Date) `
         -RepetitionInterval (New-TimeSpan -Minutes 5) `
-        -RepetitionDuration ([TimeSpan]::MaxValue)
+        -RepetitionDuration (New-TimeSpan -Days 3650)
     $trigger.Repetition = $rep.Repetition
 } catch {
     Warn "반복 트리거 설정 실패(무시): $_"
