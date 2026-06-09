@@ -1095,6 +1095,39 @@
         }
 
         // 캡처 준비 팝업 — 사용자와 싱크: 화면 준비 안내 → "준비 완료" → (Windows) 앱 전환 카운트다운
+        // 🌐 브라우저 웹뷰어 캡처 준비 — 교보 [바로보기] wviewer 를 브라우저로 띄워두게 안내
+        async function showBrowserPrep(book, slug, startPage) {
+            const title = escapeHtml(book.title || slug);
+            const ok = await showCustomConfirm({
+                title: '🌐 브라우저 웹뷰어 캡처 준비',
+                body: `<div style="font-size:0.85rem;color:#cbd5e1;line-height:1.7;">
+                        <div style="margin-bottom:9px;color:#fff;">교보 <b>[바로보기]</b> 웹뷰어를 준비하세요:</div>
+                        <ol style="margin:0;padding-left:1.3em;line-height:1.95;">
+                            <li>교보문고(또는 위 <b>[e-book 보기]</b>)에서 <b>「${title}」</b> 의 <b>[바로보기]</b> 클릭 → 브라우저에 책이 열립니다.</li>
+                            <li><b>F11</b> 로 전체화면 (브라우저 주소창·툴바 숨김 → 책 본문만).</li>
+                            <li>${startPage > 1 ? `<b>${startPage}페이지</b>로 이동.` : '<b>첫 페이지</b>로 이동.'}</li>
+                            <li>그 책 화면을 <b>맨 앞</b>에 두세요. 워커가 <b>→ 키로 넘기며 캡처</b>합니다.</li>
+                        </ol>
+                        <div style="margin-top:10px;font-size:0.78rem;color:#fcd34d;background:rgba(245,158,11,0.1);border-radius:6px;padding:9px 11px;line-height:1.6;">
+                            ⚠️ [준비 완료] 후 <b>5초 안에 그 책 웹뷰어로 전환</b>(Alt+Tab)하세요. 캡처 중 마우스·키보드를 건드리지 마세요.<br>
+                            ✅ 데스크탑 앱과 달리 <b>웹뷰어는 DRM 파란화면 없이 본문이 캡처됩니다.</b>
+                        </div>
+                    </div>`,
+                options: [
+                    { label: '취소', value: 'cancel' },
+                    { label: '✓ 준비 완료 (5초 뒤 캡처)', value: 'ready', kind: 'primary' },
+                ],
+            });
+            if (ok !== 'ready') return false;
+            await _countdown(5, '⏱ 곧 캡처가 시작됩니다', (n) => `
+                <div style="text-align:center;line-height:1.7;">
+                    지금 <b style="color:#fff;">책 웹뷰어 화면</b>으로 전환하세요! <span style="color:#94a3b8;">(Alt+Tab · F11 전체화면)</span>
+                    <div style="font-size:2.6rem;color:#34d399;font-weight:700;margin:6px 0;">${n}</div>
+                    <div style="font-size:0.76rem;color:#94a3b8;">전환 후 건드리지 마세요. 잠시 뒤 캡처가 시작됩니다.</div>
+                </div>`);
+            return true;
+        }
+
         async function showCapturePrep(book, slug, isWin, startPage) {
             const title = escapeHtml(book.title || slug);
             const pageStep = startPage > 1
@@ -1367,9 +1400,9 @@
             const canMacro = isMac || isWin;   // 로컬 워커 자동 캡처는 Mac/Windows 만 (iOS 샌드박스 불가)
             const osName = isIOS ? 'iPad/iOS' : (isMac ? 'macOS' : (isWin ? 'Windows' : '기타 OS'));
             const macOpt = canMacro
-                ? `<label class="capture-mode-opt" title="${isWin ? '교보 eLibrary 앱을 자동 설치·실행 후 화면 캡처 → NAS 백엔드가 OCR/요약/빌드 (Windows 하이브리드). 워커가 이 PC 에서 실행 중이어야 합니다.' : '교보eBook.app 자동 캡처 (macOS). 다중 모니터 권장: 책은 한 모니터, 분석 시작은 다른 모니터 브라우저에서.'}">
-                        <input type="radio" name="cap-mode" value="${isWin ? 'capture-only' : 'auto'}" checked>
-                        <span><strong>🖥 로컬 매크로</strong> <small>Recommended (${osName}) · ${isWin ? '앱 자동 실행·캡처 → 서버 처리' : '책 모니터 안 건드리고 자동 캡처'}</small></span>
+                ? `<label class="capture-mode-opt" title="${isWin ? '⚠️ Windows 교보 데스크탑 앱은 화면캡처를 DRM(파란화면)으로 차단합니다. 막히면 [브라우저 웹뷰어 캡처]를 쓰세요.' : '교보eBook.app 자동 캡처 (macOS).'}">
+                        <input type="radio" name="cap-mode" value="${isWin ? 'capture-only' : 'auto'}">
+                        <span><strong>🖥 로컬 매크로 (데스크탑 앱)</strong> <small>${isWin ? '⚠️ 교보 앱 DRM(파란화면)으로 막힐 수 있음' : 'macOS 교보앱 자동 캡처'}</small></span>
                     </label>`
                 : `<label class="capture-mode-opt is-disabled" title="로컬 매크로는 macOS·Windows 전용입니다. 현재 OS 에서는 [캡처 업로드] 를 사용하세요.">
                         <input type="radio" name="cap-mode" value="auto" disabled>
@@ -1379,9 +1412,18 @@
                         <input type="radio" name="cap-mode" value="upload" ${canMacro ? '' : 'checked'}>
                         <span><strong>📤 캡처 업로드</strong> <small>Mac/Windows/Linux/모바일${canMacro ? '' : ' · Recommended'}</small></span>
                     </label>`;
+            // 🌐 브라우저 웹뷰어 캡처 — 교보 [바로보기] wviewer 를 브라우저 전체화면으로 띄워두면
+            // 워커가 그 화면을 캡처(데스크탑 앱 DRM 우회). 새 권장 모드.
+            const browserOpt = canMacro
+                ? `<label class="capture-mode-opt" title="교보 [바로보기] 웹뷰어를 브라우저 전체화면(F11)으로 띄워두면, 워커가 그 화면을 캡처하며 →키로 페이지를 넘깁니다. 데스크탑 앱 DRM(화면캡처 차단)을 우회합니다. 워커가 이 PC 에서 실행 중이어야 합니다.">
+                        <input type="radio" name="cap-mode" value="capture-browser" checked>
+                        <span><strong>🌐 브라우저 웹뷰어 캡처</strong> <small>Recommended (${osName}) · [바로보기]를 브라우저로 열어두면 자동 캡처</small></span>
+                    </label>`
+                : '';
             const modeToggleHtml = `
                 <div class="capture-mode-box">
                     <div class="capture-mode-title">캡처 방식 <small style="opacity:.6">(${osName} 감지)</small></div>
+                    ${browserOpt}
                     ${macOpt}
                     ${uploadOpt}
                     <label class="capture-mode-opt is-disabled" title="교보 보안 정책으로 자동화 차단됨 (Phase #47 인프라 보존)">
@@ -1493,9 +1535,11 @@
                     openUploadFlow(book, slug);
                     return;
                 }
-                // 캡처(로컬 매크로) — 준비 팝업으로 사용자와 싱크 맞춘 뒤 시작
+                // 캡처 — 준비 팝업으로 사용자와 싱크 맞춘 뒤 시작
                 const sp = parseInt(document.getElementById('cap-start-page')?.value || '1', 10) || 1;
-                const ready = await showCapturePrep(book, slug, isWin, sp);
+                const ready = (mode === 'capture-browser')
+                    ? await showBrowserPrep(book, slug, sp)        // 🌐 브라우저 웹뷰어
+                    : await showCapturePrep(book, slug, isWin, sp); // 🖥 데스크탑 앱
                 if (!ready) return;  // 취소 / 백드롭
                 // 준비 완료 → job 등록
                 btn.disabled = true;
@@ -1720,7 +1764,7 @@
         async function showAnalyzeCmd(book, slug, mode) {
             mode = mode || 'auto';
             const extra = document.getElementById('bmodal-extra');
-            const modeLabel = mode === 'auto-web' ? '🌐 웹뷰' : '🖥 로컬뷰';
+            const modeLabel = mode === 'auto-web' ? '🌐 웹뷰' : (mode === 'capture-browser' ? '🌐 브라우저 웹뷰어' : '🖥 로컬뷰');
             console.log('[KL] 📊 분석 시작 클릭', { mode, modeLabel, slug, book });
             console.log('[KL]   라디오 선택값:', document.querySelector('input[name="cap-mode"]:checked')?.value);
             extra.innerHTML = `<div style="margin-top:14px;color:#8b96a8;font-size:0.82rem;">${modeLabel} 모드로 작업 등록 중...</div>`;

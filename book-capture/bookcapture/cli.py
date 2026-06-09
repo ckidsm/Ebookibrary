@@ -70,26 +70,31 @@ def cmd_capture_auto(args) -> int:
     if platform.system() == "Windows":
         from . import win_app
         bot = win_app.KyoboWinCapture(output_dir=str(out_dir), book_folder=args.slug)
-        # 검증: 교보 앱 실행 + 올바른 책이 열려 있는지 (창 제목으로)
-        win_title = win_app.get_app_window_title()
-        book_hint = args.slug.replace("_", " ").strip()
-        if not bot.is_app_running():
-            print(f"✗ 교보 eLibrary 앱이 실행 중이 아닙니다. 앱을 먼저 실행하고 "
-                  f"「{book_hint}」 책을 펼친 뒤 다시 시작하세요.", file=sys.stderr)
-            return 1
-        if not win_title:
-            print(f"✗ 교보 앱 창을 찾지 못했습니다(최소화/숨김?). 「{book_hint}」 책 창을 "
-                  f"화면에 띄운 뒤 다시 시작하세요.", file=sys.stderr)
-            return 1
-        # 책 제목 일치 검사(느슨) — 핵심 토큰이 창 제목에 있는지
-        _norm = lambda x: x.lower().replace(" ", "").replace("_", "")
-        if _norm(book_hint) and _norm(book_hint) not in _norm(win_title):
-            print(f"✗ 교보 앱에 다른 책이 열려 있습니다.\n"
-                  f"   현재 창: {win_title}\n"
-                  f"   필요한 책: {book_hint}\n"
-                  f"   앱에서 「{book_hint}」 를 펼친 뒤 다시 시작하세요.", file=sys.stderr)
-            return 1
-        print(f"[capture-auto] ✓ 검증 통과 — 교보 창: {win_title}")
+        if getattr(args, "no_app", False):
+            # 브라우저 캡처 모드: 데스크탑 앱(=DRM 파란화면) 대신 포그라운드(브라우저 wviewer)를
+            # 그대로 화면캡처. 웹페이지는 OS 캡처를 막을 수 없어 책 본문이 정상 캡처됨.
+            print("[capture-auto] 🌐 --no-app: 데스크탑 앱 검증 스킵 → 포그라운드(브라우저 웹뷰어) 캡처")
+        else:
+            # 검증: 교보 앱 실행 + 올바른 책이 열려 있는지 (창 제목으로)
+            win_title = win_app.get_app_window_title()
+            book_hint = args.slug.replace("_", " ").strip()
+            if not bot.is_app_running():
+                print(f"✗ 교보 eLibrary 앱이 실행 중이 아닙니다. 앱을 먼저 실행하고 "
+                      f"「{book_hint}」 책을 펼친 뒤 다시 시작하세요.", file=sys.stderr)
+                return 1
+            if not win_title:
+                print(f"✗ 교보 앱 창을 찾지 못했습니다(최소화/숨김?). 「{book_hint}」 책 창을 "
+                      f"화면에 띄운 뒤 다시 시작하세요.", file=sys.stderr)
+                return 1
+            # 책 제목 일치 검사(느슨) — 핵심 토큰이 창 제목에 있는지
+            _norm = lambda x: x.lower().replace(" ", "").replace("_", "")
+            if _norm(book_hint) and _norm(book_hint) not in _norm(win_title):
+                print(f"✗ 교보 앱에 다른 책이 열려 있습니다.\n"
+                      f"   현재 창: {win_title}\n"
+                      f"   필요한 책: {book_hint}\n"
+                      f"   앱에서 「{book_hint}」 를 펼친 뒤 다시 시작하세요.", file=sys.stderr)
+                return 1
+            print(f"[capture-auto] ✓ 검증 통과 — 교보 창: {win_title}")
         bot.take_multiple_screenshots(
             count=args.count, interval=args.interval, auto_page_turn=True,
             start_page=args.start_page, continue_from_last=args.continue_from_last,
@@ -450,6 +455,9 @@ def build_parser() -> argparse.ArgumentParser:
     pca.add_argument("--no-ocr", action="store_true")
     pca.add_argument("--continue-from-last", action="store_true")
     pca.add_argument("--book-id", help="salecmdtid — deep link 로 책 자동 열기")
+    pca.add_argument("--no-app", action="store_true",
+                     help="데스크탑 앱 검증/실행 스킵 → 포그라운드(브라우저 웹뷰어) 캡처. "
+                          "교보 데스크탑 앱은 화면캡처 DRM 차단이지만 wviewer 웹뷰어는 캡처됨.")
     pca.set_defaults(func=cmd_capture_auto)
 
     pu = sub.add_parser("upload", help="책 폴더 PNG 를 백엔드로 업로드(원격 캡처→백엔드 처리)")

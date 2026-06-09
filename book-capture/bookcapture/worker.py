@@ -219,6 +219,19 @@ def run_one(bridge: str, job: dict) -> None:
             cap,
             ["upload", "--slug", slug, "--title", (job.get("title") or slug)],
         ]
+    elif mode == "capture-browser":
+        # 🌐 브라우저 웹뷰어 캡처 — 사용자가 wviewer(바로보기)를 브라우저 전체화면으로 띄워두면
+        # 데스크탑 앱 없이 포그라운드(브라우저)를 화면캡처 + → 키로 페이지 넘김.
+        # 교보 데스크탑 앱 DRM(화면캡처 파란화면)을 우회. (wviewer 웹페이지는 OS 캡처 못 막음)
+        print(f"[worker] 🌐 mode=capture-browser — 브라우저 웹뷰어 화면캡처(--no-app)")
+        cap = ["capture-auto", "--slug", slug, "--count", "1500", "--interval", "2", "--no-app"]
+        _sp = str(job.get("pages") or "").strip()
+        if _sp.isdigit() and int(_sp) > 1:
+            cap += ["--start-page", _sp]
+        steps = [
+            cap,
+            ["upload", "--slug", slug, "--title", (job.get("title") or slug)],
+        ]
     elif mode == "auto-web":
         # Phase #47: e-library 통과 → wviewer 캡처 (화면 점유 X)
         print(f"[worker] 🌐 mode=auto-web 분기 진입")
