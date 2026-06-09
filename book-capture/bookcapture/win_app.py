@@ -222,11 +222,21 @@ class KyoboWinCapture:
     # ── 키 입력 (ctypes, 추가 의존성 없음) ───────────────────
     @staticmethod
     def _press_key(vk: int) -> None:
+        """키 입력(keydown→keyup). 화살표/PageUp·Down/Home/End/Ins/Del 은 '확장 키'라
+        KEYEVENTF_EXTENDEDKEY + scan code 를 함께 보내야 브라우저 웹뷰어가
+        ArrowRight 등 event.code 로 정확히 인식한다.
+        (구버전 keybd_event(vk,0,0,0) 은 scan=0·확장플래그 없음 → 웹뷰어가 ArrowRight 로 못 받아 페이지가 안 넘어갔음)"""
         import ctypes
+        user32 = ctypes.windll.user32
+        KEYEVENTF_EXTENDEDKEY = 0x0001
         KEYEVENTF_KEYUP = 0x0002
-        ctypes.windll.user32.keybd_event(vk, 0, 0, 0)
+        # 확장키: PageUp(21) PageDown(22) End(23) Home(24) ← ↑ → ↓(25~28) Ins(2D) Del(2E)
+        EXT = {0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2D, 0x2E}
+        scan = user32.MapVirtualKeyW(vk, 0) & 0xFF      # VK → scan code
+        ext = KEYEVENTF_EXTENDEDKEY if vk in EXT else 0
+        user32.keybd_event(vk, scan, ext, 0)
         time.sleep(0.05)
-        ctypes.windll.user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
+        user32.keybd_event(vk, scan, ext | KEYEVENTF_KEYUP, 0)
 
     # ── 캡처 루프 ────────────────────────────────────────────
     def take_multiple_screenshots(
