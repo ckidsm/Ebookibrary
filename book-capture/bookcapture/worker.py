@@ -205,7 +205,9 @@ def run_one(bridge: str, job: dict) -> None:
     elif mode == "capture-only":
         # 하이브리드(#67): 캡처만 워커가 하고, PNG 를 백엔드로 업로드 →
         # 백엔드가 upload-process 로 OCR/요약/빌드. 원격(Windows) 에 최적.
-        cap = ["capture-auto", "--slug", slug, "--count", "300", "--interval", "2"]
+        # count = 최대 페이지 안전 상한(책 끝에서 같은 화면 감지 시 자동 중단되므로 넉넉히).
+        # 300 은 두꺼운 책(500p+)을 다 못 찍어서 1500 으로 상향.
+        cap = ["capture-auto", "--slug", slug, "--count", "1500", "--interval", "2"]
         sale_id = job.get("salecmdtid") or _lookup_salecmdtid(bridge, slug)
         if sale_id:
             cap += ["--book-id", sale_id]
