@@ -177,9 +177,12 @@ $LOG_OUT = Join-Path $LOG_DIR "worker.out.log"
 
 # 4) Task Scheduler 등록
 Step "Task Scheduler 등록: $TASK_NAME"
+# 워커를 무한-재시작 래퍼로 실행 — 죽으면 5초 내 자동 부활 + 출력 로그 기록.
+# (예전엔 worker 를 직접 실행 → 죽으면 task 반복(5분)만 의존 + 로그 없음 → 진단 불가였음)
+$WRAPPER = Join-Path $SCRIPT_DIR "run-worker-loop.ps1"
 $action = New-ScheduledTaskAction `
-    -Execute $VENV_PY `
-    -Argument "-m bookcapture worker --interval 5" `
+    -Execute "powershell.exe" `
+    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$WRAPPER`"" `
     -WorkingDirectory $BC_DIR
 
 $trigger = New-ScheduledTaskTrigger -AtLogOn
