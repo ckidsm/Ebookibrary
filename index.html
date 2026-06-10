@@ -1482,7 +1482,7 @@
                 <div class="capture-guide">
                     <div class="cg-title">📋 분석 절차 — 🌐 브라우저 웹뷰어 캡처 (권장)</div>
                     <ol class="cg-steps">
-                        <li>이 책 <b>[바로보기]</b> → 브라우저 웹뷰어로 열기 <small style="opacity:.6">(데스크탑 앱 ✗ — DRM 차단)</small></li>
+                        <li>아래 <b>[📖 e-book 보기]</b> → 교보 책 페이지에서 <b>[바로보기]</b> 클릭 → 브라우저 웹뷰어로 열림 <small style="opacity:.6">(데스크탑 앱 ✗ — DRM 차단)</small></li>
                         <li>뷰어 상단 레이아웃을 <b>단일 페이지(1)</b> 로 <small style="opacity:.6">— 거터·여백 없이 한 장씩(권장)</small></li>
                         <li><b>F11</b> 전체화면 + <b>첫 페이지</b>로 이동 + <b>책 화면 클릭</b>(키보드 포커스)</li>
                         <li>아래 <b>[분석 시작] → 🌐 브라우저 웹뷰어 캡처</b> → <b>[준비 완료]</b></li>
@@ -1506,14 +1506,14 @@
                 ${!canMacro ? '' : `
                 <div class="capture-guide" style="background:rgba(34,211,238,0.06);border-color:rgba(34,211,238,0.3);">
                     <label style="font-size:0.82rem;color:#cbd5e1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                        <b>시작 페이지</b> <span style="font-size:0.72rem;color:#94a3b8;">(앱에 표시된 도서 페이지 번호)</span>
+                        <b>시작 페이지</b> <span style="font-size:0.72rem;color:#94a3b8;">(웹뷰어에 표시된 페이지 번호)</span>
                         <input id="cap-start-page" type="number" min="1" value="1"
                                style="width:78px;padding:4px 8px;background:#0a0c10;border:1px solid #2f3a4d;border-radius:5px;color:#fff;">
                     </label>
                     <div style="margin-top:6px;font-size:0.72rem;color:#94a3b8;line-height:1.6;">
-                        <b>1</b> = 처음부터 (기존 잔여 페이지 삭제) · <b>N</b> = 앱에서 <b>N페이지를 펼친 뒤</b> N부터 이어서.<br>
-                        📖 앱 <b>우하단</b>에 <code style="color:#cbd5e1;">21 / 757p</code> 처럼 도서 페이지 번호가 보입니다 — 그 번호를 입력하세요.<br>
-                        ✂️ 캡처 시 상단 툴바·하단 컨트롤바는 <b>자동으로 크롭</b>되어 책 본문만 OCR합니다.
+                        <b>1</b> = 처음부터 (기존 잔여 페이지 삭제) · <b>N</b> = 웹뷰어를 <b>N페이지로 이동한 뒤</b> N부터 이어서.<br>
+                        📖 웹뷰어 <b>하단 슬라이더</b>에 <code style="color:#cbd5e1;">2 / 385</code> 처럼 페이지 번호가 보입니다 — 그 번호를 입력하세요.<br>
+                        ✂️ 브라우저 크롬·창 그림자·여백은 <b>자동 크롭</b>되어 책 본문만 OCR합니다.
                     </div>
                 </div>`}
                 <div id="bmodal-extra"></div>
