@@ -1048,7 +1048,14 @@
         function applySort() {
             const sel = document.getElementById('kyobo-sort');
             if (sel) _sortMode = sel.value;
-            let list = _kyoboBooksRaw.slice();
+            // 같은 책(slug) 중복 제거 — 저자 있는 것 우선 (옛 동기화 잔재 방지)
+            const _bySlug = new Map();
+            for (const b of _kyoboBooksRaw) {
+                const k = slugify(b.title || '');
+                const cur = _bySlug.get(k);
+                if (!cur || (b.author && b.author !== '저자 미상' && (!cur.author || cur.author === '저자 미상'))) _bySlug.set(k, b);
+            }
+            let list = Array.from(_bySlug.values());
             if (_sortMode === 'title') {
                 list.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'ko'));
             } else if (_sortMode === 'analyzed') {
