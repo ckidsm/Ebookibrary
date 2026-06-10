@@ -943,8 +943,8 @@
 
         <div class="section-label" style="display:flex;align-items:center;gap:0.6rem;">내 e-Library 도서함 <small id="kyobo-count" style="opacity:0.6;font-weight:normal;text-transform:none;letter-spacing:0;"></small>
             <select id="kyobo-sort" onchange="applySort()" title="정렬" style="margin-left:auto;background:#1a2332;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:3px 9px;font-size:0.8rem;text-transform:none;letter-spacing:0;font-weight:normal;cursor:pointer;">
+                <option value="analyzed" selected>분석도서순</option>
                 <option value="sync">동기화순</option>
-                <option value="analyzed">분석도서순</option>
                 <option value="title">가나다순</option>
             </select>
         </div>
@@ -1044,7 +1044,7 @@
         // ── Phase C-4: slugify + 분석 상태 캐시 + 카드 클릭 모달 ──
         let _kyoboBooks = [];          // 동기화된 책 목록(현재 정렬 적용본)
         let _kyoboBooksRaw = [];       // 동기화 원본 순서
-        let _sortMode = 'sync';        // sync | analyzed | title
+        let _sortMode = 'analyzed';    // analyzed(기본) | sync | title
         function applySort() {
             const sel = document.getElementById('kyobo-sort');
             if (sel) _sortMode = sel.value;
