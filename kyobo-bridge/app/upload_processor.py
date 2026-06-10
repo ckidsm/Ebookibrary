@@ -148,6 +148,14 @@ def process_upload_job(job: dict) -> None:
                         break
             except Exception:
                 pass
+            # 도서 헤더 디테일 — 출판일·개정일(무료 정규식) + 종류·분야·소개(AI 1회)
+            try:
+                from .processing.book_meta import extract_dates, extract_meta_ai
+                meta.update(extract_dates(pages_txt))
+                if cfg.api_key:
+                    meta.update(extract_meta_ai(pages_txt, cfg, title=title))
+            except Exception as e:
+                log.warning("도서 메타 추출 실패(무시): %s", e)
             saved = _corpus_save(slug, meta, pages_txt)
             log.info("📚 OCR 코퍼스 DB: %s · %d 페이지 저장+백업", slug, saved)
         except Exception as e:

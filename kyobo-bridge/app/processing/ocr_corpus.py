@@ -34,6 +34,11 @@ def _conn() -> sqlite3.Connection:
             kyobo_id    TEXT,
             salecmdtid  TEXT,
             isbn        TEXT,
+            category    TEXT,                  -- 도서 종류(입문서/전문서/실용서 ...)
+            field       TEXT,                  -- 분야(인공지능·머신러닝 / 영상·미디어 ...)
+            pub_date    TEXT,                  -- 출판일(초판 발행일)
+            revision_date TEXT,                -- 개정일(최신 쇄/개정판 발행일)
+            description TEXT,                  -- 소개글(요약)
             page_count  INTEGER,
             source      TEXT,                  -- capture-browser / upload / backfill ...
             created_at  TEXT DEFAULT (datetime('now')),
@@ -52,6 +57,12 @@ def _conn() -> sqlite3.Connection:
         CREATE INDEX IF NOT EXISTS idx_pages_book ON book_pages(book_slug);
         """
     )
+    # 기존 DB 호환 — 누락 컬럼 보강
+    have = {r[1] for r in c.execute("PRAGMA table_info(book_master)")}
+    for col in ("category", "field", "pub_date", "revision_date", "description"):
+        if col not in have:
+            c.execute(f"ALTER TABLE book_master ADD COLUMN {col} TEXT")
+    c.commit()
     return c
 
 
@@ -82,15 +93,23 @@ def save_book(slug: str, meta: dict, pages: dict[int, str]) -> int:
     try:
         c.execute(
             """INSERT INTO book_master
-                 (slug,title,author,publisher,kyobo_id,salecmdtid,isbn,page_count,source)
-               VALUES (?,?,?,?,?,?,?,?,?)
+                 (slug,title,author,publisher,kyobo_id,salecmdtid,isbn,
+                  category,field,pub_date,revision_date,description,page_count,source)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(slug) DO UPDATE SET
                  title=excluded.title, author=excluded.author, publisher=excluded.publisher,
                  kyobo_id=excluded.kyobo_id, salecmdtid=excluded.salecmdtid, isbn=excluded.isbn,
+                 category=COALESCE(excluded.category, book_master.category),
+                 field=COALESCE(excluded.field, book_master.field),
+                 pub_date=COALESCE(excluded.pub_date, book_master.pub_date),
+                 revision_date=COALESCE(excluded.revision_date, book_master.revision_date),
+                 description=COALESCE(excluded.description, book_master.description),
                  page_count=excluded.page_count, source=excluded.source,
                  updated_at=datetime('now')""",
             (slug, meta.get("title"), meta.get("author"), meta.get("publisher"),
              meta.get("kyobo_id"), meta.get("salecmdtid"), meta.get("isbn"),
+             meta.get("category"), meta.get("field"), meta.get("pub_date"),
+             meta.get("revision_date"), meta.get("description"),
              len(pages), meta.get("source", "capture")),
         )
         for pn, txt in pages.items():

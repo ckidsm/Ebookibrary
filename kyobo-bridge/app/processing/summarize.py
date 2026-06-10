@@ -153,6 +153,47 @@ def _extract_json(text: str) -> dict:
     return json.loads(s)
 
 
+def _post_message(cfg: "AiCfg", user_prompt: str, system: str | None = None,
+                  max_tokens: int = 1500, max_retries: int = 3) -> tuple[str, int, int]:
+    """Anthropic Messages 단일 호출 → (text, in_tok, out_tok). summarize·book_meta 공용."""
+    if not cfg.api_key:
+        raise RuntimeError("AI API 키 없음. ANTHROPIC_API_KEY 설정 필요.")
+    body = {
+        "model": cfg.model,
+        "max_tokens": max_tokens,
+        "temperature": cfg.temperature,
+        "messages": [{"role": "user", "content": user_prompt}],
+    }
+    if system is not None:
+        body["system"] = system
+    req = urllib.request.Request(
+        API_URL, method="POST",
+        headers={"x-api-key": cfg.api_key, "anthropic-version": API_VERSION,
+                 "content-type": "application/json"},
+        data=json.dumps(body).encode("utf-8"),
+    )
+    last_err = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+                text = payload["content"][0]["text"]
+                usage = payload.get("usage", {})
+                return text, usage.get("input_tokens", 0), usage.get("output_tokens", 0)
+        except urllib.error.HTTPError as e:
+            body_txt = e.read().decode("utf-8", errors="replace")[:300]
+            last_err = f"HTTP {e.code} {e.reason}: {body_txt}"
+            if e.code in (429, 500, 502, 503, 504) and attempt < max_retries:
+                time.sleep(2 ** attempt); continue
+            raise RuntimeError(last_err)
+        except Exception as e:
+            last_err = f"{type(e).__name__}: {e}"
+            if attempt < max_retries:
+                time.sleep(2 ** attempt); continue
+            raise
+    raise RuntimeError(last_err or "알 수 없는 오류")
+
+
 def summarize_page(
     num: int,
     ocr_text: str,
