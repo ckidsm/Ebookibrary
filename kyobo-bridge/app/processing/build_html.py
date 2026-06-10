@@ -223,7 +223,7 @@ function openModal(img) {
     modal.classList.add('active');
     var pad = String(mPage).padStart(3, '0');
     mOcrText.textContent = '불러오는 중…';
-    fetch('ocr_text/page_' + pad + '.txt')
+    fetch('ocr_text/page_' + pad + '.txt?t=' + Date.now())
         .then(function(r) { return r.ok ? r.text() : Promise.reject(); })
         .then(function(t) { mOcrText.textContent = (t || '').trim() || '(OCR 텍스트 없음)'; })
         .catch(function() { mOcrText.textContent = '(이 페이지의 OCR 텍스트를 불러오지 못했습니다)'; });

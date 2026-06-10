@@ -126,6 +126,33 @@ def process_upload_job(job: dict) -> None:
         db.update_job(jid, progress=_progress(4, N, "build", 0, 0, "HTML 생성..."))
         idx = build_index(book_dir, title=title)
 
+        # ── 5) OCR 코퍼스 DB 저장 (학습/추론용 기초 데이터 + 백업) ──
+        try:
+            from .processing.ocr_corpus import save_book as _corpus_save
+            ocr_txt_dir = book_dir / "summary" / "ocr_text"
+            pages_txt: dict[int, str] = {}
+            if ocr_txt_dir.exists():
+                for f in sorted(ocr_txt_dir.glob("page_*.txt")):
+                    try:
+                        pn = int(f.stem.split("_")[-1])
+                    except ValueError:
+                        continue
+                    pages_txt[pn] = f.read_text(encoding="utf-8")
+            meta = {"title": title, "source": "upload-process"}
+            try:
+                for b in db.list_books():
+                    if (b.get("title") or "") == title:
+                        meta.update({"author": b.get("author"), "publisher": b.get("publisher"),
+                                     "kyobo_id": b.get("kyobo_id"), "salecmdtid": b.get("salecmdtid"),
+                                     "isbn": b.get("isbn")})
+                        break
+            except Exception:
+                pass
+            saved = _corpus_save(slug, meta, pages_txt)
+            log.info("📚 OCR 코퍼스 DB: %s · %d 페이지 저장+백업", slug, saved)
+        except Exception as e:
+            log.warning("OCR 코퍼스 DB 저장 실패(무시): %s", e)
+
         db.update_job(jid, status="done",
                       progress=_progress(N, N, "done", 1, 1, "전체 완료"))
         log.info("✓ upload-process job #%s 완료 → %s", jid, idx)
