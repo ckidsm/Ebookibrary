@@ -1189,7 +1189,7 @@
                 if (!isWin) return '';  // Mac 은 deep link 자동
                 const at = ws && ws.app_title;
                 const want = _norm(book.title || slug);
-                if (!ws || !ws.alive) return `<div style="margin-bottom:10px;padding:9px 11px;border-radius:6px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;color:#fca5a5;font-size:0.8rem;">✗ 워커가 감지되지 않습니다 (꺼짐?). 워커가 켜진 뒤 [🔄 다시 확인].</div>`;
+                if (!ws || !ws.alive) return `<div style="margin-bottom:10px;padding:9px 11px;border-radius:6px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;color:#fca5a5;font-size:0.8rem;">✗ <b>워커가 감지되지 않습니다</b> (꺼짐?).<br><span style="font-size:0.72rem;">→ Windows: 작업 스케줄러에서 <b>KyoboBookcaptureWorker</b> 시작, 또는 PowerShell에 <code style="color:#fcd34d;">Start-ScheduledTask -TaskName KyoboBookcaptureWorker</code>. (PC 재로그인 시 자동 시작)</span><br>켜진 뒤 [🔄 다시 확인].</div>`;
                 if (!at) return `<div style="margin-bottom:10px;padding:9px 11px;border-radius:6px;background:rgba(245,158,11,0.12);border:1px solid #f59e0b;color:#fcd34d;font-size:0.8rem;">⚠️ 교보 앱 창이 감지되지 않습니다. 앱을 실행하고 책을 펼친 뒤 [🔄 다시 확인].</div>`;
                 if (want && _norm(at).includes(want)) return `<div style="margin-bottom:10px;padding:9px 11px;border-radius:6px;background:rgba(16,185,129,0.12);border:1px solid #10b981;color:#6ee7b7;font-size:0.8rem;">✅ 교보 앱에서 <b>「${escapeHtml(book.title || slug)}」</b> 감지됨 — 준비됐습니다!<br><span style="color:#94a3b8;font-size:0.72rem;">창: ${escapeHtml(at)}</span></div>`;
                 return `<div style="margin-bottom:10px;padding:9px 11px;border-radius:6px;background:rgba(245,158,11,0.12);border:1px solid #f59e0b;color:#fcd34d;font-size:0.8rem;">⚠️ <b>다른 책</b>이 열려 있습니다: <code>${escapeHtml(at)}</code><br>「${escapeHtml(book.title || slug)}」 을 펼친 뒤 [🔄 다시 확인].</div>`;
@@ -1479,7 +1479,7 @@
                 <div class="capture-guide">
                     <div class="cg-title">📋 분석 절차 — 🌐 브라우저 웹뷰어 캡처 (권장)</div>
                     <ol class="cg-steps">
-                        <li>아래 <b>[📖 e-book 보기]</b> → 교보 책 페이지에서 <b>[바로보기]</b> 클릭 → 브라우저 웹뷰어로 열림 <small style="opacity:.6">(데스크탑 앱 ✗ — DRM 차단)</small></li>
+                        <li>아래 <b>[📖 e-book 보기]</b> → 교보 책 페이지에서 <b>[바로보기]</b> 클릭 → 브라우저 웹뷰어로 열림 <small style="opacity:.6">(데스크탑 앱 ✗ — DRM 차단)</small><br><span style="color:#fcd34d;font-size:0.92em;">⚠️ <b>[바로보기] 버튼이 안 보이면 교보 로그인 안 된 것</b> — 먼저 상단 <b>[교보문고 로그인]</b> 후 새로고침(로그인+소유해야 버튼이 나타남).</span></li>
                         <li>뷰어 상단 레이아웃을 <b>단일 페이지(1)</b> 로 <small style="opacity:.6">— 거터·여백 없이 한 장씩(권장)</small></li>
                         <li><b>F11</b> 전체화면 + <b>원하는 시작 페이지</b>로 이동 + <b>책 화면 클릭</b>(키보드 포커스)</li>
                         <li>아래 <b>[분석 시작] → 🌐 브라우저 웹뷰어 캡처</b> → <b>[준비 완료]</b></li>
