@@ -93,7 +93,7 @@ def _build_page_card(page: dict, prev_num: int | None, next_num: int | None, ima
         <div class="page-nav">{nav_html}</div>
     </div>
     <div class="page-body">
-        <div class="page-image"><img src="{img_src}" alt="Page {num}" loading="lazy"></div>
+        <div class="page-image"><img src="{img_src}" alt="Page {num}" data-page="{num}" loading="lazy"></div>
         <div class="page-summary">
             {intro}
             <div class="section"><div class="section-title">주요 주제</div><div class="tag-list">{topics}</div></div>
@@ -171,12 +171,24 @@ body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; backgroun
 .signature { margin-top: 40px; padding: 18px 22px; background: white; border-radius: 8px; border-left: 4px solid #1abc9c; font-size: 0.78rem; color: #555; }
 .signature strong { color: #2c3e50; }
 
-/* Modal */
-.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; cursor: zoom-out; }
-.modal-overlay.active { display: flex; }
-.modal-overlay img { max-width: 95vw; max-height: 95vh; object-fit: contain; border-radius: 4px; box-shadow: 0 0 40px rgba(0,0,0,0.5); }
-.modal-close { position: fixed; top: 20px; right: 30px; color: white; font-size: 2em; cursor: pointer; z-index: 1001; line-height: 1; }
+/* Modal — 확대/축소·이동·OCR텍스트·메모 */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1000; }
+.modal-overlay.active { display: block; }
+.modal-stage { position: absolute; inset: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: grab; }
+.modal-stage.panning { cursor: grabbing; }
+.modal-stage img { max-width: 96vw; max-height: 96vh; transform-origin: center center; user-select: none; -webkit-user-drag: none; will-change: transform; box-shadow: 0 0 40px rgba(0,0,0,0.5); background: #fff; }
+.modal-bar { position: fixed; top: 14px; left: 16px; z-index: 1002; display: flex; align-items: center; gap: 6px; background: rgba(20,28,40,0.88); padding: 6px 10px; border-radius: 8px; }
+.mbtn { background: #2c3e50; color: #fff; border: 1px solid #46637e; border-radius: 6px; padding: 4px 11px; font-size: 0.85rem; cursor: pointer; line-height: 1.2; font-family: inherit; }
+.mbtn:hover { background: #1abc9c; border-color: #1abc9c; }
+.modal-bar #mZoomLabel { color: #cbd5e1; font-size: 0.8rem; min-width: 44px; text-align: center; }
+.modal-bar .mbar-page { color: #7ee787; font-size: 0.82rem; font-weight: 700; margin-left: 8px; }
+.modal-close { position: fixed; top: 16px; right: 24px; color: white; font-size: 2em; cursor: pointer; z-index: 1002; line-height: 1; }
 .modal-close:hover { color: #1abc9c; }
+.modal-text { position: fixed; top: 0; right: 0; width: 380px; max-width: 92vw; height: 100vh; background: #0f1722; color: #e2e8f0; z-index: 1001; box-shadow: -4px 0 24px rgba(0,0,0,0.5); padding: 62px 16px 16px; display: none; flex-direction: column; gap: 8px; }
+.modal-text.open { display: flex; }
+.modal-text .mt-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
+.modal-text pre { flex: 1; min-height: 110px; max-height: 44vh; overflow: auto; background: #0a0e14; border: 1px solid #24323f; border-radius: 6px; padding: 10px; font-size: 0.8rem; line-height: 1.55; white-space: pre-wrap; word-break: break-word; color: #cbd5e1; margin: 0; }
+.modal-text textarea { flex: 1; min-height: 110px; background: #0a0e14; border: 1px solid #24323f; border-radius: 6px; padding: 10px; font-size: 0.85rem; line-height: 1.6; color: #fff; resize: vertical; font-family: inherit; }
 
 @media (max-width: 900px) {
     .sidebar { width: 240px; }
@@ -189,16 +201,64 @@ body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; backgroun
 _JS = """\
 const modal = document.getElementById('imageModal');
 const modalImg = document.getElementById('modalImg');
+const mStage = document.getElementById('mStage');
+const mTextPanel = document.getElementById('mTextPanel');
+const mOcrText = document.getElementById('mOcrText');
+const mMemo = document.getElementById('mMemo');
+const mZoomLabel = document.getElementById('mZoomLabel');
+const mPageLabel = document.getElementById('mPageLabel');
+const SLUG = (window.KYOBO_SLUG || 'book');
+let mScale = 1, mTx = 0, mTy = 0, mPage = '';
+function mApply() {
+    modalImg.style.transform = 'translate(' + mTx + 'px,' + mTy + 'px) scale(' + mScale + ')';
+    mZoomLabel.textContent = Math.round(mScale * 100) + '%';
+}
+function mReset() { mScale = 1; mTx = 0; mTy = 0; mApply(); }
+function mZoom(f) { mScale = Math.min(8, Math.max(0.15, mScale * f)); mApply(); }
+function openModal(img) {
+    modalImg.src = img.src;
+    mPage = img.getAttribute('data-page') || '';
+    mPageLabel.textContent = mPage ? ('Page ' + mPage) : '';
+    mReset();
+    modal.classList.add('active');
+    var pad = String(mPage).padStart(3, '0');
+    mOcrText.textContent = '불러오는 중…';
+    fetch('ocr_text/page_' + pad + '.txt')
+        .then(function(r) { return r.ok ? r.text() : Promise.reject(); })
+        .then(function(t) { mOcrText.textContent = (t || '').trim() || '(OCR 텍스트 없음)'; })
+        .catch(function() { mOcrText.textContent = '(이 페이지의 OCR 텍스트를 불러오지 못했습니다)'; });
+    mMemo.value = localStorage.getItem('memo:' + SLUG + ':' + mPage) || '';
+}
 document.querySelectorAll('.page-image img').forEach(function(img) {
-    img.addEventListener('click', function() {
-        modalImg.src = img.src;
-        modal.classList.add('active');
-    });
+    img.addEventListener('click', function() { openModal(img); });
 });
-modal.addEventListener('click', function() { modal.classList.remove('active'); });
 document.getElementById('modalClose').addEventListener('click', function() { modal.classList.remove('active'); });
+document.getElementById('mZoomIn').onclick = function() { mZoom(1.2); };
+document.getElementById('mZoomOut').onclick = function() { mZoom(1 / 1.2); };
+document.getElementById('mZoomReset').onclick = mReset;
+document.getElementById('mTextBtn').onclick = function() { mTextPanel.classList.toggle('open'); };
+document.getElementById('mCopyBtn').onclick = function() {
+    navigator.clipboard.writeText(mOcrText.textContent || '').then(function() {
+        var b = document.getElementById('mCopyBtn'); b.textContent = '✓ 복사됨';
+        setTimeout(function() { b.textContent = '📋 복사'; }, 1200);
+    });
+};
+mMemo.addEventListener('input', function() {
+    localStorage.setItem('memo:' + SLUG + ':' + mPage, mMemo.value);
+    var s = document.getElementById('mMemoSaved'); s.textContent = '저장됨';
+    setTimeout(function() { s.textContent = ''; }, 1000);
+});
+mStage.addEventListener('wheel', function(e) { e.preventDefault(); mZoom(e.deltaY < 0 ? 1.12 : 1 / 1.12); }, { passive: false });
+var panning = false, sx = 0, sy = 0;
+mStage.addEventListener('mousedown', function(e) { panning = true; sx = e.clientX - mTx; sy = e.clientY - mTy; mStage.classList.add('panning'); e.preventDefault(); });
+window.addEventListener('mousemove', function(e) { if (!panning) return; mTx = e.clientX - sx; mTy = e.clientY - sy; mApply(); });
+window.addEventListener('mouseup', function() { panning = false; mStage.classList.remove('panning'); });
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') modal.classList.remove('active');
+    if (!modal.classList.contains('active')) return;
+    if (e.key === '+' || e.key === '=') mZoom(1.2);
+    else if (e.key === '-' || e.key === '_') mZoom(1 / 1.2);
+    else if (e.key === '0') mReset();
 });
 
 var spyDisabled = false;
@@ -307,10 +367,27 @@ def build_html(
 </div>
 
 <div class="modal-overlay" id="imageModal">
-    <span class="modal-close" id="modalClose">&times;</span>
-    <img id="modalImg" src="" alt="">
+    <div class="modal-bar">
+        <button class="mbtn" id="mTextBtn" title="OCR 텍스트/메모 보기">📄 텍스트</button>
+        <button class="mbtn" id="mZoomOut" title="축소 (−)">−</button>
+        <span id="mZoomLabel">100%</span>
+        <button class="mbtn" id="mZoomIn" title="확대 (+)">+</button>
+        <button class="mbtn" id="mZoomReset" title="원래대로 (0)">⊡</button>
+        <span class="mbar-page" id="mPageLabel"></span>
+    </div>
+    <span class="modal-close" id="modalClose" title="닫기 (Esc)">&times;</span>
+    <div class="modal-stage" id="mStage">
+        <img id="modalImg" src="" alt="" draggable="false">
+    </div>
+    <aside class="modal-text" id="mTextPanel">
+        <div class="mt-row"><b>📄 OCR 텍스트</b><button class="mbtn" id="mCopyBtn">📋 복사</button></div>
+        <pre id="mOcrText">—</pre>
+        <div class="mt-row"><b>📝 메모</b><span id="mMemoSaved" style="font-size:0.7rem;color:#1abc9c;"></span></div>
+        <textarea id="mMemo" placeholder="이 페이지 메모 (자동 저장)"></textarea>
+    </aside>
 </div>
 
+<script>window.KYOBO_SLUG = {json.dumps(book_dir.name)};</script>
 <script>
 {_JS}
 </script>
