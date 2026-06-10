@@ -34,3 +34,6 @@ venv/
 
 # deploy 시 백엔드 snapshot (재생성)
 /api-cache/
+
+# 비밀 (docker-compose env)
+.env

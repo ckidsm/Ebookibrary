@@ -203,6 +203,34 @@ def sync_kyobo_library(payload: SyncRequest) -> dict:
     return {"ok": True, "source": payload.source, **result, "total": count_books()}
 
 
+# ── 교보 로그인 상태 (유저스크립트가 교보 페이지에서 감지해 보고) ──
+_kyobo_login = {"logged_in": False, "ts": 0.0}
+
+
+class KyoboLoginStatus(BaseModel):
+    logged_in: bool
+    can_view: bool | None = None
+    page: str | None = None
+
+
+@app.post("/api/kyobo/login-status")
+def post_kyobo_login(body: KyoboLoginStatus) -> dict:
+    """유저스크립트가 교보 페이지에서 로그인 여부를 감지해 보고."""
+    import time as _t
+    _kyobo_login["logged_in"] = bool(body.logged_in)
+    _kyobo_login["ts"] = _t.time()
+    return {"ok": True}
+
+
+@app.get("/api/kyobo/login-status")
+def get_kyobo_login() -> dict:
+    """포털 준비 팝업이 폴링 — logged_in + 마지막 보고 경과초."""
+    import time as _t
+    ts = _kyobo_login["ts"]
+    ago = round(_t.time() - ts, 1) if ts else None
+    return {"logged_in": bool(_kyobo_login["logged_in"]), "ago_seconds": ago}
+
+
 # ── 백엔드 프록시 로그인 (미구현 — SPA 분석 필요) ────────────
 class LoginRequest(BaseModel):
     kyobo_id: str

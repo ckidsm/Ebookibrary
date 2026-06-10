@@ -1128,12 +1128,21 @@
         // 🌐 브라우저 웹뷰어 캡처 준비 — 교보 [바로보기] wviewer 를 브라우저로 띄워두게 안내
         async function showBrowserPrep(book, slug, startPage) {
             const title = escapeHtml(book.title || slug);
+            // 교보 로그인 상태 폴링 — 유저스크립트가 교보 페이지에서 감지·보고한 것
+            const _loginPoll = setInterval(async () => {
+                try {
+                    const r = await fetch(BRIDGE_URL + '/api/kyobo/login-status', { cache: 'no-store' }).then(x => x.json());
+                    const el = document.getElementById('bp-login-chk');
+                    if (el) el.innerHTML = (r.logged_in && r.ago_seconds != null && r.ago_seconds < 1800)
+                        ? '<span style="color:#34d399;">✓ 로그인됨</span>' : '';
+                } catch (e) {}
+            }, 2500);
             const ok = await showCustomConfirm({
                 title: '🌐 브라우저 웹뷰어 캡처 준비',
                 body: `<div style="font-size:0.85rem;color:#cbd5e1;line-height:1.7;">
                         <div style="margin-bottom:9px;color:#fff;">아래 <b>순서대로</b> 준비한 뒤 [준비 완료]:</div>
                         <ol style="margin:0;padding-left:1.3em;line-height:1.95;">
-                            <li><b>교보 로그인</b> 먼저 <small style="color:#94a3b8;">(안 하면 [바로보기]가 안 보임)</small></li>
+                            <li><a href="https://mmbr.kyobobook.co.kr/login?continue=${encodeURIComponent('https://ebook-product.kyobobook.co.kr/dig/epd/ebook/' + (book.salecmdtid || book.kyobo_id || ''))}" target="_blank" rel="noopener noreferrer" style="color:#22d3ee;font-weight:700;text-decoration:underline;">교보 로그인</a> 먼저 <span id="bp-login-chk" style="font-weight:700;"></span> <small style="color:#94a3b8;">(안 하면 [바로보기]가 안 보임)</small></li>
                             <li><b>「${title}」</b>의 <b>[바로보기]</b> 클릭 → 웹뷰어 열고 <b>F11</b> 전체화면</li>
                             <li>${startPage > 1 ? `<b>${startPage}페이지</b>` : '<b>첫 페이지</b>'}로 이동</li>
                             <li>뷰어 <b>단일 페이지(1)</b> 모드로 설정 <small style="color:#94a3b8;">(펼침 X — 한 장씩)</small></li>
@@ -1149,6 +1158,7 @@
                     { label: '✓ 준비 완료 (5초 뒤 캡처)', value: 'ready', kind: 'primary' },
                 ],
             });
+            clearInterval(_loginPoll);
             if (ok !== 'ready') return false;
             await _countdown(5, '⏱ 곧 캡처가 시작됩니다', (n) => `
                 <div style="text-align:center;line-height:1.7;">

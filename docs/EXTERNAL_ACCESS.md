@@ -10,7 +10,7 @@ LAN 외부 (VPN 끊긴 환경 등) 에서 `https://redcodeme.synology.me/kyobo/`
 
 | 외부 URL | 내부 매핑 | 역할 |
 |---|---|---|
-| `https://redcodeme.synology.me/` | `/volume1/web/` (Web Station, 443) | 메인 NAS 페이지 (MyWeb) |
+| `https://redcodeme.synology.me/` | `/volume1/web/` (Web Station, 443) | 메인 NAS 페이지 (redcodeme-nas-portal) |
 | `https://redcodeme.synology.me/kyobo/` | `/volume1/web/kyobo/` (Web Station, 443) | 정적 KyoboLibrary 메인 |
 | `https://redcodeme.synology.me/kyobo/install/...` | 같이 | install 스크립트 다운로드 |
 | **`https://redcodeme.synology.me:9443/`** | `localhost:9000` (Reverse Proxy) | **kyobo-bridge 백엔드** |
@@ -107,5 +107,5 @@ allow_origins=[
 
 ## 7. 메인 NAS 페이지 카드 링크
 
-`MyWeb/portal/index.html` 의 "도서 라이브러리" 카드는 상대 경로 `kyobo/` 사용 →
+`redcodeme-nas-portal/portal/index.html` 의 "도서 라이브러리" 카드는 상대 경로 `kyobo/` 사용 →
 LAN/외부 모두 같은 도메인에서 자동 매핑. 별도 수정 불필요.

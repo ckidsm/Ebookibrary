@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         Kyobo e-Library → NAS Sync
 // @namespace    https://192.168.10.205/
-// @version      0.7.3
-// @description  교보 e-Library 페이지에서 내 도서 목록을 NAS Kyobo Bridge(9000)로 동기화 (스크롤 컨테이너 자동 감지)
+// @version      0.8.0
+// @description  교보 e-Library 도서 목록을 NAS Kyobo Bridge 로 동기화 + 로그인 상태 감지 보고
 // @author       YUNDEOKSOO
 // @match        https://elibrary.kyobobook.co.kr/*
 // @match        https://ebook.kyobobook.co.kr/dig/*
+// @match        https://ebook-product.kyobobook.co.kr/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -46,6 +47,24 @@
             GM_setValue('backendUrl', DEFAULTS.backend_external);
         }
     })();
+
+    // ── 교보 로그인 상태 감지 + 백엔드 보고 (포털 준비 팝업의 ✓ 체크용) ──
+    function reportLoginStatus() {
+        try {
+            const hasLogout = !!document.querySelector('a[href*="logout"], a[href*="Logout"], button[onclick*="logout"]');
+            const baro = [...document.querySelectorAll('button,a')]
+                .some(el => /webViewerCall/.test(el.getAttribute('onclick') || ''));
+            const loggedIn = hasLogout || baro;
+            GM_xmlhttpRequest({
+                method: 'POST',
+                url: backendUrl() + '/api/kyobo/login-status',
+                headers: { 'Content-Type': 'application/json' },
+                data: JSON.stringify({ logged_in: loggedIn, can_view: baro, page: location.hostname }),
+            });
+            console.log('[NVK] 로그인 상태 보고:', loggedIn, '(바로보기:', baro, ')');
+        } catch (e) { console.warn('[NVK] 로그인 상태 보고 실패', e); }
+    }
+    setTimeout(reportLoginStatus, 1500);
 
     // ── UI ──────────────────────────────────────────────
     function injectPanel() {

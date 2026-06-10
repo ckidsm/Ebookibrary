@@ -36,6 +36,8 @@ services:
       KYOBO_BRIDGE_DB: /data/library.db
       LIBRARY_BOOKS_DIR: /mnt/library/books
       LIBRARY_BOOKS_WRITE_DIR: /mnt/library-rw/books
+      # 민감 비밀은 .env(git 제외)에서 주입 — DB·이미지 미포함
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
     # 헬스체크는 이미지 안에도 있지만 compose에도 명시 (재시작 트리거)
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
