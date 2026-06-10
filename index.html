@@ -939,29 +939,15 @@
                     백엔드 상태 확인 중...
                 </div>
             </div>
-            <div class="quick-card">
-                <div class="quick-icon">📷</div>
-                <div class="quick-title">책 분석 — 캡처 방법 <span class="ext">가이드</span></div>
-                <div class="quick-desc">
-                    교보 웹뷰어를 화면 캡처해 OCR·AI 요약·HTML로 만듭니다.
-                    깨끗한 결과를 위한 <b>준비 순서</b>:
-                </div>
-                <ol class="sync-steps">
-                    <li>책 <b>[바로보기]</b> → 브라우저 웹뷰어로 열기 <small style="opacity:.6">(데스크탑 앱 ✗ — DRM 차단)</small></li>
-                    <li>뷰어 상단 레이아웃을 <b>단일 페이지(1)</b> 로 <small style="opacity:.6">— 거터·여백 없이 한 장씩(권장)</small></li>
-                    <li><b>F11</b> 전체화면 + <b>첫 페이지</b>로 이동 + <b>책 화면 클릭</b>(키보드 포커스)</li>
-                    <li>아래 도서함에서 그 책 클릭 → <b>[분석 시작] → 🌐 브라우저 웹뷰어 캡처</b> → [준비 완료]</li>
-                    <li><b>5초 안에 웹뷰어로 전환</b>(Alt+Tab) → 마우스·키보드 떼고 기다리기</li>
-                </ol>
-                <div class="quick-desc" style="margin-top:0.7rem;font-size:0.8rem;opacity:0.85;">
-                    ⚙️ <b>워커가 자동 처리</b>: 화면 캡처(DRM 우회·Mac 창ID/Win dxcam) · →키 페이지 넘김 ·
-                    사람처럼 천천히(차단 회피) · 브라우저 크롬·여백 자동 크롭.
-                    <b>로컬 워커가 실행 중</b>이어야 합니다(로그인 시 자동 시작).
-                </div>
-            </div>
         </section>
 
-        <div class="section-label">내 e-Library 도서함 <small id="kyobo-count" style="opacity:0.6;font-weight:normal;text-transform:none;letter-spacing:0;"></small></div>
+        <div class="section-label" style="display:flex;align-items:center;gap:0.6rem;">내 e-Library 도서함 <small id="kyobo-count" style="opacity:0.6;font-weight:normal;text-transform:none;letter-spacing:0;"></small>
+            <select id="kyobo-sort" onchange="applySort()" title="정렬" style="margin-left:auto;background:#1a2332;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:3px 9px;font-size:0.8rem;text-transform:none;letter-spacing:0;font-weight:normal;cursor:pointer;">
+                <option value="sync">동기화순</option>
+                <option value="analyzed">분석도서순</option>
+                <option value="title">가나다순</option>
+            </select>
+        </div>
         <section id="kyobo-books-container" class="kyobo-books-grid">
             <div class="kyobo-empty">백엔드를 확인하는 중...</div>
         </section>
@@ -1056,7 +1042,24 @@
         }
 
         // ── Phase C-4: slugify + 분석 상태 캐시 + 카드 클릭 모달 ──
-        let _kyoboBooks = [];          // 동기화된 책 목록
+        let _kyoboBooks = [];          // 동기화된 책 목록(현재 정렬 적용본)
+        let _kyoboBooksRaw = [];       // 동기화 원본 순서
+        let _sortMode = 'sync';        // sync | analyzed | title
+        function applySort() {
+            const sel = document.getElementById('kyobo-sort');
+            if (sel) _sortMode = sel.value;
+            let list = _kyoboBooksRaw.slice();
+            if (_sortMode === 'title') {
+                list.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'ko'));
+            } else if (_sortMode === 'analyzed') {
+                list.sort((a, b) => {
+                    const da = _analyzedMap.has(slugify(a.title)) ? 0 : 1;
+                    const db = _analyzedMap.has(slugify(b.title)) ? 0 : 1;
+                    return da - db || (a.title || '').localeCompare(b.title || '', 'ko');
+                });
+            }   // 'sync' → 원본 순서 유지
+            renderKyoboBooks(list);
+        }
         let _analyzedMap = new Map();  // slug → {pages, url}
         let _activeJobs = new Map();   // slug → { jobId, status, pct, stage, stageName, msg }
 
@@ -1360,7 +1363,8 @@
                     const r = await fetch(u, { cache: 'no-store' });
                     if (!r.ok) { lastErr = `HTTP ${r.status} (${u})`; continue; }
                     const j = await r.json();
-                    renderKyoboBooks(j.books || []);
+                    _kyoboBooksRaw = j.books || [];
+                    applySort();
                     // snapshot 으로 동작 중이면 안내 한 줄
                     if (u.startsWith('api-cache/')) {
                         const cnt = document.getElementById('kyobo-count');
@@ -1467,28 +1471,18 @@
                         <span style="color:#94a3b8;">(참고: joons.pe.kr/527 — "스크린샷 반복" 단축어)</span>
                     </div>
                     <div class="cg-warn">⚠️ ${isIOS ? 'iPad/아이폰' : '이 기기'}는 iOS 보안(샌드박스)으로 <b>앱 자동 열기·완전 자동 캡처가 불가</b>합니다(페이지 넘김은 수동). Mac/Windows만 페이지넘김까지 자동.</div>
-                </div>` : (isWin ? `
-                <div class="capture-guide">
-                    <div class="cg-title">📋 분석 절차 — 순서대로 (Windows 로컬 캡처)</div>
-                    <ol class="cg-steps">
-                        <li><b>교보 eLibrary 앱을 직접 실행</b>하세요. (웹/워커가 책을 자동으로 못 엽니다)</li>
-                        <li>분석할 <b>책을 펼치고</b> → <b>첫 페이지</b>로 이동 → 뷰어를 <b>전체화면</b>으로.</li>
-                        <li>그 <b>책 화면을 그대로</b> 두세요. (다른 창 클릭·이동 금지)</li>
-                        <li>아래 <b>[분석 시작]</b> 클릭.</li>
-                        <li>워커가 화면을 캡처하며 <b>→ 키로 자동 페이지 넘김</b>.</li>
-                        <li>캡처 끝 → 서버가 <b>OCR·요약·HTML</b> 생성 → 라이브러리 게시.</li>
-                    </ol>
-                    <div class="cg-warn">⚠️ 캡처 중에는 책 화면을 가리거나 마우스/키보드를 건드리지 마세요. <b>지금 화면에 보이는 그대로</b> 찍힙니다. 캡처가 일찍 멈추면 페이지 넘김 키(→)가 안 먹은 것 — 책 뷰어에 포커스를 두세요.</div>
                 </div>` : `
                 <div class="capture-guide">
-                    <div class="cg-title">📋 분석 절차 (macOS 로컬 캡처)</div>
+                    <div class="cg-title">📋 분석 절차 — 🌐 브라우저 웹뷰어 캡처 (권장)</div>
                     <ol class="cg-steps">
-                        <li><b>[분석 시작]</b> 클릭 → 교보 eBook 앱이 deep link 로 책을 자동으로 엽니다.</li>
-                        <li>다중 모니터 권장: 책은 한 모니터, 분석 시작은 다른 모니터 브라우저에서.</li>
-                        <li>워커가 자동 캡처 → 서버가 OCR·요약·HTML 처리.</li>
+                        <li>이 책 <b>[바로보기]</b> → 브라우저 웹뷰어로 열기 <small style="opacity:.6">(데스크탑 앱 ✗ — DRM 차단)</small></li>
+                        <li>뷰어 상단 레이아웃을 <b>단일 페이지(1)</b> 로 <small style="opacity:.6">— 거터·여백 없이 한 장씩(권장)</small></li>
+                        <li><b>F11</b> 전체화면 + <b>첫 페이지</b>로 이동 + <b>책 화면 클릭</b>(키보드 포커스)</li>
+                        <li>아래 <b>[분석 시작] → 🌐 브라우저 웹뷰어 캡처</b> → <b>[준비 완료]</b></li>
+                        <li><b>5초 안에 웹뷰어로 전환</b>(Alt+Tab) → 마우스·키보드 떼고 기다리기</li>
                     </ol>
-                    <div class="cg-warn">⚠️ 캡처 중 책 화면을 가리지 마세요. 페이지 넘김이 멈추면 책 창에 포커스를 두세요.</div>
-                </div>`);
+                    <div class="cg-warn">⚙️ 워커가 자동 처리: 화면 캡처(DRM 우회) · →키 페이지 넘김 · 천천히(차단 회피) · 크롬·여백 자동 크롭. 캡처 중 화면·마우스·키보드 건드리지 마세요. <b>로컬 워커 실행 중</b>이어야 합니다(로그인 시 자동 시작).</div>
+                </div>`;
             document.getElementById('bmodal-body').innerHTML = `
                 ${cover}
                 <div class="bmodal-title">${escapeHtml(book.title)}</div>
