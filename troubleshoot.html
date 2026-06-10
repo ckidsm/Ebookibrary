@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>교보 라이브러리 — 트러블슈팅</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Apple SD Gothic Neo','Noto Sans KR',system-ui,sans-serif; background:#0a0c10; color:#e6ecf2; line-height:1.7; padding:24px 16px 80px; }
+  .wrap { max-width:860px; margin:0 auto; }
+  h1 { font-size:1.5rem; margin-bottom:4px; }
+  .sub { color:#8b96a8; font-size:0.85rem; margin-bottom:24px; }
+  h2 { font-size:1.1rem; margin:30px 0 12px; padding-bottom:8px; border-bottom:2px solid #1f2937; color:#7ee787; display:flex; align-items:center; gap:8px; }
+  h3 { font-size:0.95rem; margin:18px 0 8px; color:#a5b4fc; }
+  p, li { font-size:0.88rem; }
+  ol, ul { margin:6px 0 6px 1.3em; }
+  li { margin-bottom:4px; }
+  b { color:#fff; }
+  code { background:#1a2332; color:#fcd34d; padding:1px 6px; border-radius:4px; font-family:'SF Mono',Consolas,Menlo,monospace; font-size:0.86em; }
+  .cmd { position:relative; background:#11151c; border:1px solid #2f3a4d; border-radius:8px; padding:12px 44px 12px 14px; margin:8px 0 14px; font-family:'SF Mono',Consolas,Menlo,monospace; font-size:0.82rem; color:#cbd5e1; white-space:pre-wrap; word-break:break-all; }
+  .cmd .copy { position:absolute; top:8px; right:8px; background:#2c3e50; color:#fff; border:1px solid #46637e; border-radius:6px; padding:3px 9px; font-size:0.72rem; cursor:pointer; font-family:inherit; }
+  .cmd .copy:hover { background:#1abc9c; border-color:#1abc9c; }
+  .card { background:#11151c; border:1px solid #1f2937; border-radius:10px; padding:16px 18px; margin-bottom:14px; }
+  .sit { border-left:3px solid #f59e0b; padding-left:12px; margin:12px 0; }
+  .sit .q { color:#fcd34d; font-weight:700; font-size:0.9rem; }
+  .ok { color:#34d399; } .bad { color:#fca5a5; } .warn { color:#fcd34d; }
+  .pill { display:inline-block; background:rgba(34,211,238,0.15); color:#22d3ee; border:1px solid #22d3ee; border-radius:12px; padding:2px 10px; font-size:0.72rem; font-weight:600; }
+  a { color:#22d3ee; }
+  .top { margin-bottom:20px; }
+  .top a { font-size:0.82rem; }
+  .big { background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.4); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a href="./">← 교보 라이브러리 포털로</a></div>
+  <h1>🛠 교보 라이브러리 — 트러블슈팅</h1>
+  <div class="sub">캡처가 안 될 때 상황별 해결 + Windows 워커/유저스크립트 명령 모음</div>
+
+  <!-- ── 한 방 진단 ── -->
+  <h2>⚡ 한 방 진단·복구 (Windows)</h2>
+  <div class="card big">
+    <p>제일 먼저 이걸 PowerShell에 붙여넣으세요. <b>워커 상태를 점검하고, 멈췄으면 자동으로 켭니다.</b></p>
+    <div class="cmd"><button class="copy">복사</button>$t = Get-ScheduledTask -TaskName KyoboBookcaptureWorker -ErrorAction SilentlyContinue; if (-not $t) { Write-Host "워커 미설치 - 아래 [재설치] 명령 실행" -ForegroundColor Red } else { $i = $t | Get-ScheduledTaskInfo; Write-Host "상태: $($t.State) / 마지막실행: $($i.LastRunTime) / 결과코드: $($i.LastTaskResult)"; if ($t.State -ne 'Running') { Start-ScheduledTask -TaskName KyoboBookcaptureWorker; Write-Host "-> 워커를 시작했습니다" -ForegroundColor Green } else { Write-Host "-> 워커 실행 중 (정상)" -ForegroundColor Green } }</div>
+    <p style="font-size:0.8rem;color:#8b96a8;">결과가 <span class="ok">실행 중(정상)</span> 이면 OK. <span class="bad">미설치</span> 면 아래 [워커 재설치]를, 켰는데도 안 되면 [로그 확인]을 보세요.</p>
+  </div>
+
+  <!-- ── 워커 명령 ── -->
+  <h2>🖥 Windows 워커 명령</h2>
+
+  <h3>① 상태 확인</h3>
+  <div class="cmd"><button class="copy">복사</button>Get-ScheduledTask -TaskName KyoboBookcaptureWorker | Get-ScheduledTaskInfo | Select State, LastRunTime, LastTaskResult</div>
+
+  <h3>② 워커 켜기 (멈췄을 때)</h3>
+  <div class="cmd"><button class="copy">복사</button>Start-ScheduledTask -TaskName KyoboBookcaptureWorker</div>
+
+  <h3>③ 로그 확인 (왜 죽었나)</h3>
+  <div class="cmd"><button class="copy">복사</button>Get-Content "$env:LOCALAPPDATA\kyobo-library\worker.out.log" -Tail 40</div>
+
+  <h3>④ 워커 위치 찾기</h3>
+  <div class="cmd"><button class="copy">복사</button>(Get-ScheduledTask -TaskName KyoboBookcaptureWorker).Actions[0].WorkingDirectory</div>
+
+  <h3>⑤ 워커 재설치 <span class="pill">대부분의 문제 해결</span></h3>
+  <p style="font-size:0.82rem;color:#8b96a8;">설치 위치를 자동으로 찾아 재설치합니다. (먼저 OneDrive 동기화 완료 확인)</p>
+  <div class="cmd"><button class="copy">복사</button>$bc = (Get-ScheduledTask -TaskName KyoboBookcaptureWorker).Actions[0].WorkingDirectory; Write-Host "위치: $bc"; powershell -ExecutionPolicy Bypass -File "$bc\scripts\install-worker-windows.ps1"</div>
+
+  <h3>⑥ 워커 제거</h3>
+  <div class="cmd"><button class="copy">복사</button>$bc = (Get-ScheduledTask -TaskName KyoboBookcaptureWorker).Actions[0].WorkingDirectory; powershell -ExecutionPolicy Bypass -File "$bc\scripts\uninstall-worker-windows.ps1"</div>
+
+  <!-- ── 유저스크립트 ── -->
+  <h2>🧩 Tampermonkey 유저스크립트</h2>
+  <div class="card">
+    <h3 style="margin-top:0;">① "사용자 스크립트 허용" 켜기 <span class="warn">★필수★</span></h3>
+    <p>이게 꺼져 있으면 스크립트를 설치해도 <b>아예 안 됩니다</b> (Chrome 최신 요구사항).</p>
+    <ol>
+      <li>주소창에 <code>chrome://extensions</code> 입력</li>
+      <li>우측 상단 <b>개발자 모드</b> 토글 <span class="ok">ON</span></li>
+      <li><b>Tampermonkey</b> → <b>세부정보</b> → 아래로 → <b>"사용자 스크립트 허용"</b> 토글 <span class="ok">ON</span></li>
+    </ol>
+    <h3>② 설치 / 업데이트 (v0.8.0+)</h3>
+    <p>포털 <b>[📥 내 e-Library 동기화]</b> 카드 → <b>[이 Userscript 설치]</b>, 또는 직접:</p>
+    <div class="cmd"><button class="copy">복사</button>https://redcodeme.synology.me/kyobo/userscript/sync-kyobo-library.user.js</div>
+    <p style="font-size:0.82rem;color:#8b96a8;">이미 설치돼 있으면: Tampermonkey 대시보드 → 스크립트 → <b>마지막 업데이트 확인</b> 으로 v0.8.0 으로 갱신 (로그인 감지 기능 포함).</p>
+  </div>
+
+  <!-- ── 상황별 ── -->
+  <h2>🔍 상황별 해결</h2>
+
+  <div class="sit">
+    <div class="q">Q. [분석 시작] 눌러도 아무 일도 안 일어난다</div>
+    <p>→ <b>워커가 꺼졌을 가능성</b>. 위 <b>[한 방 진단·복구]</b> 실행 → 워커 켜고 다시 [분석 시작].</p>
+  </div>
+
+  <div class="sit">
+    <div class="q">Q. 워커가 자꾸 멈춘다 / 재설치해도 또 빠진다</div>
+    <p>→ 워커는 <b>화면을 캡처</b>하므로 <b>Windows 세션이 살아있어야</b> 합니다. 원격 데스크톱을 <b>완전히 끊거나(로그오프)·PC 절전</b> 되면 멈춥니다. <b>캡처하는 동안 세션을 켜둔 채</b> 두세요. (세션 돌아오면 5초 내 자동 부활)</p>
+  </div>
+
+  <div class="sit">
+    <div class="q">Q. 교보에서 [바로보기] 버튼이 안 보인다</div>
+    <p>→ <b>교보 로그인 안 됨</b>. 로그인+소유해야 버튼이 나타납니다. 포털 상단 <b>[교보문고 로그인]</b> 후 새로고침.</p>
+  </div>
+
+  <div class="sit">
+    <div class="q">Q. 엉뚱한 화면(바탕화면·다른 창)이 캡처됐다</div>
+    <p>→ 캡처 순간 <b>교보 웹뷰어가 맨 앞</b>에 없었던 것. [준비 완료] 후 <b>5초 안에 웹뷰어로 전환(Alt+Tab)</b> 하고, 캡처 끝날 때까지 <b>다른 창 누르지 마세요</b>.</p>
+  </div>
+
+  <div class="sit">
+    <div class="q">Q. 양쪽(2페이지)으로 찍힌다 / 가운데 여백이 크다</div>
+    <p>→ 뷰어가 <b>2페이지 펼침 모드</b>. 뷰어 상단 <b>단일 페이지(1)</b> 로 바꾸거나(권장), 창을 <b>세로</b>로 하면 한 장씩 찍힙니다.</p>
+  </div>
+
+  <div class="sit">
+    <div class="q">Q. PowerShell에 여러 줄 붙여넣으니 <code>></code> 만 뜨고 안 된다</div>
+    <p>→ <b>Enter 한두 번</b> 누르거나, <b>Ctrl+C</b> 후 명령을 <b>세미콜론(;)으로 이어 한 줄</b>로 붙여넣으세요 (이 페이지 명령은 모두 한 줄로 준비됨).</p>
+  </div>
+
+  <div class="sit">
+    <div class="q">Q. Tampermonkey에 스크립트가 없다 (Windows)</div>
+    <p>→ 위 <b>[유저스크립트] ①②</b> 순서대로: "사용자 스크립트 허용" 켜고 → 설치. Mac에서 됐어도 PC마다 따로 설치해야 합니다.</p>
+  </div>
+
+  <!-- ── 깨끗한 캡처 순서 ── -->
+  <h2>✅ 깨끗한 캡처 순서 (요약)</h2>
+  <div class="card">
+    <ol>
+      <li><b>워커 실행 중</b> 확인 (위 한 방 진단)</li>
+      <li><b>교보 로그인</b> → 책 <b>[바로보기]</b> → 웹뷰어 열기</li>
+      <li><b>단일 페이지(1)</b> + <b>F11 전체화면</b> + 첫 페이지</li>
+      <li>포털에서 책 → <b>[분석 시작] → 🌐 브라우저 웹뷰어 캡처 → [준비 완료]</b></li>
+      <li><b>5초 안에 웹뷰어로 전환</b> → 손 떼고 기다리기 (세션 끄지 말기)</li>
+    </ol>
+  </div>
+
+  <div style="margin-top:30px;color:#566; font-size:0.78rem; text-align:center;">교보 라이브러리 · 트러블슈팅 · 명령은 복사 버튼으로 그대로 붙여넣으세요</div>
+</div>
+
+<script>
+document.querySelectorAll('.cmd .copy').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var cmd = btn.parentElement.textContent.replace(/^복사/, '').trim();
+    navigator.clipboard.writeText(cmd).then(function(){
+      btn.textContent = '✓ 복사됨';
+      setTimeout(function(){ btn.textContent = '복사'; }, 1200);
+    });
+  });
+});
+</script>
+</body>
+</html>
