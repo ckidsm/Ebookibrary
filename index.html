@@ -1253,6 +1253,7 @@
                         <span class="kjo-pct">${pct}%</span>
                     </div>
                     <div class="kjo-bar"><div class="kjo-bar-fill${failClass}" style="width:${Math.max(2, pct)}%"></div></div>
+                    ${j.msg ? `<div class="kjo-msg" style="font-size:0.6rem;color:#cbd5e1;margin-top:3px;line-height:1.3;white-space:normal;">${escapeHtml(String(j.msg))}</div>` : ''}
                     <div class="kjo-foot">
                         <button class="kjo-btn kjo-open" type="button">상세</button>
                         ${canStop ? '<button class="kjo-btn kjo-btn-stop kjo-stop" type="button">⏹ 중단</button>' : ''}
@@ -1293,6 +1294,15 @@
                 e.stopPropagation();
                 const jid = +ov.dataset.jid;
                 if (!jid) return;
+                const ok = await showCustomConfirm({
+                    title: '⏹ 분석을 중단할까요?',
+                    body: `<div style="font-size:0.85rem;color:#cbd5e1;line-height:1.7;">정말 중단하시겠어요?<br><br><b style="color:#fca5a5;">⚠️ 지금까지 토큰을 써서 진행한 요약이 사라지고</b>, 분석 페이지가 완성되지 않습니다. 다시 하려면 처음부터입니다.</div>`,
+                    options: [
+                        { label: '계속 진행', value: 'no' },
+                        { label: '중단', value: 'yes', kind: 'danger' },
+                    ],
+                });
+                if (ok !== 'yes') return;
                 stop.disabled = true; stop.textContent = '⏳ 중단 중';
                 try { await fetch(`${BRIDGE_URL}/api/jobs/${jid}`, { method: 'DELETE' }); }
                 catch (_) {}
@@ -2343,6 +2353,15 @@
         }
 
         async function cancelCurrentJob(jid) {
+            const ok = await showCustomConfirm({
+                title: '⏹ 분석을 중단할까요?',
+                body: `<div style="font-size:0.85rem;color:#cbd5e1;line-height:1.7;">정말 중단하시겠어요?<br><br><b style="color:#fca5a5;">⚠️ 지금까지 토큰을 써서 진행한 요약이 사라지고</b>, 분석 페이지가 완성되지 않습니다. 다시 하려면 처음부터입니다.</div>`,
+                options: [
+                    { label: '계속 진행', value: 'no' },
+                    { label: '중단', value: 'yes', kind: 'danger' },
+                ],
+            });
+            if (ok !== 'yes') return;
             try {
                 await fetch(`${BRIDGE_URL}/api/jobs/${jid}`, { method: 'DELETE' });
                 // 다음 tick 이 갱신. 즉시 반영을 위해 모달에서 호출 시 slug 알 수 있는 entry 찾기

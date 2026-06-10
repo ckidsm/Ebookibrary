@@ -278,6 +278,7 @@ def summarize_pages(
     out_path: Path,
     page_range: tuple[int, int] | None = None,
     progress: bool = True,
+    progress_cb=None,
 ) -> dict:
     """여러 페이지 OCR → batch JSON 파일 저장.
 
@@ -309,7 +310,13 @@ def summarize_pages(
     if done_nums:
         print(f"[summarize] resume — 기존 {len(done_nums)}장 유지, 남은 {len(nums)}장 처리")
 
+    _ov_total = len(done_nums) + len(nums)   # 전체(이미 한 것 포함) 페이지 수
     for i, num in enumerate(nums, 1):
+        if progress_cb:
+            try:
+                progress_cb(len(done_nums) + i, _ov_total, num)
+            except Exception:
+                pass
         text = ocr_files[num].read_text(encoding="utf-8")
         # 캡처 오염 검사 — 터미널/콘솔이 책 대신 찍힌 페이지는 요약 안 하고 제외
         bad, why = is_contaminated_ocr(text)

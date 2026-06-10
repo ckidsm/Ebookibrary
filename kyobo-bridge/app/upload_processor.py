@@ -106,9 +106,19 @@ def process_upload_job(job: dict) -> None:
             db.update_job(jid, status="failed",
                           error="AI API 키 없음 — ⚙ 설정에서 키 저장 후 다시 시도")
             return
-        db.update_job(jid, progress=_progress(2, N, "summarize", 0, len(ocr_files), "AI 요약 시작..."))
+        _tot_pg = len(ocr_files)
+        db.update_job(jid, progress=_progress(2, N, "summarize", 0, _tot_pg, "AI 요약 시작..."))
         out_path = book_dir / "summary" / "batch_001.json"
-        res = summarize_pages(ocr_files, cfg, out_path, progress=True)
+        # 페이지별 진행을 잡에 반영 — 웹 진행바가 실시간으로 올라가고, 하트비트 역할도 함
+
+        def _sum_cb(done: int, tot: int, num: int) -> None:
+            if _cancelling(jid):
+                return
+            db.update_job(jid, progress=_progress(
+                2, N, "summarize", done, tot,
+                f"AI 요약 중 — {done}/{tot}장 (현재 p.{num}, 남은 {tot - done}장)"))
+
+        res = summarize_pages(ocr_files, cfg, out_path, progress=True, progress_cb=_sum_cb)
         db.update_job(jid, progress=_progress(
             2, N, "summarize", res.get("pages_done", 0), len(ocr_files),
             f"요약 {res.get('pages_done',0)}p · ${res.get('cost_usd',0):.3f}"
