@@ -72,8 +72,21 @@ def cmd_capture_auto(args) -> int:
         bot = win_app.KyoboWinCapture(output_dir=str(out_dir), book_folder=args.slug)
         if getattr(args, "no_app", False):
             # 브라우저 캡처 모드: 데스크탑 앱(=DRM 파란화면) 대신 포그라운드(브라우저 wviewer)를
-            # 그대로 화면캡처. 웹페이지는 OS 캡처를 막을 수 없어 책 본문이 정상 캡처됨.
-            print("[capture-auto] 🌐 --no-app: 데스크탑 앱 검증 스킵 → 포그라운드(브라우저 웹뷰어) 캡처")
+            # 그대로 화면캡처. 단, 캡처 전에 교보 웹뷰어(그 책)가 실제로 열려 있는지 확인.
+            book_hint = args.slug.replace("_", " ").strip()
+            win_title = win_app.find_kyobo_browser_window(book_hint)
+            if not win_title:
+                print(f"✗ 브라우저에 교보 웹뷰어가 보이지 않습니다.\n"
+                      f"   「{book_hint}」 [바로보기]를 브라우저로 열어 화면에 띄운 뒤(전체화면) 다시 시작하세요.",
+                      file=sys.stderr)
+                return 1
+            _n = lambda x: x.lower().replace(" ", "").replace("_", "")
+            toks = [t for t in book_hint.split() if len(t) >= 2]
+            book_ok = bool(toks) and sum(1 for t in toks if _n(t) in _n(win_title)) >= max(1, (len(toks) + 1) // 2)
+            if book_ok:
+                print(f"[capture-auto] ✓ 교보 웹뷰어(해당 책) 감지: {win_title}")
+            else:
+                print(f"[capture-auto] ⚠ 교보 웹뷰어 감지됨(책 제목 확인은 불가): {win_title} — 그대로 진행")
         else:
             # 검증: 교보 앱 실행 + 올바른 책이 열려 있는지 (창 제목으로)
             win_title = win_app.get_app_window_title()

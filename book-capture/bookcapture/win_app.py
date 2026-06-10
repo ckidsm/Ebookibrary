@@ -152,6 +152,45 @@ def get_app_window_title() -> str:
         return ""
 
 
+def find_kyobo_browser_window(book_hint: str = "") -> str:
+    """브라우저에 열린 교보 웹뷰어(가능하면 그 책) 창 제목을 반환. 없으면 ''.
+    창 제목에 교보/kyobo 지표 또는 책 제목 토큰이 있는 보이는 창을 찾는다.
+    책 제목이 매칭되는 창을 최우선(그 책 확인), 없으면 교보 사이트 창."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+        norm = lambda x: (x or "").lower().replace(" ", "").replace("_", "")
+        tokens = [t for t in (book_hint or "").replace("_", " ").split() if len(t) >= 2]
+        book_hits: list[str] = []
+        kyobo_hits: list[str] = []
+
+        @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+        def _cb(hwnd, _l):
+            if not user32.IsWindowVisible(hwnd):
+                return True
+            ln = user32.GetWindowTextLengthW(hwnd)
+            if ln and ln > 0:
+                buf = ctypes.create_unicode_buffer(ln + 1)
+                user32.GetWindowTextW(hwnd, buf, ln + 1)
+                t = buf.value or ""
+                nt = norm(t)
+                is_kyobo = ("교보" in t) or ("kyobo" in nt) or ("ebook" in nt)
+                tokhit = bool(tokens) and sum(1 for tk in tokens if norm(tk) in nt) >= max(1, (len(tokens) + 1) // 2)
+                if tokhit:
+                    book_hits.append(t)
+                elif is_kyobo:
+                    kyobo_hits.append(t)
+            return True
+
+        user32.EnumWindows(_cb, 0)
+        if book_hits:
+            return book_hits[0]
+        return kyobo_hits[0] if kyobo_hits else ""
+    except Exception:
+        return ""
+
+
 def download_installer(dest: str | None = None, timeout: int = 300) -> str:
     """설치파일 다운로드. 받은 파일 경로 반환."""
     dest = dest or os.path.join(tempfile.gettempdir(), "KyoboeBook_Setup.exe")

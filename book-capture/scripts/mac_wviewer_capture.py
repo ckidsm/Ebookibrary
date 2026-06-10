@@ -27,6 +27,20 @@ def osa(s): subprocess.run(['osascript', '-e', s], capture_output=True)
 def activate(): osa('tell application "Google Chrome" to activate')
 def key(code): osa(f'tell application "System Events" to key code {code}')
 
+def kyobo_tab_open():
+    """Chrome 탭 중 교보 사이트(kyobobook.co.kr)가 열려있는지 — AppleScript URL 확인."""
+    s = ('tell application "Google Chrome"\n'
+         '  set f to false\n'
+         '  repeat with w in windows\n'
+         '    repeat with t in tabs of w\n'
+         '      if (URL of t) contains "kyobobook.co.kr" then set f to true\n'
+         '    end repeat\n'
+         '  end repeat\n'
+         '  return f\n'
+         'end tell')
+    r = subprocess.run(['osascript', '-e', s], capture_output=True, text=True)
+    return 'true' in (r.stdout or '').lower()
+
 def _content_crop(im):
     """브라우저 크롬·작업표시줄·여백 제거 → 본문만 꽉 차게. 상단 크롬 높이를
     '색상(채도) 행'으로 자동 감지(탭·파비콘·북마크)해 딱 그만큼 잘라 본문 첫 줄 보존.
@@ -73,10 +87,14 @@ def looks_blocked(im):
     dark = sum(1 for p in px if p < 120) / n   # 본문은 글자(어두운 픽셀) 비율 꽤 됨
     return avg > 235 and dark < 0.02            # 거의 백지(차단/빈페이지)
 
+if not kyobo_tab_open():
+    print("✗ Chrome에 교보 사이트(kyobobook.co.kr)가 안 열렸습니다. [바로보기]로 책을 연 뒤 다시 시작하세요.")
+    sys.exit(1)
 wid = find_wid()
 print("WID", wid, flush=True)
 if not wid:
     print("✗ Chrome 책창 못찾음"); sys.exit(1)
+print("✓ 교보 탭 감지됨", flush=True)
 activate(); time.sleep(0.8)
 
 last = None; n = 0; same = 0; blank = 0
