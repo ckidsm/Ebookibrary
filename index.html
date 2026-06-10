@@ -1131,16 +1131,17 @@
             const ok = await showCustomConfirm({
                 title: '🌐 브라우저 웹뷰어 캡처 준비',
                 body: `<div style="font-size:0.85rem;color:#cbd5e1;line-height:1.7;">
-                        <div style="margin-bottom:9px;color:#fff;">교보 <b>[바로보기]</b> 웹뷰어를 준비하세요:</div>
+                        <div style="margin-bottom:9px;color:#fff;">아래 <b>순서대로</b> 준비한 뒤 [준비 완료]:</div>
                         <ol style="margin:0;padding-left:1.3em;line-height:1.95;">
-                            <li>교보문고(또는 위 <b>[e-book 보기]</b>)에서 <b>「${title}」</b> 의 <b>[바로보기]</b> 클릭 → 브라우저에 책이 열립니다.</li>
-                            <li><b>F11</b> 로 전체화면 (브라우저 주소창·툴바 숨김 → 책 본문만).</li>
-                            <li>${startPage > 1 ? `<b>${startPage}페이지</b>로 이동.` : '<b>첫 페이지</b>로 이동.'}</li>
-                            <li>그 책 화면을 <b>맨 앞</b>에 두세요. 워커가 <b>→ 키로 넘기며 캡처</b>합니다.</li>
+                            <li><b>교보 로그인</b> 먼저 <small style="color:#94a3b8;">(안 하면 [바로보기]가 안 보임)</small></li>
+                            <li><b>「${title}」</b>의 <b>[바로보기]</b> 클릭 → 웹뷰어 열고 <b>F11</b> 전체화면</li>
+                            <li>${startPage > 1 ? `<b>${startPage}페이지</b>` : '<b>첫 페이지</b>'}로 이동</li>
+                            <li>뷰어 <b>단일 페이지(1)</b> 모드로 설정 <small style="color:#94a3b8;">(펼침 X — 한 장씩)</small></li>
+                            <li>책 화면을 <b>맨 앞</b>에 두기 → 아래 <b>[준비 완료]</b></li>
                         </ol>
                         <div style="margin-top:10px;font-size:0.78rem;color:#fcd34d;background:rgba(245,158,11,0.1);border-radius:6px;padding:9px 11px;line-height:1.6;">
-                            ⚠️ [준비 완료] 후 <b>5초 안에 그 책 웹뷰어로 전환</b>(Alt+Tab)하세요. 캡처 중 마우스·키보드를 건드리지 마세요.<br>
-                            ✅ 데스크탑 앱과 달리 <b>웹뷰어는 DRM 파란화면 없이 본문이 캡처됩니다.</b>
+                            ⚠️ [준비 완료] 후 <b>5초 안에 웹뷰어로 전환</b>(Alt+Tab) → 마우스·키보드 떼기. 워커가 →키로 넘기며 캡처합니다.<br>
+                            ✅ 웹뷰어는 DRM 파란화면 없이 본문이 캡처됩니다.
                         </div>
                     </div>`,
                 options: [
@@ -1479,13 +1480,11 @@
                 <div class="capture-guide">
                     <div class="cg-title">📋 분석 절차 — 🌐 브라우저 웹뷰어 캡처 (권장)</div>
                     <ol class="cg-steps">
-                        <li>아래 <b>[📖 e-book 보기]</b> → 교보 책 페이지에서 <b>[바로보기]</b> 클릭 → 브라우저 웹뷰어로 열림 <small style="opacity:.6">(데스크탑 앱 ✗ — DRM 차단)</small><br><span style="color:#fcd34d;font-size:0.92em;">⚠️ <b>[바로보기] 버튼이 안 보이면 교보 로그인 안 된 것</b> — 먼저 상단 <b>[교보문고 로그인]</b> 후 새로고침(로그인+소유해야 버튼이 나타남).</span></li>
-                        <li>뷰어 상단 레이아웃을 <b>단일 페이지(1)</b> 로 <small style="opacity:.6">— 거터·여백 없이 한 장씩(권장)</small></li>
-                        <li><b>F11</b> 전체화면 + <b>원하는 시작 페이지</b>로 이동 + <b>책 화면 클릭</b>(키보드 포커스)</li>
-                        <li>아래 <b>[분석 시작] → 🌐 브라우저 웹뷰어 캡처</b> → <b>[준비 완료]</b></li>
-                        <li><b>5초 안에 웹뷰어로 전환</b>(Alt+Tab) → 마우스·키보드 떼고 기다리기</li>
+                        <li><b>교보 로그인</b> → <b>[📖 e-book 보기]</b> → <b>[바로보기]</b>로 웹뷰어 열기 <small style="opacity:.6">(로그인 안 하면 바로보기 안 보임)</small></li>
+                        <li><b>단일 페이지(1)</b> 모드 + <b>F11</b> 전체화면 + <b>첫 페이지</b></li>
+                        <li><b>[분석 시작]</b> → 준비 안내 따라 <b>[준비 완료]</b> → <b>5초 전환</b></li>
                     </ol>
-                    <div class="cg-warn">⚙️ 워커 자동: 화면 캡처(DRM 우회)·→키 넘김·천천히(차단 회피)·크롬/여백 자동 크롭. 캡처 중 화면·마우스·키보드 건드리지 마세요. <b>로컬 워커 실행 중</b>이어야 합니다.</div>
+                    <div class="cg-warn">⚙️ 캡처·페이지 넘김·크롭은 워커가 자동. <b>로컬 워커 실행 중</b>이어야 합니다.</div>
                 </div>` + _startPageBox(`
                         <b>1</b> = 처음부터(잔여 삭제) · <b>N</b> = N페이지부터 이어서.<br>
                         ⚠️ <b>자동으로 그 페이지로 넘어가지 않습니다</b> — 위 ③에서 <b>웹뷰어를 직접 N페이지에 맞춰둔 뒤</b> 시작하세요(하단 슬라이더 <code style="color:#cbd5e1;">2 / 385</code> 로 확인).`);
