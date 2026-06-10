@@ -1463,33 +1463,66 @@
                     </label>
                 </div>
             `;
-            // 분석 절차 안내(옵저버) — 로컬 매크로(캡처) 사용자가 순서대로 따라가도록.
-            const captureGuideHtml = !canMacro ? `
-                <div class="capture-guide">
-                    <div class="cg-title">📋 분석 절차 — ${isIOS ? 'iPad/iOS' : '모바일'} (캡처 업로드)</div>
-                    <ol class="cg-steps">
-                        <li>교보 eBook 앱(또는 위 <b>[e-book 보기]</b>)에서 <b>이 책을 직접 펼치세요</b>.</li>
-                        <li>각 페이지를 <b>스크린샷</b>으로 찍으세요${isIOS ? ' (전원+볼륨↑ 동시)' : ''}. 페이지 넘기며 필요한 만큼.</li>
-                        <li>아래 <b>[분석 시작]</b> → <b>찍은 스크린샷들을 업로드</b> → 서버가 OCR·요약·HTML 처리.</li>
-                    </ol>
-                    <div style="margin-top:10px;padding:9px 11px;border-radius:6px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-size:0.78rem;line-height:1.65;">
-                        💡 <b>준자동 꿀팁</b> — iOS <b>단축어</b>로 「1초마다 자동 스크린샷 N회」를 만들면 버튼 안 눌러도 됩니다.<br>
-                        ① 교보 앱에서 <b>화면 탭해 툴바 숨기기</b>(본문만) → ② 단축어 실행 → ③ <b>1초에 한 번씩 페이지만 넘기기</b> → ④ 사진앱 스샷들을 여기 업로드.<br>
-                        <span style="color:#94a3b8;">(참고: joons.pe.kr/527 — "스크린샷 반복" 단축어)</span>
-                    </div>
-                    <div class="cg-warn">⚠️ ${isIOS ? 'iPad/아이폰' : '이 기기'}는 iOS 보안(샌드박스)으로 <b>앱 자동 열기·완전 자동 캡처가 불가</b>합니다(페이지 넘김은 수동). Mac/Windows만 페이지넘김까지 자동.</div>
-                </div>` : `
+            // 분석 절차 + 시작페이지 — 선택한 캡처 방식에 맞춰 표시(라디오 change 시 renderCapGuide 로 갱신).
+            const _startPageBox = (note) => `
+                <div class="capture-guide" style="background:rgba(34,211,238,0.06);border-color:rgba(34,211,238,0.3);margin-top:10px;">
+                    <label style="font-size:0.82rem;color:#cbd5e1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <b>시작 페이지</b> <span style="font-size:0.72rem;color:#94a3b8;">(처음부터면 1)</span>
+                        <input id="cap-start-page" type="number" min="1" value="1"
+                               style="width:78px;padding:4px 8px;background:#0a0c10;border:1px solid #2f3a4d;border-radius:5px;color:#fff;">
+                    </label>
+                    <div style="margin-top:6px;font-size:0.72rem;color:#94a3b8;line-height:1.6;">${note}</div>
+                </div>`;
+            function cgForMode(mode) {
+                if (mode === 'capture-browser') {
+                    return `
                 <div class="capture-guide">
                     <div class="cg-title">📋 분석 절차 — 🌐 브라우저 웹뷰어 캡처 (권장)</div>
                     <ol class="cg-steps">
                         <li>아래 <b>[📖 e-book 보기]</b> → 교보 책 페이지에서 <b>[바로보기]</b> 클릭 → 브라우저 웹뷰어로 열림 <small style="opacity:.6">(데스크탑 앱 ✗ — DRM 차단)</small></li>
                         <li>뷰어 상단 레이아웃을 <b>단일 페이지(1)</b> 로 <small style="opacity:.6">— 거터·여백 없이 한 장씩(권장)</small></li>
-                        <li><b>F11</b> 전체화면 + <b>첫 페이지</b>로 이동 + <b>책 화면 클릭</b>(키보드 포커스)</li>
+                        <li><b>F11</b> 전체화면 + <b>원하는 시작 페이지</b>로 이동 + <b>책 화면 클릭</b>(키보드 포커스)</li>
                         <li>아래 <b>[분석 시작] → 🌐 브라우저 웹뷰어 캡처</b> → <b>[준비 완료]</b></li>
                         <li><b>5초 안에 웹뷰어로 전환</b>(Alt+Tab) → 마우스·키보드 떼고 기다리기</li>
                     </ol>
-                    <div class="cg-warn">⚙️ 워커가 자동 처리: 화면 캡처(DRM 우회) · →키 페이지 넘김 · 천천히(차단 회피) · 크롬·여백 자동 크롭. 캡처 중 화면·마우스·키보드 건드리지 마세요. <b>로컬 워커 실행 중</b>이어야 합니다(로그인 시 자동 시작).</div>
+                    <div class="cg-warn">⚙️ 워커 자동: 화면 캡처(DRM 우회)·→키 넘김·천천히(차단 회피)·크롬/여백 자동 크롭. 캡처 중 화면·마우스·키보드 건드리지 마세요. <b>로컬 워커 실행 중</b>이어야 합니다.</div>
+                </div>` + _startPageBox(`
+                        <b>1</b> = 처음부터(잔여 삭제) · <b>N</b> = N페이지부터 이어서.<br>
+                        ⚠️ <b>자동으로 그 페이지로 넘어가지 않습니다</b> — 위 ③에서 <b>웹뷰어를 직접 N페이지에 맞춰둔 뒤</b> 시작하세요(하단 슬라이더 <code style="color:#cbd5e1;">2 / 385</code> 로 확인).`);
+                }
+                if (mode === 'capture-only' || mode === 'auto') {
+                    return `
+                <div class="capture-guide">
+                    <div class="cg-title">📋 분석 절차 — 🖥 로컬 매크로 (데스크탑 앱)</div>
+                    <ol class="cg-steps">
+                        <li><b>교보 ${isWin ? 'eLibrary' : 'eBook'} 앱</b> 실행 → 이 책 펼치고 <b>원하는 시작 페이지</b>로 → 전체화면.</li>
+                        <li>아래 <b>[분석 시작]</b> → 워커가 화면 캡처 + <b>→키 자동 넘김</b>.</li>
+                        <li>캡처 끝 → 서버 OCR·요약·HTML.</li>
+                    </ol>
+                    <div class="cg-warn">⚠️ <b>교보 데스크탑 앱은 화면캡처를 DRM(파란화면)으로 차단</b>할 수 있습니다(특히 Windows). 막히면 <b>[🌐 브라우저 웹뷰어 캡처]</b>를 쓰세요. 캡처 중 화면·키보드 건드리지 마세요.</div>
+                </div>` + _startPageBox(`
+                        <b>1</b> = 처음부터 · <b>N</b> = N페이지부터 이어서.<br>
+                        ⚠️ <b>자동으로 그 페이지로 안 넘어갑니다</b> — <b>교보 앱을 직접 N페이지에 펼쳐둔 뒤</b> 시작하세요(앱 우하단 <code style="color:#cbd5e1;">21 / 757p</code>).`);
+                }
+                // upload (모바일 또는 선택) — 시작 페이지 없음
+                return `
+                <div class="capture-guide">
+                    <div class="cg-title">📋 분석 절차 — 📤 캡처 업로드</div>
+                    <ol class="cg-steps">
+                        <li>${isIOS ? '교보 앱/뷰어' : '교보 앱(또는 [바로보기] 웹뷰어)'}에서 책을 펼치고 <b>각 페이지를 스크린샷</b>${isIOS ? ' (전원+볼륨↑ 동시)' : ''}.</li>
+                        <li>아래 <b>[분석 시작]</b> → <b>찍은 스크린샷들 업로드</b> → 서버가 OCR·요약·HTML.</li>
+                    </ol>${isIOS ? `
+                    <div style="margin-top:10px;padding:9px 11px;border-radius:6px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-size:0.78rem;line-height:1.6;">
+                        💡 <b>준자동 꿀팁</b> — iOS <b>단축어</b>로 「1초마다 자동 스크린샷 N회」를 만들면 버튼 안 눌러도 됩니다(참고: joons.pe.kr/527).
+                    </div>` : ''}
+                    <div class="cg-warn">⚠️ 업로드는 <b>시작 페이지 설정이 없습니다</b> — 올린 이미지 순서가 곧 페이지입니다.${isIOS ? ' iPad/아이폰은 iOS 보안으로 자동 캡처 불가(스샷 수동).' : ''}</div>
                 </div>`;
+            }
+            function renderCapGuide() {
+                const m = document.querySelector('input[name="cap-mode"]:checked')?.value || (canMacro ? 'capture-browser' : 'upload');
+                const el = document.getElementById('cap-guide-wrap');
+                if (el) el.innerHTML = cgForMode(m);
+            }
             document.getElementById('bmodal-body').innerHTML = `
                 ${cover}
                 <div class="bmodal-title">${escapeHtml(book.title)}</div>
@@ -1502,22 +1535,13 @@
                     sync: ${book.synced_at || '-'}${book.progress_pct != null ? ' · 읽기 ' + book.progress_pct + '%' : ''}
                 </div>
                 ${modeToggleHtml}
-                ${captureGuideHtml}
-                ${!canMacro ? '' : `
-                <div class="capture-guide" style="background:rgba(34,211,238,0.06);border-color:rgba(34,211,238,0.3);">
-                    <label style="font-size:0.82rem;color:#cbd5e1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                        <b>시작 페이지</b> <span style="font-size:0.72rem;color:#94a3b8;">(웹뷰어에 표시된 페이지 번호)</span>
-                        <input id="cap-start-page" type="number" min="1" value="1"
-                               style="width:78px;padding:4px 8px;background:#0a0c10;border:1px solid #2f3a4d;border-radius:5px;color:#fff;">
-                    </label>
-                    <div style="margin-top:6px;font-size:0.72rem;color:#94a3b8;line-height:1.6;">
-                        <b>1</b> = 처음부터 (기존 잔여 페이지 삭제) · <b>N</b> = 웹뷰어를 <b>N페이지로 이동한 뒤</b> N부터 이어서.<br>
-                        📖 웹뷰어 <b>하단 슬라이더</b>에 <code style="color:#cbd5e1;">2 / 385</code> 처럼 페이지 번호가 보입니다 — 그 번호를 입력하세요.<br>
-                        ✂️ 브라우저 크롬·창 그림자·여백은 <b>자동 크롭</b>되어 책 본문만 OCR합니다.
-                    </div>
-                </div>`}
+                <div id="cap-guide-wrap"></div>
                 <div id="bmodal-extra"></div>
             `;
+
+            // 캡처 방식별 절차/시작페이지 — 초기 렌더 + 라디오 변경 시 갱신
+            renderCapGuide();
+            document.querySelectorAll('input[name="cap-mode"]').forEach(r => r.addEventListener('change', renderCapGuide));
 
             // 진행 중인 잡이 있으면 버튼은 "⏳ 분석 중" + 비활성
             const activeJob = _activeJobs.get(slug);
