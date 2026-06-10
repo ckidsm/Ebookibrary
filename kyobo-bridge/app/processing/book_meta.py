@@ -56,14 +56,18 @@ def extract_meta_ai(pages: dict[int, str], cfg, title: str = "") -> dict:
         "{\n"
         '  "category": "도서 종류 (입문서/전문서/실용서/교재/자격증 등 한 단어급)",\n'
         '  "field": "분야 (예: 인공지능·머신러닝 / 영상·미디어 / 정보처리)",\n'
+        '  "pub_date": "초판(처음) 발행일 YYYY-MM-DD, 없으면 null",\n'
+        '  "revision_date": "최신 쇄/개정판 발행일 YYYY-MM-DD, 초판만 있으면 null",\n'
         '  "description": "2~3문장 소개"\n'
         "}\n"
-        "규칙: JSON 객체만 출력. 코드펜스·설명 금지.\n\n"
+        '규칙: 날짜는 판권면의 "초판 발행"·"N쇄 발행"·"개정판 발행" 표기에서만 추출. '
+        "전화번호·주소·ISBN·우편번호 숫자를 날짜로 쓰지 말 것. JSON 객체만 출력, 코드펜스·설명 금지.\n\n"
         f"텍스트:\n{blob}"
     )
     try:
         text, _it, _ot = S._post_message(cfg, prompt)  # (text, in_tok, out_tok)
         obj = S._extract_json(text)
-        return {k: obj.get(k) for k in ("category", "field", "description") if obj.get(k)}
+        keys = ("category", "field", "pub_date", "revision_date", "description")
+        return {k: obj.get(k) for k in keys if obj.get(k)}
     except Exception:
         return {}
