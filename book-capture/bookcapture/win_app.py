@@ -81,26 +81,38 @@ def _grab_frame(bbox, prefer_dxcam: bool = True):
 
 
 def _content_crop(im):
-    """브라우저 웹뷰어 캡처에서 Chrome 크롬(탭·주소·북마크)·창 그림자·여백 제거
-    → 책 본문 글씨가 프레임을 꽉 채우게. (같은 페이지→결정적 같은 결과라 해시 끝감지 안정)
-    Windows 브라우저는 보통 F11 미적용(상단 ~100px 크롬)이라 상단 고정 크롭 후 bbox 트림."""
+    """브라우저 웹뷰어 캡처에서 Chrome 크롬·작업표시줄·여백 제거 → 책 본문만 꽉 차게.
+    상단 크롬 높이를 '색상(채도) 행'으로 자동 감지(탭·파비콘·북마크 아이콘)해서 딱 그만큼만
+    잘라 본문 첫 줄을 안 짤리게 한다. (고정 % 크롭은 레이아웃마다 과/소 → 적응형)
+    같은 페이지→결정적 같은 결과라 해시 끝감지 안정."""
     try:
-        W, H = im.size
-        im = im.crop((0, int(H * 0.11), W, H))                   # 상단 브라우저 크롬
-        W2, H2 = im.size
-        ex, ey = int(W2 * 0.035), int(H2 * 0.03)
-        im = im.crop((ex, ey, W2 - ex, H2 - ey))                 # 창 그림자/배경 비침
-        bw = im.convert("L").point(lambda p: 255 if p < 115 else 0)  # 어두운 글자만(워터마크 제외)
+        rgb = im.convert("RGB"); W, H = im.size
+        SS = 8; sw, sh = max(1, W // SS), max(1, H // SS)
+        px = rgb.resize((sw, sh)).load()
+        last_color = -1                       # 상단 12% 내 마지막 '컬러' 행 = 크롬 하단
+        for y in range(int(sh * 0.12)):
+            c = 0
+            for x in range(sw):
+                r, g, b = px[x, y]
+                if max(r, g, b) > 50 and (max(r, g, b) - min(r, g, b)) > 30:
+                    c += 1
+            if c > max(2, sw * 0.015):
+                last_color = y
+        top = int((last_color + 2) * SS) if last_color >= 0 else 0
+        bottom = H - int(H * 0.035)            # 하단 Windows 작업표시줄/여백
+        rgb = rgb.crop((0, top, W, bottom))
+        W2, H2 = rgb.size; e = int(min(W2, H2) * 0.015)
+        rgb = rgb.crop((e, e, W2 - e, H2 - e))                       # 창 그림자
+        bw = rgb.convert("L").point(lambda p: 255 if p < 115 else 0)  # 어두운 글자만
         bbox = bw.getbbox()
         if bbox:
-            pad = 18
-            l, t, r, b = bbox
-            im = im.crop((max(0, l - pad), max(0, t - pad),
-                          min(im.size[0], r + pad), min(im.size[1], b + pad)))
-        return im.convert("RGB")
+            pad = 16; l, t, r, b = bbox
+            rgb = rgb.crop((max(0, l - pad), max(0, t - pad),
+                            min(rgb.size[0], r + pad), min(rgb.size[1], b + pad)))
+        return rgb.convert("RGB")
     except Exception as e:
         print(f"[win] content-crop 실패(원본 유지): {e}", file=sys.stderr)
-        return im
+        return im.convert("RGB")
 
 
 def is_installed() -> bool:

@@ -28,22 +28,33 @@ def activate(): osa('tell application "Google Chrome" to activate')
 def key(code): osa(f'tell application "System Events" to key code {code}')
 
 def _content_crop(im):
-    """브라우저 크롬·창 그림자·여백 제거 → 본문 글씨가 프레임을 꽉 채우게.
-    1) 상단 크롬(탭·주소·북마크) 고정 제거 2) 가장자리 그림자/배경비침 제거
-    3) 어두운 글자 기준 bounding box 로 사방 여백 트림.
-    (같은 페이지→결정적 같은 결과라 해시 끝감지 안정)"""
-    W, H = im.size
-    im = im.crop((0, int(H * 0.11), W, H))                  # 상단 브라우저 크롬
-    W2, H2 = im.size
-    ex, ey = int(W2 * 0.035), int(H2 * 0.03)
-    im = im.crop((ex, ey, W2 - ex, H2 - ey))                # 창 그림자/배경 비침
-    bw = im.convert("L").point(lambda p: 255 if p < 115 else 0)  # 어두운 글자만(워터마크 제외)
+    """브라우저 크롬·작업표시줄·여백 제거 → 본문만 꽉 차게. 상단 크롬 높이를
+    '색상(채도) 행'으로 자동 감지(탭·파비콘·북마크)해 딱 그만큼 잘라 본문 첫 줄 보존.
+    고정 % 는 레이아웃마다 과/소 크롭 → 적응형. (같은 페이지→결정적 결과=해시 안정)"""
+    rgb = im.convert("RGB"); W, H = im.size
+    SS = 8; sw, sh = max(1, W // SS), max(1, H // SS)
+    px = rgb.resize((sw, sh)).load()
+    last_color = -1
+    for y in range(int(sh * 0.12)):
+        c = 0
+        for x in range(sw):
+            r, g, b = px[x, y]
+            if max(r, g, b) > 50 and (max(r, g, b) - min(r, g, b)) > 30:
+                c += 1
+        if c > max(2, sw * 0.015):
+            last_color = y
+    top = int((last_color + 2) * SS) if last_color >= 0 else 0
+    bottom = H - int(H * 0.035)
+    rgb = rgb.crop((0, top, W, bottom))
+    W2, H2 = rgb.size; e = int(min(W2, H2) * 0.015)
+    rgb = rgb.crop((e, e, W2 - e, H2 - e))
+    bw = rgb.convert("L").point(lambda p: 255 if p < 115 else 0)
     bbox = bw.getbbox()
     if bbox:
-        pad = 18; l, t, r, b = bbox
-        im = im.crop((max(0, l - pad), max(0, t - pad),
-                      min(im.size[0], r + pad), min(im.size[1], b + pad)))
-    return im.convert("RGB")
+        pad = 16; l, t, r, b = bbox
+        rgb = rgb.crop((max(0, l - pad), max(0, t - pad),
+                        min(rgb.size[0], r + pad), min(rgb.size[1], b + pad)))
+    return rgb.convert("RGB")
 
 def grab_crop(wid):
     raw = OUT / "_raw.png"
