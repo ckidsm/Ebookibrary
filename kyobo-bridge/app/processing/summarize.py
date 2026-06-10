@@ -64,11 +64,13 @@ OCR 원문:
   "topics": ["...", "..."],          // 2~3개, 페이지가 다루는 큰 주제
   "terms":  ["...", "...", "..."],   // 3~5개, 핵심 키워드/용어
   "summary": "...<br>...",           // 3~5문장. 마침표마다 <br> 줄바꿈. 절 번호 앞엔 ·
-  "points": ["...", "..."]           // 3~5개, 구체적 포인트 (li 후보)
+  "points": ["...", "..."],          // 3~5개, 구체적 포인트 (li 후보)
+  "full_text": "..."                 // OCR 원문을 교정한 페이지 본문 전체(아래 규칙)
 }}
 규칙:
 - "summary" 는 한 줄 문자열, 문장 사이 <br> 만 사용.
 - "points" 는 굵게 표시할 소제목은 <strong>...</strong>, 코드/경로는 <code>...</code> 가능.
+- "full_text" 는 OCR 원문의 오타·깨진 글자·잘못된 줄바꿈을 문맥에 맞게 바로잡은 **페이지 본문 전체**. 내용은 그대로(요약·생략·창작 금지), 글자만 교정. 브라우저 북마크·UI·헤더/푸터 같은 책 외 잡음은 제외. 단락 구분은 \\n, 평문(마크업·<br> 없이).
 - JSON 객체만 출력. 코드 펜스, 설명, 인사말 모두 금지.{intro_note}
 """
 
@@ -262,6 +264,14 @@ def summarize_pages(
             continue
         try:
             r = summarize_page(num, text, cfg)
+            # AI 교정 전문(full_text) → ocr_text 덮어쓰기(모달 [텍스트 보기]가 이걸 읽음).
+            # batch JSON 엔 넣지 않음(HTML 비대 방지).
+            ft = (r.page or {}).pop("full_text", None)
+            if ft and ft.strip():
+                try:
+                    ocr_files[num].write_text(ft.strip() + "\n", encoding="utf-8")
+                except Exception:
+                    pass
             results.append(r.page)
             pages_done += 1
             in_total += r.input_tokens
