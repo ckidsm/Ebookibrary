@@ -199,7 +199,7 @@ def summarize_page(
     ocr_text: str,
     cfg: AiCfg,
     is_chapter_intro_hint: bool = False,
-    max_retries: int = 3,
+    max_retries: int = 6,
 ) -> SummarizeResult:
     """OCR 1페이지 → batch JSON 1페이지 객체."""
     if not cfg.api_key:
@@ -254,7 +254,8 @@ def summarize_page(
             body_txt = e.read().decode("utf-8", errors="replace")[:300]
             last_err = f"HTTP {e.code} {e.reason}: {body_txt}"
             if e.code in (429, 500, 502, 503, 504) and attempt < max_retries:
-                wait = 2 ** attempt
+                # 429(분당 토큰 한도)는 윈도우가 풀릴 때까지 길게 대기
+                wait = (20 + 10 * attempt) if e.code == 429 else (2 ** attempt)
                 print(f"[summarize] {last_err} — {wait}초 후 재시도 ({attempt}/{max_retries})")
                 time.sleep(wait)
                 continue
@@ -288,11 +289,25 @@ def summarize_pages(
     in_total = out_total = 0
     cost_total = 0.0
     results: list[dict] = []
+    # resume — 기존 batch 가 있으면 이미 요약된 페이지는 유지하고 빠진 것만 처리
+    # (rate limit 등으로 일부 실패 후 재실행 시 토큰 낭비 방지)
+    done_nums: set[int] = set()
+    if out_path.exists():
+        try:
+            prev = json.loads(out_path.read_text(encoding="utf-8"))
+            if isinstance(prev, list):
+                results = list(prev)
+                done_nums = {p.get("num") for p in prev if p.get("num")}
+        except Exception:
+            results, done_nums = [], set()
 
     nums = sorted(ocr_files.keys())
     if page_range:
         lo, hi = page_range
         nums = [n for n in nums if lo <= n <= hi]
+    nums = [n for n in nums if n not in done_nums]
+    if done_nums:
+        print(f"[summarize] resume — 기존 {len(done_nums)}장 유지, 남은 {len(nums)}장 처리")
 
     for i, num in enumerate(nums, 1):
         text = ocr_files[num].read_text(encoding="utf-8")
@@ -326,7 +341,8 @@ def summarize_pages(
             errors.append((num, str(e)))
             print(f"[summarize] ✗ p.{num:03d}: {e}", file=sys.stderr)
 
-    # batch JSON 저장 (기존 스키마: list of page dicts)
+    # batch JSON 저장 (기존 스키마: list of page dicts) — 페이지 번호순 정렬
+    results.sort(key=lambda p: p.get("num", 0))
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
         json.dumps(results, ensure_ascii=False, indent=2),
