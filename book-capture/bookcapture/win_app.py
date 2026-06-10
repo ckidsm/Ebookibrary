@@ -191,6 +191,33 @@ def find_kyobo_browser_window(book_hint: str = "") -> str:
         return ""
 
 
+def close_kyobo_tab() -> bool:
+    """현재 포그라운드 창이 교보 뷰어면 Ctrl+W 로 그 탭을 닫는다.
+    안전장치: 교보/kyobo/ebook 가 창 제목에 없으면 닫지 않음(엉뚱한 탭 보호). 닫았으면 True."""
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+        hwnd = user32.GetForegroundWindow()
+        ln = user32.GetWindowTextLengthW(hwnd)
+        buf = ctypes.create_unicode_buffer(ln + 1)
+        user32.GetWindowTextW(hwnd, buf, ln + 1)
+        t = buf.value or ""
+        tl = t.lower()
+        if not (("교보" in t) or ("kyobo" in tl) or ("ebook" in tl)):
+            print(f"[win] 탭 닫기 스킵 — 포그라운드가 교보 뷰어가 아님: {t[:40]!r}")
+            return False
+        VK_CONTROL, VK_W, KEYUP = 0x11, 0x57, 0x0002
+        user32.keybd_event(VK_CONTROL, 0, 0, 0)
+        user32.keybd_event(VK_W, 0, 0, 0)
+        user32.keybd_event(VK_W, 0, KEYUP, 0)
+        user32.keybd_event(VK_CONTROL, 0, KEYUP, 0)
+        print(f"[win] ✓ 캡처 끝 — 교보 뷰어 탭 닫음: {t[:40]!r}")
+        return True
+    except Exception as e:
+        print(f"[win] 탭 닫기 실패(무시): {e}")
+        return False
+
+
 def download_installer(dest: str | None = None, timeout: int = 300) -> str:
     """설치파일 다운로드. 받은 파일 경로 반환."""
     dest = dest or os.path.join(tempfile.gettempdir(), "KyoboeBook_Setup.exe")
@@ -407,4 +434,8 @@ class KyoboWinCapture:
                 self._press_key(vk)
             time.sleep(interval)
         print(f"[win] 캡처 완료 — {saved}장 ({self.book_dir})")
+        # 브라우저 웹뷰어 모드: 마지막 페이지 인식해 캡처 끝났으면 그 뷰어 탭을 닫는다
+        # (안전장치: 포그라운드가 교보 뷰어일 때만 Ctrl+W — 아니면 스킵)
+        if no_crop:
+            close_kyobo_tab()
         return saved
