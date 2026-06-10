@@ -36,7 +36,23 @@
 <div class="wrap">
   <div class="top"><a href="./">← 교보 라이브러리 포털로</a></div>
   <h1>🛠 교보 라이브러리 — 트러블슈팅</h1>
-  <div class="sub">캡처가 안 될 때 상황별 해결 + Windows 워커/유저스크립트 명령 모음</div>
+  <div class="sub">초기 세팅 + 캡처가 안 될 때 상황별 해결 + Windows 워커/유저스크립트 명령 모음</div>
+
+  <!-- ── 초기 세팅 ── -->
+  <h2>🚀 초기 세팅 — 원클릭 설치 (Windows)</h2>
+  <div class="card big">
+    <p><b>PowerShell을 열고</b> 아래 <b>한 줄</b>을 붙여넣으세요. 윈도우 상태를 읽어
+       <b>Python 확인·설치 → 서버에서 최신 워커 코드 다운로드 → 워커 자동 등록</b> 까지 한 번에 됩니다.</p>
+    <div class="cmd"><button class="copy">복사</button>irm https://redcodeme.synology.me/kyobo/setup-windows.ps1 | iex</div>
+    <p style="font-size:0.82rem;color:#34d399;">→ 부족한 것만 설치하고 <b>서버에서 항상 최신 코드</b>를 받습니다(코드 갱신도 이 명령으로). 설치 후 워커는 죽어도 <b>5초 내 자동 부활</b>(세션 켜둔 동안).</p>
+    <p style="font-size:0.8rem;color:#8b96a8;">⚠️ Python이 방금 설치됐다면 PowerShell을 <b>새로 열고</b> 위 명령을 한 번 더 실행하세요(경로 인식).</p>
+
+    <h3>그다음 — Tampermonkey (브라우저, 1회)</h3>
+    <ol>
+      <li><code>chrome://extensions</code> → <b>개발자 모드 ON</b> → Tampermonkey <b>세부정보</b> → <b>"사용자 스크립트 허용" ON</b> <span class="warn">★필수★</span></li>
+      <li>유저스크립트 설치: <code>https://redcodeme.synology.me/kyobo/userscript/sync-kyobo-library.user.js</code></li>
+    </ol>
+  </div>
 
   <!-- ── 한 방 진단 ── -->
   <h2>⚡ 한 방 진단·복구 (Windows)</h2>
@@ -61,9 +77,9 @@
   <h3>④ 워커 위치 찾기</h3>
   <div class="cmd"><button class="copy">복사</button>(Get-ScheduledTask -TaskName KyoboBookcaptureWorker).Actions[0].WorkingDirectory</div>
 
-  <h3>⑤ 워커 재설치 <span class="pill">대부분의 문제 해결</span></h3>
-  <p style="font-size:0.82rem;color:#8b96a8;">설치 위치를 자동으로 찾아 재설치합니다. (먼저 OneDrive 동기화 완료 확인)</p>
-  <div class="cmd"><button class="copy">복사</button>$bc = (Get-ScheduledTask -TaskName KyoboBookcaptureWorker).Actions[0].WorkingDirectory; Write-Host "위치: $bc"; powershell -ExecutionPolicy Bypass -File "$bc\scripts\install-worker-windows.ps1"</div>
+  <h3>⑤ 워커 재설치 / 최신 갱신 <span class="pill">대부분의 문제 해결</span></h3>
+  <p style="font-size:0.82rem;color:#8b96a8;">서버에서 <b>최신 코드</b>를 받아 재설치합니다 (초기 세팅과 동일 — 코드 업데이트도 이 명령으로).</p>
+  <div class="cmd"><button class="copy">복사</button>irm https://redcodeme.synology.me/kyobo/setup-windows.ps1 | iex</div>
 
   <h3>⑥ 워커 제거</h3>
   <div class="cmd"><button class="copy">복사</button>$bc = (Get-ScheduledTask -TaskName KyoboBookcaptureWorker).Actions[0].WorkingDirectory; powershell -ExecutionPolicy Bypass -File "$bc\scripts\uninstall-worker-windows.ps1"</div>
