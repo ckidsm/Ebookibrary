@@ -1441,7 +1441,7 @@
                 : `<div class="bmodal-cover-ph">📘</div>`;
 
             const statusHtml = analyzed
-                ? `<span class="bmodal-status is-analyzed">✓ 분석 완료 · ${analyzed.pages}페이지</span>`
+                ? `<span class="bmodal-status is-analyzed">✓ 분석 완료 · ${analyzed.pages}페이지</span><div id="bmodal-history" style="margin-top:6px;font-size:0.72rem;color:#94a3b8;line-height:1.5;"></div>`
                 : `<span class="bmodal-status is-none" title="아래 [📊 분석 시작] 후 활성화됩니다">⏳ 미분석</span>`;
 
             // 캡처 모드 선택 (#47/#67) — 웹뷰 차단됨, 업로드 추가
@@ -1573,29 +1573,53 @@
                 : (analyzed ? '📊 다시 분석' : '📊 분석 시작');
             const analyzeBtnDisabled = isRunning ? 'disabled' : '';
 
-            // 푸터 — 4버튼 (분석 시작 + 분석 페이지 + e-book + 검색)
+            // 푸터 — 분석됨이면 [분석 페이지] 가 첫번째(주), [다시 분석] 다음. 미분석이면 [분석 시작] 첫번째.
+            const _summaryBtn = summaryUrl
+                ? `<a class="bbtn is-go${analyzed ? ' is-primary' : ''}" href="${escapeAttr(summaryUrl)}" target="_blank" rel="noopener noreferrer">📊 분석 페이지</a>`
+                : `<button class="bbtn" disabled title="분석 완료 후 활성화 (slug 폴더에 summary/index.html 생성 시)">📊 분석 페이지</button>`;
+            const _analyzeBtn = `<button class="bbtn${analyzed ? '' : ' is-primary'}" id="bb-analyze" ${analyzeBtnDisabled}>${analyzeBtnLabel}</button>`;
+            const _ebookBtn = ebookUrl
+                ? `<a class="bbtn is-ebook" href="${escapeAttr(ebookUrl)}" target="_blank" rel="noopener noreferrer">📖 e-book 보기</a>`
+                : `<button class="bbtn" disabled title="meta link 또는 kyobo_id (E... 형식) 없어 직링 불가">📖 e-book 보기</button>`;
+            const _searchBtn = sUrl ? `<a class="bbtn" href="${escapeAttr(sUrl)}" target="_blank" rel="noopener noreferrer">↗ 검색</a>` : '';
             document.getElementById('bmodal-foot').innerHTML = `
-                <button class="bbtn is-primary" id="bb-analyze" ${analyzeBtnDisabled}>${analyzeBtnLabel}</button>
-
-                ${summaryUrl
-                    ? `<a class="bbtn is-go" href="${escapeAttr(summaryUrl)}" target="_blank" rel="noopener noreferrer">📊 분석 페이지</a>`
-                    : `<button class="bbtn" disabled title="분석 완료 후 활성화 (slug 폴더에 summary/index.html 생성 시)">📊 분석 페이지</button>`
-                }
-
-                ${ebookUrl
-                    ? `<a class="bbtn is-ebook" href="${escapeAttr(ebookUrl)}" target="_blank" rel="noopener noreferrer">📖 e-book 보기</a>`
-                    : `<button class="bbtn" disabled title="meta link 또는 kyobo_id (E... 형식) 없어 직링 불가">📖 e-book 보기</button>`
-                }
-
-                ${sUrl
-                    ? `<a class="bbtn" href="${escapeAttr(sUrl)}" target="_blank" rel="noopener noreferrer">↗ 검색</a>`
-                    : ''
-                }
+                ${analyzed ? _summaryBtn + _analyzeBtn : _analyzeBtn + _summaryBtn}
+                ${_ebookBtn}
+                ${_searchBtn}
             `;
 
             document.getElementById('bb-analyze').onclick = async (e) => {
                 const btn = e.currentTarget;
                 if (btn.disabled) return;
+                // 이미 분석된 책 → 경고 + 선택(재처리 / 재캡처)
+                if (analyzed) {
+                    window._reanaSel = 'reprocess';
+                    const ok = await showCustomConfirm({
+                        title: '🔁 다시 분석',
+                        body: `<div style="font-size:0.85rem;color:#cbd5e1;line-height:1.7;">
+                            <div style="color:#fca5a5;font-weight:700;margin-bottom:8px;">⚠️ 이미 분석이 완료된 페이지입니다.</div>
+                            <div style="margin-bottom:10px;">이미 <b>캡처된 이미지와 OCR 결과</b>가 있습니다. 무엇을 할까요?</div>
+                            <label style="display:block;padding:9px 11px;border:1px solid #2f3a4d;border-radius:7px;margin-bottom:7px;cursor:pointer;">
+                                <input type="radio" name="reana" value="reprocess" checked onchange="window._reanaSel=this.value">
+                                <b>재처리</b> <small style="color:#94a3b8;">— 기존 이미지·OCR로 <b>다시 요약·교정·보강</b> (재캡처 X, 빠르고 쌈)</small>
+                            </label>
+                            <label style="display:block;padding:9px 11px;border:1px solid #2f3a4d;border-radius:7px;cursor:pointer;">
+                                <input type="radio" name="reana" value="recapture" onchange="window._reanaSel=this.value">
+                                <b>캡처부터 다시</b> <small style="color:#94a3b8;">— 이미지를 <b>새로 캡처</b> + 재분석 (캡처가 잘못됐을 때)</small>
+                            </label>
+                        </div>`,
+                        options: [
+                            { label: '취소', value: 'cancel' },
+                            { label: '진행', value: 'go', kind: 'primary' },
+                        ],
+                    });
+                    if (ok !== 'go') return;
+                    if ((window._reanaSel || 'reprocess') === 'reprocess') {
+                        await startReprocess(book, slug);
+                        return;
+                    }
+                    // 'recapture' → 아래 캡처 흐름 계속
+                }
                 const mode = document.querySelector('input[name="cap-mode"]:checked')?.value || 'upload';
                 if (mode === 'upload') {
                     // 파일 선택 → 업로드 (별도 흐름)
@@ -1618,6 +1642,41 @@
             };
             document.getElementById('bmodal-bd').classList.add('open');
             document.getElementById('bmodal').classList.add('open');
+
+            // 분석 히스토리(날짜·비용·토큰·모델) 표시 — analysis_meta.json fetch
+            if (analyzed && summaryUrl) {
+                const metaUrl = summaryUrl.replace(/index\.html.*$/, 'analysis_meta.json');
+                fetch(metaUrl, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(m => {
+                    const el = document.getElementById('bmodal-history');
+                    if (!el || !m) return;
+                    const dt = String(m.analyzed_at || '').replace('T', ' ').slice(0, 16);
+                    const cost = (m.cost_usd_total != null ? m.cost_usd_total : m.cost_usd) || 0;
+                    const outK = Math.round((m.output_tokens || 0) / 1000);
+                    const model = String(m.model || '').replace('claude-', '').replace(/-\d{8}$/, '');
+                    el.innerHTML = `📅 분석일 <b>${escapeHtml(dt)}</b> · 💰 비용 <b>$${cost.toFixed(3)}</b>`
+                        + (outK ? ` · 🔤 ${outK}K 출력토큰` : '') + (model ? ` · 🤖 ${escapeHtml(model)}` : '');
+                }).catch(() => {});
+            }
+        }
+
+        // 재처리 — 기존 캡처 이미지·OCR 로 다시 분석(재캡처 없이). upload-process job 등록.
+        async function startReprocess(book, slug) {
+            try {
+                const r = await fetch(`${BRIDGE_URL}/api/books/${encodeURIComponent(slug)}/reprocess`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: book.title || slug }),
+                });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const j = await r.json();
+                const jid = (j.job && j.job.id) || j.id;
+                if (!jid) throw new Error('job 없음');
+                _activeJobs.set(slug, { jobId: jid, status: 'pending', pct: 0, stage: 1, stageName: 'ocr', msg: '재처리 시작...' });
+                startPolling(jid, slug);
+                syncCardOverlay(slug);
+                await closeBookModal();
+            } catch (e) {
+                await showCustomConfirm({ title: '재처리 실패', body: `<div style="color:#fca5a5;">재처리 시작 실패: ${escapeHtml(String(e))}</div>`, options: [{ label: '확인', value: 'ok' }] });
+            }
         }
 
         async function closeBookModal() {

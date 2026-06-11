@@ -496,6 +496,23 @@ async def upload_book_pages(
     }
 
 
+class ReprocessReq(BaseModel):
+    title: str | None = None
+
+
+@app.post("/api/books/{slug}/reprocess")
+def reprocess_book(slug: str, body: ReprocessReq | None = None) -> dict:
+    """이미 캡처된 이미지·OCR 로 재분석(재캡처 없이) — upload-process job 등록.
+    다시 분석 → '재처리' 선택 시 호출. OCR 캐시는 그대로, 요약·교정·빌드·코퍼스만 다시."""
+    s = (slug or "").strip()
+    if not s:
+        raise HTTPException(400, "slug 필요")
+    title = (body.title if body else None) or s.replace("_", " ")
+    job = create_job(slug=s, title=title, mode="upload-process", pages=None)
+    log.info("🔁 재처리 job 생성: #%s slug=%s", job["id"], s)
+    return {"ok": True, "slug": s, "job": job}
+
+
 @app.post("/api/books/{slug}/upload-video")
 async def upload_book_video(
     slug: str,

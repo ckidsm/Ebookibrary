@@ -136,6 +136,29 @@ def process_upload_job(job: dict) -> None:
         db.update_job(jid, progress=_progress(4, N, "build", 0, 0, "HTML 생성..."))
         idx = build_index(book_dir, title=title)
 
+        # ── analysis_meta.json — 분석 히스토리(날짜·비용·토큰·페이지·모델). 모달이 읽어 표시 ──
+        try:
+            import datetime as _dt
+            _mp = book_dir / "summary" / "analysis_meta.json"
+            _prev = 0.0
+            if _mp.exists():
+                try:
+                    _prev = float(json.loads(_mp.read_text(encoding="utf-8")).get("cost_usd_total", 0))
+                except Exception:
+                    _prev = 0.0
+            _rc = float(res.get("cost_usd", 0))
+            _mp.write_text(json.dumps({
+                "analyzed_at": _dt.datetime.now().isoformat(timespec="seconds"),
+                "pages": res.get("pages_done", 0),
+                "cost_usd": round(_rc, 4),
+                "cost_usd_total": round(_prev + _rc, 4),
+                "input_tokens": res.get("in_tok", 0),
+                "output_tokens": res.get("out_tok", 0),
+                "model": cfg.model,
+            }, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception as e:
+            log.warning("analysis_meta 기록 실패(무시): %s", e)
+
         # ── 5) OCR 코퍼스 DB 저장 (학습/추론용 기초 데이터 + 백업) ──
         try:
             from .processing.ocr_corpus import save_book as _corpus_save
