@@ -118,6 +118,21 @@ def cmd_capture_auto(args) -> int:
         )
         return 0
 
+    # ── Linux(X11): scrot 캡처 + xdotool →키 (브라우저 웹뷰어 전용) ──
+    if platform.system() == "Linux":
+        from . import linux_app
+        if not getattr(args, "no_app", False):
+            print("✗ Linux는 브라우저 웹뷰어 캡처(--no-app)만 지원합니다. "
+                  "교보 [바로보기]를 Chrome 전체화면으로 띄운 뒤 시작하세요.", file=sys.stderr)
+            return 1
+        print("[capture-auto] 🐧 Linux X11 캡처 (scrot + xdotool) → 포그라운드(브라우저 웹뷰어)")
+        linux_app.capture_book(
+            str(out_dir), args.slug, args.count, args.interval,
+            next_key=(getattr(args, "next_key", None) or s.capture.next_key or "right"),
+            no_crop=True,
+        )
+        return 0
+
     # ── macOS: 기존 KyoboAppScreenshot ──
     from . import kyobo_app
     bot = kyobo_app.KyoboAppScreenshot(output_dir=str(out_dir), book_folder=args.slug)
