@@ -1452,9 +1452,11 @@
             const isIOS = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && (navigator.maxTouchPoints||0) > 1);
             const isMac = (/Macintosh|Mac OS X/i.test(ua)) && !isIOS;
             const isWin = /Windows/i.test(ua);
-            const canMacro = isMac || isWin;   // 로컬 워커 자동 캡처는 Mac/Windows 만 (iOS 샌드박스 불가)
-            const osName = isIOS ? 'iPad/iOS' : (isMac ? 'macOS' : (isWin ? 'Windows' : '기타 OS'));
-            const macOpt = canMacro
+            const isLinux = /Linux/i.test(ua) && !/Android/i.test(ua) && !isIOS;
+            const canMacro = isMac || isWin || isLinux;   // 워커 자동 캡처(브라우저 웹뷰어) — Mac/Win/Linux (iOS만 불가)
+            const hasDesktopApp = isMac || isWin;          // 교보 데스크탑 앱 매크로 — Mac/Win 만 (Linux 교보앱 없음)
+            const osName = isIOS ? 'iPad/iOS' : (isMac ? 'macOS' : (isWin ? 'Windows' : (isLinux ? 'Linux' : '기타 OS')));
+            const macOpt = hasDesktopApp
                 ? `<label class="capture-mode-opt" title="${isWin ? '⚠️ Windows 교보 데스크탑 앱은 화면캡처를 DRM(파란화면)으로 차단합니다. 막히면 [브라우저 웹뷰어 캡처]를 쓰세요.' : '교보eBook.app 자동 캡처 (macOS).'}">
                         <input type="radio" name="cap-mode" value="${isWin ? 'capture-only' : 'auto'}">
                         <span><strong>🖥 로컬 매크로 (데스크탑 앱)</strong> <small>${isWin ? '⚠️ 교보 앱 DRM(파란화면)으로 막힐 수 있음' : 'macOS 교보앱 자동 캡처'}</small></span>
