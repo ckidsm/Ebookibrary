@@ -2,6 +2,20 @@
 #   irm https://redcodeme.synology.me/kyobo/install/fix-worker.ps1 | iex
 $ErrorActionPreference = "Stop"
 try { Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force } catch {}
+
+# Self-elevate to Administrator (enabling/changing the scheduled task needs it)
+$admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+if (-not $admin) {
+    Write-Host "[..] requesting administrator rights (please click YES on the UAC prompt)..." -ForegroundColor Yellow
+    try {
+        Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','irm https://redcodeme.synology.me/kyobo/install/fix-worker.ps1 | iex'
+        Write-Host "[OK] opened an elevated window - continue there." -ForegroundColor Green
+    } catch {
+        Write-Host "[X] elevation cancelled. Right-click fix-worker.cmd -> 'Run as administrator'." -ForegroundColor Red
+    }
+    return
+}
+
 $TASK = "KyoboBookcaptureWorker"
 Write-Host ""
 Write-Host "=== Kyobo Worker - check and fix ===" -ForegroundColor Cyan
