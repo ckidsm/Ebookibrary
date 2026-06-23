@@ -139,15 +139,13 @@ def is_contaminated_ocr(text: str) -> tuple[bool, str]:
 def _extract_json(text: str) -> dict:
     """모델 응답에서 JSON 객체만 추출. 코드 펜스/잡담 제거."""
     s = text.strip()
-    # ```json ... ``` 제거
-    m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", s, re.S)
-    if m:
-        s = m.group(1)
-    else:
-        # 첫 { 부터 마지막 } 까지
-        i, j = s.find("{"), s.rfind("}")
-        if i >= 0 and j > i:
-            s = s[i:j+1]
+    # 코드펜스 제거 — 닫는 ``` 가 없어도(응답 truncate) 안전하게.
+    s = re.sub(r"^```(?:json)?\s*", "", s)
+    s = re.sub(r"\s*```$", "", s).strip()
+    # 첫 { 부터 마지막 } 까지
+    i, j = s.find("{"), s.rfind("}")
+    if i >= 0 and j > i:
+        s = s[i:j + 1]
     return json.loads(s)
 
 
@@ -167,7 +165,8 @@ def summarize_page(
 
     body = {
         "model": cfg.model,
-        "max_tokens": 1500,
+        # 4000: 코드·용어 많은 페이지는 1500 으로 잘려 JSON truncate → 파싱 실패.
+        "max_tokens": 4000,
         "temperature": cfg.temperature,
         "system": SYSTEM_PROMPT,
         "messages": [
@@ -274,6 +273,11 @@ def summarize_pages(
         except Exception as e:
             errors.append((num, str(e)))
             print(f"[summarize] ✗ p.{num:03d}: {e}", file=sys.stderr)
+            # 크레딧 소진은 영구 에러 — 남은 페이지도 전부 실패하니 즉시 중단.
+            if "credit balance is too low" in str(e):
+                print("[summarize] ⛔ Anthropic 크레딧 소진 — 남은 페이지 중단. "
+                      "충전 후 재처리(resume)하세요.", file=sys.stderr)
+                break
 
     # batch JSON 저장 (기존 스키마: list of page dicts)
     out_path.parent.mkdir(parents=True, exist_ok=True)
