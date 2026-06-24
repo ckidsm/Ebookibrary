@@ -130,6 +130,15 @@ def process_upload_job(job: dict) -> None:
         db.update_job(jid, progress=_progress(3, N, "merge", 0, 0, "병합..."))
         merge_batches(book_dir / "summary", fallback_title=title)
 
+        # ── 3.5) 책 전체 개요(AI 1회) — 머리말 카드(요약·핵심용어·핵심페이지) ──
+        if cfg.api_key:
+            try:
+                from .processing.book_overview import generate_overview
+                db.update_job(jid, progress=_progress(3, N, "merge", 1, 1, "책 개요 생성..."))
+                generate_overview(book_dir, cfg, title)
+            except Exception as e:
+                log.warning("책 개요 생성 실패(무시): %s", e)
+
         # ── 4) build HTML ────────────────────────────────────
         if _cancelling(jid):
             return

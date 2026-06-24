@@ -196,6 +196,25 @@ body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; backgroun
     .page-body { grid-template-columns: 1fr; }
     .page-image { border-right: none; border-bottom: 1px solid #eee; }
 }
+/* 책 개요 카드 */
+.overview { background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 30px; padding: 26px 28px; border-top: 5px solid #6c5ce7; scroll-margin-top: 12vh; }
+.overview > h2 { font-size: 1.4rem; color: #2d2154; margin-bottom: 6px; }
+.overview .ov-reader { display: inline-block; background: #f3f0ff; color: #5b46c9; font-size: 0.82rem; padding: 4px 12px; border-radius: 20px; margin-bottom: 14px; }
+.overview .ov-summary { font-size: 0.98rem; line-height: 1.85; color: #2c3e50; margin-bottom: 22px; }
+.overview .ov-block { margin-top: 20px; border-top: 1px solid #eef0f5; padding-top: 18px; }
+.overview .ov-block h3 { font-size: 1.05rem; color: #6c5ce7; margin-bottom: 12px; }
+.overview .ov-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.overview .ov-chip { background: #ede9fe; color: #5b46c9; font-size: 0.85rem; padding: 6px 13px; border-radius: 8px; font-weight: 600; }
+.overview .ov-terms { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px 22px; }
+.overview .ov-terms li { font-size: 0.9rem; line-height: 1.5; color: #34495e; border-left: 3px solid #c4b5fd; padding-left: 10px; }
+.overview .ov-terms b { color: #4c3a9e; }
+.overview .ov-pages { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.overview .ov-pages li { font-size: 0.9rem; line-height: 1.5; color: #34495e; }
+.overview .ov-pages a { display: inline-block; min-width: 56px; text-align: center; background: #6c5ce7; color: white; font-weight: 700; text-decoration: none; padding: 2px 8px; border-radius: 6px; margin-right: 8px; font-size: 0.82rem; }
+.overview .ov-pages a:hover { background: #4c3a9e; }
+.overview .ov-guide { font-size: 0.93rem; line-height: 1.8; color: #2c3e50; background: #faf9ff; border-radius: 8px; padding: 14px 16px; }
+.tree-overview { display: block; padding: 9px 20px; color: #c9b8ff; text-decoration: none; font-size: 0.86rem; font-weight: 700; border-bottom: 1px solid #2c3e50; }
+.tree-overview:hover { background: #2c3e50; color: #fff; }
 """
 
 _JS = """\
@@ -294,6 +313,40 @@ spyTargets.forEach(function(t) { observer.observe(t); });
 """
 
 
+def _build_overview(ov: dict | None) -> str:
+    """책 개요 카드 HTML. ov 없으면 빈 문자열(하위 호환)."""
+    if not ov:
+        return ""
+    reader = ov.get("target_reader") or ""
+    summary = ov.get("overview") or ""          # <br> 등 HTML 허용(자체 파이프라인 생성물)
+    guide = ov.get("study_guide") or ""
+    topics = "".join(
+        f'<span class="ov-chip">{html.escape(str(t))}</span>'
+        for t in (ov.get("key_topics") or []) if t)
+    terms = "".join(
+        f'<li><b>{html.escape(str(t.get("term","")))}</b> — {html.escape(str(t.get("desc","")))}</li>'
+        for t in (ov.get("key_terms") or []) if isinstance(t, dict) and t.get("term"))
+    pages = "".join(
+        f'<li><a href="#page-{int(p.get("page"))}">p.{int(p.get("page"))}</a>'
+        f'{html.escape(str(p.get("why","")))}</li>'
+        for p in (ov.get("must_read_pages") or []) if isinstance(p, dict) and p.get("page"))
+    parts = ['<section id="overview" class="overview">', '<h2>📋 책 개요</h2>']
+    if reader:
+        parts.append(f'<span class="ov-reader">👤 {html.escape(reader)}</span>')
+    if summary:
+        parts.append(f'<div class="ov-summary">{summary}</div>')
+    if topics:
+        parts.append(f'<div class="ov-block"><h3>🏷 주요 주제</h3><div class="ov-chips">{topics}</div></div>')
+    if terms:
+        parts.append(f'<div class="ov-block"><h3>📖 꼭 알아야 할 용어</h3><ul class="ov-terms">{terms}</ul></div>')
+    if pages:
+        parts.append(f'<div class="ov-block"><h3>⭐ 핵심 페이지</h3><ul class="ov-pages">{pages}</ul></div>')
+    if guide:
+        parts.append(f'<div class="ov-block"><h3>🧭 학습 가이드</h3><div class="ov-guide">{guide}</div></div>')
+    parts.append('</section>')
+    return "\n".join(parts)
+
+
 def build_html(
     book_dir: Path,
     pages_data: dict,
@@ -301,6 +354,7 @@ def build_html(
     subtitle: str = "도서 페이지별 요약 노트",
     signature: str = "YUNDEOKSOO",
     image_pattern: str | None = None,
+    overview: dict | None = None,
 ) -> Path:
     """pages_data → summary/index.html 생성.
 
@@ -315,6 +369,10 @@ def build_html(
         image_pattern = "../thumbs/page_{num:03d}.png"
 
     sidebar = _build_sidebar(chapters)
+    overview_html = _build_overview(overview)
+    if overview_html:
+        sidebar = ('                <a href="#overview" class="tree-overview">'
+                   '📋 책 개요</a>\n') + sidebar
     page_cards = []
     for i, p in enumerate(pages):
         prev_num = pages[i-1]["num"] if i > 0 else None
@@ -357,6 +415,8 @@ def build_html(
         <span class="mt-tag">{len(chapters)}챕터</span>
     </div>
 </div>
+
+{overview_html}
 
 {"".join(page_cards)}
 
@@ -412,7 +472,14 @@ def build_index(book_dir: Path, title: str | None = None) -> Path:
     if pages_data_path.exists():
         with pages_data_path.open(encoding="utf-8") as f:
             pages_data = json.load(f)
-        return build_html(book_dir, pages_data, title=title)
+        overview = None
+        ov_path = summary_dir / "book_overview.json"
+        if ov_path.exists():
+            try:
+                overview = json.loads(ov_path.read_text(encoding="utf-8"))
+            except Exception:
+                overview = None
+        return build_html(book_dir, pages_data, title=title, overview=overview)
     # 폴백 — 단순 그리드 (C-2 placeholder 유지)
     pngs = sorted(book_dir.glob("*.png"))
     ocr_dir = summary_dir / "ocr_text"
