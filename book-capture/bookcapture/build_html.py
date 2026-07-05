@@ -93,7 +93,7 @@ def _build_page_card(page: dict, prev_num: int | None, next_num: int | None, ima
         <div class="page-nav">{nav_html}</div>
     </div>
     <div class="page-body">
-        <div class="page-image"><img src="{img_src}" alt="Page {num}" loading="lazy"></div>
+        <div class="page-image"><img src="{img_src}" alt="Page {num}" data-page="{num}" loading="lazy"></div>
         <div class="page-summary">
             {intro}
             <div class="section"><div class="section-title">주요 주제</div><div class="tag-list">{topics}</div></div>
@@ -171,12 +171,37 @@ body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; backgroun
 .signature { margin-top: 40px; padding: 18px 22px; background: white; border-radius: 8px; border-left: 4px solid #1abc9c; font-size: 0.78rem; color: #555; }
 .signature strong { color: #2c3e50; }
 
-/* Modal */
-.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; cursor: zoom-out; }
-.modal-overlay.active { display: flex; }
-.modal-overlay img { max-width: 95vw; max-height: 95vh; object-fit: contain; border-radius: 4px; box-shadow: 0 0 40px rgba(0,0,0,0.5); }
-.modal-close { position: fixed; top: 20px; right: 30px; color: white; font-size: 2em; cursor: pointer; z-index: 1001; line-height: 1; }
+/* Modal — 확대/축소·이동·OCR텍스트·메모 */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1000; }
+.modal-overlay.active { display: block; }
+.modal-stage { position: absolute; inset: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: grab; }
+.modal-stage.panning { cursor: grabbing; }
+.modal-stage img { max-width: 96vw; max-height: 96vh; transform-origin: center center; user-select: none; -webkit-user-drag: none; will-change: transform; box-shadow: 0 0 40px rgba(0,0,0,0.5); background: #fff; }
+.modal-bar { position: fixed; top: 14px; left: 16px; z-index: 1002; display: flex; align-items: center; gap: 6px; background: rgba(20,28,40,0.88); padding: 6px 10px; border-radius: 8px; }
+.mbtn { background: #2c3e50; color: #fff; border: 1px solid #46637e; border-radius: 6px; padding: 4px 11px; font-size: 0.85rem; cursor: pointer; line-height: 1.2; font-family: inherit; }
+.mbtn:hover { background: #1abc9c; border-color: #1abc9c; }
+.modal-bar #mZoomLabel { color: #cbd5e1; font-size: 0.8rem; min-width: 44px; text-align: center; }
+.modal-bar .mbar-page { color: #7ee787; font-size: 0.82rem; font-weight: 700; margin-left: 8px; }
+.modal-close { position: fixed; top: 16px; right: 24px; color: white; font-size: 2em; cursor: pointer; z-index: 1002; line-height: 1; }
 .modal-close:hover { color: #1abc9c; }
+.modal-text { position: fixed; top: 0; right: 0; width: 440px; max-width: 94vw; height: 100vh; background: #0f1722; color: #e2e8f0; z-index: 1001; box-shadow: -4px 0 24px rgba(0,0,0,0.5); padding: 62px 14px 16px; display: none; flex-direction: column; gap: 8px; overflow-y: auto; }
+.modal-text.open { display: flex; }
+.modal-text .mt-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; flex: none; }
+.modal-text pre#mOcrText { flex: none; min-height: 90px; max-height: 26vh; overflow: auto; background: #0a0e14; border: 1px solid #24323f; border-radius: 6px; padding: 10px; font-size: 0.8rem; line-height: 1.55; white-space: pre-wrap; word-break: break-word; color: #cbd5e1; margin: 0; }
+.modal-text textarea { flex: none; min-height: 90px; background: #0a0e14; border: 1px solid #24323f; border-radius: 6px; padding: 10px; font-size: 0.85rem; line-height: 1.6; color: #fff; resize: vertical; font-family: inherit; }
+/* 💻 코드 패널 */
+.mt-code { display: flex; flex-direction: column; gap: 10px; }
+.mt-code-empty { color: #5a6b7d; font-size: 0.8rem; padding: 4px 2px; }
+.code-block { border: 1px solid #24323f; border-radius: 7px; overflow: hidden; background: #0a0e14; }
+.code-head { display: flex; justify-content: space-between; align-items: center; padding: 5px 8px 5px 10px; background: #16202c; border-bottom: 1px solid #24323f; }
+.code-lang { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.3px; padding: 2px 8px; border-radius: 10px; }
+.code-lang.cs { background: rgba(126,231,135,0.16); color: #7ee787; }
+.code-lang.py { background: rgba(96,165,250,0.16); color: #7cb7ff; }
+.code-title { flex: 1; font-size: 0.7rem; color: #8fa3b6; margin: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.code-copy { background: #2c3e50; color: #cfe0ea; border: 1px solid #46637e; border-radius: 5px; padding: 2px 8px; font-size: 0.72rem; cursor: pointer; font-family: inherit; }
+.code-copy:hover { background: #1abc9c; border-color: #1abc9c; color: #04120e; }
+.code-block pre { margin: 0; max-height: 42vh; overflow: auto; padding: 10px; font-size: 0.76rem; line-height: 1.5; color: #dbe7f0; white-space: pre; font-family: 'SF Mono', Consolas, Menlo, monospace; }
+#mCodeLangs { font-size: 0.7rem; color: #7ee787; }
 
 @media (max-width: 900px) {
     .sidebar { width: 240px; }
@@ -184,21 +209,124 @@ body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; backgroun
     .page-body { grid-template-columns: 1fr; }
     .page-image { border-right: none; border-bottom: 1px solid #eee; }
 }
+/* 책 개요 카드 */
+.overview { background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 30px; padding: 26px 28px; border-top: 5px solid #6c5ce7; scroll-margin-top: 12vh; }
+.overview > h2 { font-size: 1.4rem; color: #2d2154; margin-bottom: 6px; }
+.overview .ov-reader { display: inline-block; background: #f3f0ff; color: #5b46c9; font-size: 0.82rem; padding: 4px 12px; border-radius: 20px; margin-bottom: 14px; }
+.overview .ov-summary { font-size: 0.98rem; line-height: 1.85; color: #2c3e50; margin-bottom: 22px; }
+.overview .ov-block { margin-top: 20px; border-top: 1px solid #eef0f5; padding-top: 18px; }
+.overview .ov-block h3 { font-size: 1.05rem; color: #6c5ce7; margin-bottom: 12px; }
+.overview .ov-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.overview .ov-chip { background: #ede9fe; color: #5b46c9; font-size: 0.85rem; padding: 6px 13px; border-radius: 8px; font-weight: 600; }
+.overview .ov-terms { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px 22px; }
+.overview .ov-terms li { font-size: 0.9rem; line-height: 1.5; color: #34495e; border-left: 3px solid #c4b5fd; padding-left: 10px; }
+.overview .ov-terms b { color: #4c3a9e; }
+.overview .ov-pages { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.overview .ov-pages li { font-size: 0.9rem; line-height: 1.5; color: #34495e; }
+.overview .ov-pages a { display: inline-block; min-width: 56px; text-align: center; background: #6c5ce7; color: white; font-weight: 700; text-decoration: none; padding: 2px 8px; border-radius: 6px; margin-right: 8px; font-size: 0.82rem; }
+.overview .ov-pages a:hover { background: #4c3a9e; }
+.overview .ov-guide { font-size: 0.93rem; line-height: 1.8; color: #2c3e50; background: #faf9ff; border-radius: 8px; padding: 14px 16px; }
+.tree-overview { display: block; padding: 9px 20px; color: #c9b8ff; text-decoration: none; font-size: 0.86rem; font-weight: 700; border-bottom: 1px solid #2c3e50; }
+.tree-overview:hover { background: #2c3e50; color: #fff; }
 """
 
 _JS = """\
 const modal = document.getElementById('imageModal');
 const modalImg = document.getElementById('modalImg');
-document.querySelectorAll('.page-image img').forEach(function(img) {
-    img.addEventListener('click', function() {
-        modalImg.src = img.src;
-        modal.classList.add('active');
+const mStage = document.getElementById('mStage');
+const mTextPanel = document.getElementById('mTextPanel');
+const mOcrText = document.getElementById('mOcrText');
+const mMemo = document.getElementById('mMemo');
+const mZoomLabel = document.getElementById('mZoomLabel');
+const mPageLabel = document.getElementById('mPageLabel');
+const SLUG = (window.KYOBO_SLUG || 'book');
+const mCodeWrap = document.getElementById('mCodeWrap');
+const mCodeLangs = document.getElementById('mCodeLangs');
+let mScale = 1, mTx = 0, mTy = 0, mPage = '';
+let _codeBlocks = null;
+function _esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+fetch('code_blocks.json?t=' + Date.now()).then(function(r){ return r.ok ? r.json() : {}; })
+    .then(function(j){ _codeBlocks = j || {}; if (mPage) renderCode(mPage); })
+    .catch(function(){ _codeBlocks = {}; });
+function renderCode(page){
+    if (!mCodeWrap) return;
+    var blocks = (_codeBlocks && _codeBlocks[String(page)]) || null;
+    if (!blocks || !blocks.length){
+        mCodeWrap.innerHTML = '<div class="mt-code-empty">' + (_codeBlocks === null ? '불러오는 중…' : '이 페이지에 코드 없음') + '</div>';
+        mCodeLangs.textContent = ''; return;
+    }
+    var langs = {}; var html = '';
+    blocks.forEach(function(b){
+        var lang = (b.lang || '').trim();
+        var cls = /python|파이썬|py/i.test(lang) ? 'py' : 'cs';
+        var label = cls === 'py' ? 'Python' : 'C#';
+        langs[label] = 1;
+        html += '<div class="code-block"><div class="code-head">'
+             + '<span class="code-lang ' + cls + '">' + label + '</span>'
+             + '<span class="code-title">' + _esc(b.title || '') + '</span>'
+             + '<button class="code-copy">복사</button></div>'
+             + '<pre>' + _esc(b.code || '') + '</pre></div>';
     });
+    mCodeWrap.innerHTML = html;
+    mCodeLangs.textContent = Object.keys(langs).join(' · ');
+    mCodeWrap.querySelectorAll('.code-copy').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            var code = btn.parentElement.parentElement.querySelector('pre').textContent;
+            navigator.clipboard.writeText(code).then(function(){ btn.textContent='✓'; setTimeout(function(){ btn.textContent='복사'; },1000); });
+        });
+    });
+}
+function mApply() {
+    modalImg.style.transform = 'translate(' + mTx + 'px,' + mTy + 'px) scale(' + mScale + ')';
+    mZoomLabel.textContent = Math.round(mScale * 100) + '%';
+}
+function mReset() { mScale = 1; mTx = 0; mTy = 0; mApply(); }
+function mZoom(f) { mScale = Math.min(8, Math.max(0.15, mScale * f)); mApply(); }
+function openModal(img) {
+    modalImg.src = img.src;
+    mPage = img.getAttribute('data-page') || '';
+    mPageLabel.textContent = mPage ? ('Page ' + mPage) : '';
+    mReset();
+    modal.classList.add('active');
+    var pad = String(mPage).padStart(3, '0');
+    mOcrText.textContent = '불러오는 중…';
+    fetch('ocr_text/page_' + pad + '.txt?t=' + Date.now())
+        .then(function(r) { return r.ok ? r.text() : Promise.reject(); })
+        .then(function(t) { mOcrText.textContent = (t || '').trim() || '(OCR 텍스트 없음)'; })
+        .catch(function() { mOcrText.textContent = '(이 페이지의 OCR 텍스트를 불러오지 못했습니다)'; });
+    mMemo.value = localStorage.getItem('memo:' + SLUG + ':' + mPage) || '';
+    renderCode(mPage);
+}
+document.querySelectorAll('.page-image img').forEach(function(img) {
+    img.addEventListener('click', function() { openModal(img); });
 });
-modal.addEventListener('click', function() { modal.classList.remove('active'); });
 document.getElementById('modalClose').addEventListener('click', function() { modal.classList.remove('active'); });
+document.getElementById('mZoomIn').onclick = function() { mZoom(1.2); };
+document.getElementById('mZoomOut').onclick = function() { mZoom(1 / 1.2); };
+document.getElementById('mZoomReset').onclick = mReset;
+document.getElementById('mTextBtn').onclick = function() { mTextPanel.classList.toggle('open'); };
+document.getElementById('mCopyBtn').onclick = function() {
+    navigator.clipboard.writeText(mOcrText.textContent || '').then(function() {
+        var b = document.getElementById('mCopyBtn'); b.textContent = '✓ 복사됨';
+        setTimeout(function() { b.textContent = '📋 복사'; }, 1200);
+    });
+};
+mMemo.addEventListener('input', function() {
+    localStorage.setItem('memo:' + SLUG + ':' + mPage, mMemo.value);
+    var s = document.getElementById('mMemoSaved'); s.textContent = '저장됨';
+    setTimeout(function() { s.textContent = ''; }, 1000);
+});
+mStage.addEventListener('wheel', function(e) { e.preventDefault(); mZoom(e.deltaY < 0 ? 1.12 : 1 / 1.12); }, { passive: false });
+var panning = false, sx = 0, sy = 0;
+mStage.addEventListener('mousedown', function(e) { panning = true; sx = e.clientX - mTx; sy = e.clientY - mTy; mStage.classList.add('panning'); e.preventDefault(); });
+window.addEventListener('mousemove', function(e) { if (!panning) return; mTx = e.clientX - sx; mTy = e.clientY - sy; mApply(); });
+window.addEventListener('mouseup', function() { panning = false; mStage.classList.remove('panning'); });
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') modal.classList.remove('active');
+    if (!modal.classList.contains('active')) return;
+    if (e.key === '+' || e.key === '=') mZoom(1.2);
+    else if (e.key === '-' || e.key === '_') mZoom(1 / 1.2);
+    else if (e.key === '0') mReset();
 });
 
 var spyDisabled = false;
@@ -234,6 +362,40 @@ spyTargets.forEach(function(t) { observer.observe(t); });
 """
 
 
+def _build_overview(ov: dict | None) -> str:
+    """책 개요 카드 HTML. ov 없으면 빈 문자열(하위 호환)."""
+    if not ov:
+        return ""
+    reader = ov.get("target_reader") or ""
+    summary = ov.get("overview") or ""          # <br> 등 HTML 허용(자체 파이프라인 생성물)
+    guide = ov.get("study_guide") or ""
+    topics = "".join(
+        f'<span class="ov-chip">{html.escape(str(t))}</span>'
+        for t in (ov.get("key_topics") or []) if t)
+    terms = "".join(
+        f'<li><b>{html.escape(str(t.get("term","")))}</b> — {html.escape(str(t.get("desc","")))}</li>'
+        for t in (ov.get("key_terms") or []) if isinstance(t, dict) and t.get("term"))
+    pages = "".join(
+        f'<li><a href="#page-{int(p.get("page"))}">p.{int(p.get("page"))}</a>'
+        f'{html.escape(str(p.get("why","")))}</li>'
+        for p in (ov.get("must_read_pages") or []) if isinstance(p, dict) and p.get("page"))
+    parts = ['<section id="overview" class="overview">', '<h2>📋 책 개요</h2>']
+    if reader:
+        parts.append(f'<span class="ov-reader">👤 {html.escape(reader)}</span>')
+    if summary:
+        parts.append(f'<div class="ov-summary">{summary}</div>')
+    if topics:
+        parts.append(f'<div class="ov-block"><h3>🏷 주요 주제</h3><div class="ov-chips">{topics}</div></div>')
+    if terms:
+        parts.append(f'<div class="ov-block"><h3>📖 꼭 알아야 할 용어</h3><ul class="ov-terms">{terms}</ul></div>')
+    if pages:
+        parts.append(f'<div class="ov-block"><h3>⭐ 핵심 페이지</h3><ul class="ov-pages">{pages}</ul></div>')
+    if guide:
+        parts.append(f'<div class="ov-block"><h3>🧭 학습 가이드</h3><div class="ov-guide">{guide}</div></div>')
+    parts.append('</section>')
+    return "\n".join(parts)
+
+
 def build_html(
     book_dir: Path,
     pages_data: dict,
@@ -241,6 +403,7 @@ def build_html(
     subtitle: str = "도서 페이지별 요약 노트",
     signature: str = "YUNDEOKSOO",
     image_pattern: str | None = None,
+    overview: dict | None = None,
 ) -> Path:
     """pages_data → summary/index.html 생성.
 
@@ -255,6 +418,10 @@ def build_html(
         image_pattern = "../thumbs/page_{num:03d}.png"
 
     sidebar = _build_sidebar(chapters)
+    overview_html = _build_overview(overview)
+    if overview_html:
+        sidebar = ('                <a href="#overview" class="tree-overview">'
+                   '📋 책 개요</a>\n') + sidebar
     page_cards = []
     for i, p in enumerate(pages):
         prev_num = pages[i-1]["num"] if i > 0 else None
@@ -298,6 +465,8 @@ def build_html(
     </div>
 </div>
 
+{overview_html}
+
 {"".join(page_cards)}
 
 <div class="signature">
@@ -307,10 +476,29 @@ def build_html(
 </div>
 
 <div class="modal-overlay" id="imageModal">
-    <span class="modal-close" id="modalClose">&times;</span>
-    <img id="modalImg" src="" alt="">
+    <div class="modal-bar">
+        <button class="mbtn" id="mTextBtn" title="OCR 텍스트/메모 보기">📄 텍스트</button>
+        <button class="mbtn" id="mZoomOut" title="축소 (−)">−</button>
+        <span id="mZoomLabel">100%</span>
+        <button class="mbtn" id="mZoomIn" title="확대 (+)">+</button>
+        <button class="mbtn" id="mZoomReset" title="원래대로 (0)">⊡</button>
+        <span class="mbar-page" id="mPageLabel"></span>
+    </div>
+    <span class="modal-close" id="modalClose" title="닫기 (Esc)">&times;</span>
+    <div class="modal-stage" id="mStage">
+        <img id="modalImg" src="" alt="" draggable="false">
+    </div>
+    <aside class="modal-text" id="mTextPanel">
+        <div class="mt-row"><b>💻 소스코드</b><span id="mCodeLangs"></span></div>
+        <div id="mCodeWrap" class="mt-code"><div class="mt-code-empty">—</div></div>
+        <div class="mt-row"><b>📄 OCR 텍스트</b><button class="mbtn" id="mCopyBtn">📋 복사</button></div>
+        <pre id="mOcrText">—</pre>
+        <div class="mt-row"><b>📝 메모</b><span id="mMemoSaved" style="font-size:0.7rem;color:#1abc9c;"></span></div>
+        <textarea id="mMemo" placeholder="이 페이지 메모 (자동 저장)"></textarea>
+    </aside>
 </div>
 
+<script>window.KYOBO_SLUG = {json.dumps(book_dir.name)};</script>
 <script>
 {_JS}
 </script>
@@ -335,7 +523,14 @@ def build_index(book_dir: Path, title: str | None = None) -> Path:
     if pages_data_path.exists():
         with pages_data_path.open(encoding="utf-8") as f:
             pages_data = json.load(f)
-        return build_html(book_dir, pages_data, title=title)
+        overview = None
+        ov_path = summary_dir / "book_overview.json"
+        if ov_path.exists():
+            try:
+                overview = json.loads(ov_path.read_text(encoding="utf-8"))
+            except Exception:
+                overview = None
+        return build_html(book_dir, pages_data, title=title, overview=overview)
     # 폴백 — 단순 그리드 (C-2 placeholder 유지)
     pngs = sorted(book_dir.glob("*.png"))
     ocr_dir = summary_dir / "ocr_text"

@@ -25,6 +25,7 @@ from . import ocr as ocr_mod
 from . import build_html
 from . import merge as merge_mod
 from . import summarize as summarize_mod
+from . import extract_code as code_mod
 from . import worker as worker_mod
 
 
@@ -239,6 +240,19 @@ def cmd_summarize(args) -> int:
     return 0 if not res["errors"] else 1
 
 
+def cmd_code(args) -> int:
+    """페이지 이미지 → 언어별 소스코드 비전 추출 → summary/code_blocks.json (팝업 코드 패널용)."""
+    s = cfg.load(bridge_url=args.bridge)
+    book_dir = _resolve_book_dir(args)
+    if not book_dir.exists():
+        print(f"✗ 폴더 없음: {book_dir}", file=sys.stderr); return 2
+    pages = None
+    if getattr(args, "pages", None):
+        pages = [int(x) for x in str(args.pages).replace("-", ",").split(",") if x.strip().isdigit()]
+    res = code_mod.extract_code_blocks(book_dir, s.ai, pages=pages)
+    return 0 if res.get("done") else 1
+
+
 def cmd_worker(args) -> int:
     """백엔드 jobs 큐 polling — 한 번 띄워두면 [분석 시작] 클릭마다 자동 처리."""
     return worker_mod.run_worker(bridge=args.bridge, interval=args.interval)
@@ -410,6 +424,11 @@ def cmd_run(args) -> int:
     if not getattr(args, "no_summarize", False):
         rc = cmd_summarize(args)
         if rc != 0: print(f"[run] summarize 일부 실패 (계속 진행)")
+    if not getattr(args, "no_code", False):
+        try:
+            cmd_code(args)
+        except Exception as e:
+            print(f"[run] code 추출 실패 (계속 진행): {e}")
     rc = cmd_merge(args)
     if rc != 0: print(f"[run] merge 실패 (batch JSON 없음 가능) — placeholder HTML 만 생성")
     rc = cmd_build(args)
@@ -521,6 +540,12 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--out", help="출력 파일명 (기본: batch_<첫페이지>.json)")
     ps.set_defaults(func=cmd_summarize)
 
+    pc = sub.add_parser("code", help="페이지 이미지 → 언어별 소스코드 (Claude 비전) → code_blocks.json")
+    pc.add_argument("--slug")
+    pc.add_argument("--book-dir")
+    pc.add_argument("--pages", help="페이지 목록 (예: 24,26,33) 또는 범위. 기본: 코드 자동감지")
+    pc.set_defaults(func=cmd_code)
+
     pw = sub.add_parser("worker", help="백엔드 jobs 큐 polling (한 번 띄워두면 [분석 시작] 자동 처리)")
     pw.add_argument("--interval", type=float, default=2.0, help="polling 간격(초, 기본 2)")
     pw.set_defaults(func=cmd_worker)
@@ -576,6 +601,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--mode", choices=["1", "2", "3"], default="3")
     pr.add_argument("--refresh", action="store_true")
     pr.add_argument("--no-summarize", action="store_true", help="AI 요약 단계 스킵 (비용 0)")
+    pr.add_argument("--no-code", action="store_true", help="소스코드 추출 단계 스킵 (비용 0)")
     pr.add_argument("--pages")
     pr.add_argument("--out")
     pr.set_defaults(func=cmd_run)

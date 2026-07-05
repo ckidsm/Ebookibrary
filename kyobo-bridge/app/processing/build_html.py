@@ -184,11 +184,24 @@ body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; backgroun
 .modal-bar .mbar-page { color: #7ee787; font-size: 0.82rem; font-weight: 700; margin-left: 8px; }
 .modal-close { position: fixed; top: 16px; right: 24px; color: white; font-size: 2em; cursor: pointer; z-index: 1002; line-height: 1; }
 .modal-close:hover { color: #1abc9c; }
-.modal-text { position: fixed; top: 0; right: 0; width: 380px; max-width: 92vw; height: 100vh; background: #0f1722; color: #e2e8f0; z-index: 1001; box-shadow: -4px 0 24px rgba(0,0,0,0.5); padding: 62px 16px 16px; display: none; flex-direction: column; gap: 8px; }
+.modal-text { position: fixed; top: 0; right: 0; width: 440px; max-width: 94vw; height: 100vh; background: #0f1722; color: #e2e8f0; z-index: 1001; box-shadow: -4px 0 24px rgba(0,0,0,0.5); padding: 62px 14px 16px; display: none; flex-direction: column; gap: 8px; overflow-y: auto; }
 .modal-text.open { display: flex; }
-.modal-text .mt-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
-.modal-text pre { flex: 1; min-height: 110px; max-height: 44vh; overflow: auto; background: #0a0e14; border: 1px solid #24323f; border-radius: 6px; padding: 10px; font-size: 0.8rem; line-height: 1.55; white-space: pre-wrap; word-break: break-word; color: #cbd5e1; margin: 0; }
-.modal-text textarea { flex: 1; min-height: 110px; background: #0a0e14; border: 1px solid #24323f; border-radius: 6px; padding: 10px; font-size: 0.85rem; line-height: 1.6; color: #fff; resize: vertical; font-family: inherit; }
+.modal-text .mt-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; flex: none; }
+.modal-text pre#mOcrText { flex: none; min-height: 90px; max-height: 26vh; overflow: auto; background: #0a0e14; border: 1px solid #24323f; border-radius: 6px; padding: 10px; font-size: 0.8rem; line-height: 1.55; white-space: pre-wrap; word-break: break-word; color: #cbd5e1; margin: 0; }
+.modal-text textarea { flex: none; min-height: 90px; background: #0a0e14; border: 1px solid #24323f; border-radius: 6px; padding: 10px; font-size: 0.85rem; line-height: 1.6; color: #fff; resize: vertical; font-family: inherit; }
+/* 💻 코드 패널 */
+.mt-code { display: flex; flex-direction: column; gap: 10px; }
+.mt-code-empty { color: #5a6b7d; font-size: 0.8rem; padding: 4px 2px; }
+.code-block { border: 1px solid #24323f; border-radius: 7px; overflow: hidden; background: #0a0e14; }
+.code-head { display: flex; justify-content: space-between; align-items: center; padding: 5px 8px 5px 10px; background: #16202c; border-bottom: 1px solid #24323f; }
+.code-lang { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.3px; padding: 2px 8px; border-radius: 10px; }
+.code-lang.cs { background: rgba(126,231,135,0.16); color: #7ee787; }
+.code-lang.py { background: rgba(96,165,250,0.16); color: #7cb7ff; }
+.code-title { flex: 1; font-size: 0.7rem; color: #8fa3b6; margin: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.code-copy { background: #2c3e50; color: #cfe0ea; border: 1px solid #46637e; border-radius: 5px; padding: 2px 8px; font-size: 0.72rem; cursor: pointer; font-family: inherit; }
+.code-copy:hover { background: #1abc9c; border-color: #1abc9c; color: #04120e; }
+.code-block pre { margin: 0; max-height: 42vh; overflow: auto; padding: 10px; font-size: 0.76rem; line-height: 1.5; color: #dbe7f0; white-space: pre; font-family: 'SF Mono', Consolas, Menlo, monospace; }
+#mCodeLangs { font-size: 0.7rem; color: #7ee787; }
 
 @media (max-width: 900px) {
     .sidebar { width: 240px; }
@@ -227,7 +240,42 @@ const mMemo = document.getElementById('mMemo');
 const mZoomLabel = document.getElementById('mZoomLabel');
 const mPageLabel = document.getElementById('mPageLabel');
 const SLUG = (window.KYOBO_SLUG || 'book');
+const mCodeWrap = document.getElementById('mCodeWrap');
+const mCodeLangs = document.getElementById('mCodeLangs');
 let mScale = 1, mTx = 0, mTy = 0, mPage = '';
+let _codeBlocks = null;
+function _esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+fetch('code_blocks.json?t=' + Date.now()).then(function(r){ return r.ok ? r.json() : {}; })
+    .then(function(j){ _codeBlocks = j || {}; if (mPage) renderCode(mPage); })
+    .catch(function(){ _codeBlocks = {}; });
+function renderCode(page){
+    if (!mCodeWrap) return;
+    var blocks = (_codeBlocks && _codeBlocks[String(page)]) || null;
+    if (!blocks || !blocks.length){
+        mCodeWrap.innerHTML = '<div class="mt-code-empty">' + (_codeBlocks === null ? '불러오는 중…' : '이 페이지에 코드 없음') + '</div>';
+        mCodeLangs.textContent = ''; return;
+    }
+    var langs = {}; var html = '';
+    blocks.forEach(function(b){
+        var lang = (b.lang || '').trim();
+        var cls = /python|파이썬|py/i.test(lang) ? 'py' : 'cs';
+        var label = cls === 'py' ? 'Python' : 'C#';
+        langs[label] = 1;
+        html += '<div class="code-block"><div class="code-head">'
+             + '<span class="code-lang ' + cls + '">' + label + '</span>'
+             + '<span class="code-title">' + _esc(b.title || '') + '</span>'
+             + '<button class="code-copy">복사</button></div>'
+             + '<pre>' + _esc(b.code || '') + '</pre></div>';
+    });
+    mCodeWrap.innerHTML = html;
+    mCodeLangs.textContent = Object.keys(langs).join(' · ');
+    mCodeWrap.querySelectorAll('.code-copy').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            var code = btn.parentElement.parentElement.querySelector('pre').textContent;
+            navigator.clipboard.writeText(code).then(function(){ btn.textContent='✓'; setTimeout(function(){ btn.textContent='복사'; },1000); });
+        });
+    });
+}
 function mApply() {
     modalImg.style.transform = 'translate(' + mTx + 'px,' + mTy + 'px) scale(' + mScale + ')';
     mZoomLabel.textContent = Math.round(mScale * 100) + '%';
@@ -247,6 +295,7 @@ function openModal(img) {
         .then(function(t) { mOcrText.textContent = (t || '').trim() || '(OCR 텍스트 없음)'; })
         .catch(function() { mOcrText.textContent = '(이 페이지의 OCR 텍스트를 불러오지 못했습니다)'; });
     mMemo.value = localStorage.getItem('memo:' + SLUG + ':' + mPage) || '';
+    renderCode(mPage);
 }
 document.querySelectorAll('.page-image img').forEach(function(img) {
     img.addEventListener('click', function() { openModal(img); });
@@ -440,6 +489,8 @@ def build_html(
         <img id="modalImg" src="" alt="" draggable="false">
     </div>
     <aside class="modal-text" id="mTextPanel">
+        <div class="mt-row"><b>💻 소스코드</b><span id="mCodeLangs"></span></div>
+        <div id="mCodeWrap" class="mt-code"><div class="mt-code-empty">—</div></div>
         <div class="mt-row"><b>📄 OCR 텍스트</b><button class="mbtn" id="mCopyBtn">📋 복사</button></div>
         <pre id="mOcrText">—</pre>
         <div class="mt-row"><b>📝 메모</b><span id="mMemoSaved" style="font-size:0.7rem;color:#1abc9c;"></span></div>

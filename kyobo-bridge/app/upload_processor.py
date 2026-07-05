@@ -124,6 +124,16 @@ def process_upload_job(job: dict) -> None:
             f"요약 {res.get('pages_done',0)}p · ${res.get('cost_usd',0):.3f}"
             + (f" · 오염제외 {len(res['skipped'])}" if res.get("skipped") else "")))
 
+        # ── 2.5) 소스코드 비전 추출 → code_blocks.json (팝업 '💻 소스코드' 패널용) ──
+        if cfg.api_key and not _cancelling(jid):
+            try:
+                from .processing.extract_code import extract_code_blocks
+                db.update_job(jid, progress=_progress(
+                    2, N, "summarize", res.get("pages_done", 0), len(ocr_files), "소스코드 추출..."))
+                extract_code_blocks(book_dir, cfg)
+            except Exception as e:
+                log.warning("소스코드 추출 실패(무시): %s", e)
+
         # ── 3) merge ─────────────────────────────────────────
         if _cancelling(jid):
             return

@@ -179,6 +179,7 @@ def run_one(bridge: str, job: dict) -> None:
         steps = [
             ["ocr", "--book-dir", str(book_dir)],
             ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
+            ["code", "--book-dir", str(book_dir)],
             ["merge", "--book-dir", str(book_dir)],
             ["build", "--book-dir", str(book_dir)],
         ]
@@ -199,6 +200,7 @@ def run_one(bridge: str, job: dict) -> None:
         steps = [
             ["ocr", "--book-dir", str(book_dir)],
             ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
+            ["code", "--book-dir", str(book_dir)],
             ["merge", "--book-dir", str(book_dir)],
             ["build", "--book-dir", str(book_dir)],
         ]
@@ -255,6 +257,7 @@ def run_one(bridge: str, job: dict) -> None:
              "--max-pages", "300", "--delay", "1.5"],
             ["ocr", "--book-dir", str(book_dir)],
             ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
+            ["code", "--book-dir", str(book_dir)],
             ["merge", "--book-dir", str(book_dir)],
             ["build", "--book-dir", str(book_dir)],
         ]
@@ -273,6 +276,7 @@ def run_one(bridge: str, job: dict) -> None:
             cap,
             ["ocr", "--book-dir", str(book_dir)],
             ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
+            ["code", "--book-dir", str(book_dir)],
             ["merge", "--book-dir", str(book_dir)],
             ["build", "--book-dir", str(book_dir)],
         ]

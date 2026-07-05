@@ -36,7 +36,7 @@ time.sleep(1)
 # 2) 표지부터 raw 저장, 오른쪽 진행, 끝(해시 반복) 감지
 log("raw 저장 시작")
 n=0; last=None; same=0
-for i in range(320):
+for i in range(400):  # 캡 상향(528p 등 긴 책 대비; 끝 감지로 실제 종료)
     im=shot(R/"_cur.png"); h=phash(im)
     if h==last:
         same+=1

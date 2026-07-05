@@ -1312,8 +1312,11 @@
 
         function slugify(title) {
             // book-capture 폴더명 규칙과 일치 (공백→_, prefix [..] 제거, 양끝 trim)
+            // '#'는 URL 조각 구분자라 폴더/URL을 깨므로 sharp로 치환(C#→Csharp). '+'는 plus(C++→Cplusplus).
             return String(title || '')
                 .replace(/^\s*\[[^\]]+\]\s*/, '')   // 선행 [epub3.0] 같은 prefix
+                .replace(/#/g, 'sharp')
+                .replace(/\+/g, 'plus')
                 .trim()
                 .replace(/\s+/g, '_');
         }

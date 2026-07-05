@@ -11,13 +11,17 @@
 | 2 | 크롭+썸네일 | `scripts/crop_book.py <raws> <out> --thumb 1800` | `page_NNN.png` + `thumbs/` |
 | 3 | OCR | `python -m bookcapture ocr --book-dir <책>` | `summary/ocr_text/page_NNN.txt` |
 | 4 | AI 요약 | `python -m bookcapture summarize --book-dir <책>` | `summary/batch_*.json` |
-| 5 | merge+빌드 | `python -m bookcapture merge && ... build` | 깨끗한 `summary/index.html` |
+| 4.5 | **소스코드 추출** | `python -m bookcapture code --book-dir <책>` | `summary/code_blocks.json` |
+| 5 | merge+빌드 | `python -m bookcapture merge && ... build` | 깨끗한 `summary/index.html`(리치 뷰어+코드 패널 포함) |
 | 6 | 챕터·표 정의 | 사람이 작성: `summary/chapters.json`, `summary/page_extras.json` | 정의 JSON |
 | 7 | **최종화(주입)** | `python scripts/finalize_book.py summary/` | 챕터트리+표정리본 든 `index.html` |
-| 8 | **NAS 발행** | `NAS_PASS=... scripts/publish_book.sh <SLUG> summary/index.html summary/page_extras.json summary/chapters.json` | 라이브 반영 |
+| 8 | **NAS 발행** | `NAS_PASS=... scripts/publish_book.sh <SLUG> summary/index.html summary/page_extras.json summary/chapters.json summary/code_blocks.json` | 라이브 반영 |
 | 9 | 원본 보관 | raw 전량 → 책 폴더 `source_raws/` (sudo cp) | 재크롭 대비 |
-| 10 | 검증 | 라이브 `grep -o 'class="ptable"'` 개수 + Playwright 렌더 육안 | — |
+| 10 | 검증 | 라이브 `grep -o 'class="ptable"'` 개수 + Playwright 렌더(팝업 뷰어·코드 패널) 육안 | — |
 
+- **3~5는 `python -m bookcapture run` 한 번으로도** (capture→ocr→summarize→**code**→merge→build). 스킵: `--no-summarize`, `--no-code`.
+- **페이지별 팝업 뷰어(표준)**: `build`가 리치 모달을 생성 — 좌상단 📄 텍스트 토글·줌(−/100%/+/원복), 우측 `📄 OCR 텍스트`(복사, `ocr_text/` fetch)·`💻 소스코드`(언어별 C#/Python 코드 패널, `code_blocks.json` fetch)·`📝 메모`(페이지별 localStorage 자동저장). **build_html.py는 로컬·벤더드(`kyobo-bridge/app/processing/`) 동일 버전 유지**(웹 분석도 같은 뷰어 생성).
+- **소스코드 추출(4.5)**: OCR은 코드 품질 낮음(문자오류·들여쓰기 손실) → `bookcapture/extract_code.py`가 Claude 비전으로 페이지 이미지에서 언어별 코드를 정밀 추출. 코드 자동감지·resume·429재시도. 웹 파이프라인은 `upload_processor.py`가 summarize 뒤 자동 실행.
 - **6→7 규칙**: `finalize_book.py` 는 *깨끗한 빌드 결과*에만 돌린다(멱등 아님, 이미 주입 시 중단). chapters.json/page_extras.json 은 **있으면** 자동 주입, 없으면 건너뜀.
 - **8 규칙**: 웹 파일은 root 소유라 RedCode 가 직접 못 덮어씀 → `publish_book.sh` 가 홈 업로드→`sudo cp`→`chown root:root`→`chmod 644`→검증까지 처리. 비번은 `NAS_PASS` 환경변수(하드코딩 금지, 출처 `인증서/나스인증/`).
 - 이미지만 바뀌면 8에서 이미지도 넘기고, HTML 썸네일 src `?v=N` 증가(캐시버스트).
