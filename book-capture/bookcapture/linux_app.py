@@ -28,6 +28,16 @@ _KEYMAP = {
 }
 
 
+try:  # 캡처 표준 정규화 (실패해도 캡처 안 깨짐)
+    from . import capture_standard as _cs
+except Exception:
+    _cs = None
+
+
+def _std_normalize(im):
+    return _cs.safe_normalize(im) if _cs else im
+
+
 def _content_crop(im):
     """브라우저 크롬·여백 제거 → 본문만. win_app/mac 과 동일한 적응형 크롭."""
     rgb = im.convert("RGB"); W, H = im.size
@@ -45,15 +55,12 @@ def _content_crop(im):
     top = int((last_color + 2) * SS) if last_color >= 0 else 0
     bottom = H - int(H * 0.035)
     rgb = rgb.crop((0, top, W, bottom))
-    W2, H2 = rgb.size; e = int(min(W2, H2) * 0.015)
-    rgb = rgb.crop((e, e, W2 - e, H2 - e))
-    bw = rgb.convert("L").point(lambda p: 255 if p < 115 else 0)
-    bbox = bw.getbbox()
-    if bbox:
-        pad = 16; l, t, r, b = bbox
-        rgb = rgb.crop((max(0, l - pad), max(0, t - pad),
-                        min(rgb.size[0], r + pad), min(rgb.size[1], b + pad)))
-    return rgb.convert("RGB")
+    # 표준 콘텐츠 크롭(안 잘림+여백). 실패 시 원본.
+    try:
+        from . import page_crop
+        return page_crop.content_crop(rgb)
+    except Exception:
+        return rgb.convert("RGB")
 
 
 def has_display() -> bool:
@@ -109,7 +116,7 @@ def capture_book(out_dir: str, slug: str, count: int, interval: float,
             _press(next_key); time.sleep(interval); continue
         same = 0; last = h; n += 1
         dst = book_dir / f"page_{n:03d}.png"
-        im.save(dst)
+        _std_normalize(im).save(dst)   # 표준 폭 1600px 정규화(균일)
         print(f"[{i+1}/{count}] 캡처 중... → {dst.name}")
         _press(next_key)
         time.sleep(interval)

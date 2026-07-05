@@ -80,6 +80,16 @@ def _grab_frame(bbox, prefer_dxcam: bool = True):
     return ImageGrab.grab(bbox=bbox)
 
 
+try:  # 캡처 표준 정규화 (실패해도 캡처 안 깨짐)
+    from . import capture_standard as _cs
+except Exception:
+    _cs = None
+
+
+def _std_normalize(im):
+    return _cs.safe_normalize(im) if _cs else im
+
+
 def _content_crop(im):
     """브라우저 웹뷰어 캡처에서 Chrome 크롬·작업표시줄·여백 제거 → 책 본문만 꽉 차게.
     상단 크롬 높이를 '색상(채도) 행'으로 자동 감지(탭·파비콘·북마크 아이콘)해서 딱 그만큼만
@@ -101,15 +111,12 @@ def _content_crop(im):
         top = int((last_color + 2) * SS) if last_color >= 0 else 0
         bottom = H - int(H * 0.035)            # 하단 Windows 작업표시줄/여백
         rgb = rgb.crop((0, top, W, bottom))
-        W2, H2 = rgb.size; e = int(min(W2, H2) * 0.015)
-        rgb = rgb.crop((e, e, W2 - e, H2 - e))                       # 창 그림자
-        bw = rgb.convert("L").point(lambda p: 255 if p < 115 else 0)  # 어두운 글자만
-        bbox = bw.getbbox()
-        if bbox:
-            pad = 16; l, t, r, b = bbox
-            rgb = rgb.crop((max(0, l - pad), max(0, t - pad),
-                            min(rgb.size[0], r + pad), min(rgb.size[1], b + pad)))
-        return rgb.convert("RGB")
+        # 표준 콘텐츠 크롭(안 잘림+여백). 실패 시 원본.
+        try:
+            from . import page_crop
+            return page_crop.content_crop(rgb)
+        except Exception:
+            return rgb.convert("RGB")
     except Exception as e:
         print(f"[win] content-crop 실패(원본 유지): {e}", file=sys.stderr)
         return im.convert("RGB")
@@ -425,7 +432,7 @@ class KyoboWinCapture:
                 break
             last_hash = h
             dst = self.book_dir / f"page_{n:03d}.png"
-            img.save(dst)
+            _std_normalize(img).save(dst)   # 표준 폭 1600px 정규화(균일)
             saved += 1
             # worker 가 진행률 파싱: "[N/M] 캡처"
             print(f"[{i+1}/{count}] 캡처 중... → {dst.name}")

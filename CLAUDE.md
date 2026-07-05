@@ -1010,3 +1010,21 @@ powershell -ExecutionPolicy Bypass -File .\install-worker-windows.ps1 -BridgeUrl
 - ✅ **비디오코덱(194장)·LLM(400장) 이미지 재크롭** — 컨테이너 내 `_content_crop`(상단11%+그림자+bbox) in-place 적용 + 썸네일 재생성 + summary HTML 이미지 URL `?v=2` 캐시버스트. 둘 다 크롬·여백 제거 확인. (Windows 캡처도 Mac 크롭 그대로 동작)
 - ✅ **이미지 재빌드 완료** — `deploy.sh --backend`. heartbeat(touch_heartbeat)·ffmpeg 이미지에 baking 확인. health 200.
 - **남은 것**: OpenCV 책 capture-browser(Windows, ~400p). 이젠 워커가 크롭(7573b5a) 자동 반영하니 깨끗하게 캡처됨.
+
+### 2026-07-05: 이북 처리 파이프라인 규칙화·정규화 + "클로드 코드" 책 전권 완성
+
+이북 캡처→발행 전 과정을 **단일 런북 + 재사용 스크립트**로 정규화. "클로드 코드로 시작하는 실전 에이전틱 코딩"(246p)을 이 표준으로 완성.
+
+**새 기능·자산**
+1. **표(表) 정리본** — 표 있는 페이지에 이미지 대신 재구성한 깔끔한 HTML 표를 카드에 삽입.
+   - `scripts/add_page_extras.py` — `page_extras.json`(`{"37":"<div class=page-extra>…표…</div>"}`)을 페이지 카드에 주입. `.ptable`/`<kbd>`/다중표 CSS 포함. 그림(그림 N-N)은 표 아님 → 제외.
+   - "클로드 코드" 책 **19개 표 페이지·24개 표** 작성·배포(`scripts/page_extras_클로드코드_예시.json`). 단축키표는 `<kbd>` 키캡, 명령어·경로는 `<code>`.
+2. **챕터 트리 + 챕터 요약** — `scripts/add_chapter_tree.py` — `chapters.json`으로 사이드바 접기/펴기 트리 + 챕터별 "무엇/왜/어떻게/개념" 요약 카드. (`scripts/chapters_클로드코드_예시.json`, 10챕터 리치 요약)
+3. **최종화 통합** — `scripts/finalize_book.py <summary_dir>` — 깨끗한 빌드 index.html에 챕터트리+표정리본을 **한 명령으로** 주입. 멱등 아니라 이미 주입 시 중단(중복 방지), `--force`로만 강제.
+4. **개별 도서 발행** — `scripts/publish_book.sh <SLUG> <파일>…` — root 소유 웹파일 문제 해결: 홈 업로드→`sudo cp`→`chown root:root`→`chmod 644`→검증. 비번은 `NAS_PASS` 환경변수(하드코딩 금지).
+5. **캡처·크롭 표준** — `bookcapture/page_crop.py`(콘텐츠 감지+여백 복원 크롭), `scripts/crop_book.py`(배치), `scripts/app_capture_raws.py`(Mac앱 raw), `bookcapture/capture_standard.py`(모니터 독립 해상도), `scripts/mac_capture_preflight.py`. 근거: `docs/CAPTURE_SHARPNESS.md`.
+6. **단일 런북** — `docs/EBOOK_CAPTURE_STANDARD.md` §0 에 캡처→크롭→OCR→요약→빌드→최종화→발행→검증 10단계 순서표. 이 문서가 이북 처리 단일 진실원본.
+
+**캡처 개선(6월 작업 반영)** — `win_app.py`/`linux_app.py`/`wviewer.py`/`mac_wviewer_capture.py`: dxcam 상단 크롬 크롭, 그림자/bbox 트림, 브라우저(no_crop) 경로 적용.
+
+**NAS 배포 메모(확정)** — SSH password 폴백은 `-o PubkeyAuthentication=no -o PreferredAuthentications=password -o NumberOfPasswordPrompts=1` 필수(빼면 keyboard-interactive로 timeout). scp는 Synology에서 자주 끊김 → `ssh "cat > 원격" < 로컬` 우회. zsh는 미따옴표 변수 단어분할 안 함 → 옵션 인라인 또는 bash 스크립트.

@@ -97,6 +97,60 @@ if not wid:
 print("✓ 교보 탭 감지됨", flush=True)
 activate(); time.sleep(0.8)
 
+# ── 캡처 표준 사전점검(최대화·스프레드·해상도) ─────────────────
+# 규칙: 최대화 안 됨 or 표준 미충족이면 중단. KYOBO_ALLOW_SUBSTANDARD=1 이면 경고만.
+def _preflight_gate(wid):
+    try:
+        import os as _os, sys as _sys
+        from pathlib import Path as _P
+        _sys.path.insert(0, str(_P(__file__).resolve().parent.parent / "bookcapture"))
+        import capture_standard as _cs
+        # 창 bounds + 소속 디스플레이 scale
+        wl = Quartz.CGWindowListCopyWindowInfo(
+            Quartz.kCGWindowListExcludeDesktopElements, Quartz.kCGNullWindowID)
+        wb = next((w.get('kCGWindowBounds', {}) for w in wl
+                   if w.get('kCGWindowNumber') == wid), None)
+        if not wb:
+            return True
+        x, y, W, H = wb['X'], wb['Y'], wb['Width'], wb['Height']
+        err, ids, cnt = Quartz.CGGetActiveDisplayList(8, None, None)
+        dpw = dph = scale = None
+        for did in ids[:cnt]:
+            b = Quartz.CGDisplayBounds(did)
+            if b.origin.x <= x < b.origin.x + b.size.width and b.origin.y <= y < b.origin.y + b.size.height:
+                m = Quartz.CGDisplayCopyDisplayMode(did)
+                ptw = Quartz.CGDisplayModeGetWidth(m)
+                dpw, dph = ptw, Quartz.CGDisplayModeGetHeight(m)
+                scale = Quartz.CGDisplayModeGetPixelWidth(m) / ptw if ptw else 1.0
+                break
+        if scale is None:
+            return True
+        # 스프레드 판정 + 실측 페이지당 픽셀(줌·여백 반영): 지금 화면 1장 크롭
+        im = grab_crop(wid)
+        pages = 2 if (im and im.size[0] > im.size[1]) else 1
+        measured = (im.size[0] // pages) if im else None
+        pf = _cs.capture_preflight(W, H, dpw, dph, scale, pages_per_spread=pages,
+                                   measured_page_px=measured)
+        print(f"[사전점검] 모니터 {dpw:.0f}x{dph:.0f}pt {scale:.0f}x · 창 {W:.0f}x{H:.0f}pt · "
+              f"{'스프레드2p' if pages==2 else '단면1p'} · 최대화 "
+              f"{'O' if pf['maximized'] else 'X'}({pf['coverage_w']*100:.0f}%) · "
+              f"예상 페이지당 {pf['page_px']}px → {'OK' if pf['meets_standard'] else '미달'}", flush=True)
+        for a in pf['advice']:
+            print(f"[사전점검]   • {a}", flush=True)
+        if not pf['ok']:
+            if _os.environ.get("KYOBO_ALLOW_SUBSTANDARD") == "1":
+                print("[사전점검] ⚠ 표준 미충족이지만 KYOBO_ALLOW_SUBSTANDARD=1 → 계속 진행", flush=True)
+                return True
+            print("[사전점검] ✗ 표준 미충족 — 중단. (조치 후 재시도 / 강제하려면 KYOBO_ALLOW_SUBSTANDARD=1)", flush=True)
+            return False
+        return True
+    except Exception as e:
+        print(f"[사전점검] (건너뜀: {e})", flush=True)
+        return True
+
+if not _preflight_gate(wid):
+    sys.exit(3)
+
 last = None; n = 0; same = 0; blank = 0
 for i in range(700):
     if i % 15 == 0: activate()
@@ -110,7 +164,12 @@ for i in range(700):
             print("→ 책 끝 도달", flush=True); break
         key(124); time.sleep(random.uniform(5, 8)); continue
     same = 0; last = hh; n += 1
-    im.save(OUT / f"page_{n:03d}.png")
+    try:
+        import capture_standard as _csn  # gate 에서 sys.path 등록됨
+        im = _csn.safe_normalize(im)
+    except Exception:
+        pass
+    im.save(OUT / f"page_{n:03d}.png")   # 표준 폭 1600px 정규화(균일)
     if n % 10 == 0: print(f"  {n}장...", flush=True)
     key(124)
     # 사람처럼: 보통 5~9초, 12~18장마다 25~50초 휴식

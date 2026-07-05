@@ -14,6 +14,22 @@ import time
 from pathlib import Path
 from typing import Callable, Iterator
 
+# 캡처 표준(모니터 무관 규격 + 정규화). 패키지/단독 실행 양쪽 대비.
+try:
+    from . import capture_standard as _cs
+except Exception:  # 단독 실행
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import capture_standard as _cs
+
+
+def _finalize_shot(path):
+    """Playwright 스크린샷을 표준 폭(1600px)으로 정규화 저장. 실패해도 원본 유지."""
+    try:
+        from PIL import Image
+        _cs.safe_normalize(Image.open(path)).save(path)
+    except Exception:
+        pass
+
 # Playwright 는 worker 첫 import 시 ImportError 가능 (설치 안 됨) — 지연 import
 def _ensure_playwright():
     try:
@@ -303,7 +319,8 @@ def capture_book(
             ],
         )
         ctx_kwargs = {
-            "viewport": {"width": 1400, "height": 1900},
+            # 표준 viewport(단면 세로) + device_scale_factor=2 → 모니터 무관 1920×2880
+            **_cs.playwright_context_kwargs(),
             "locale": "ko-KR",
             "user_agent": UA,
             "extra_http_headers": {
@@ -364,6 +381,7 @@ def capture_book(
             png_path = out_dir / f"page_{i:03d}.png"
             try:
                 page.screenshot(path=str(png_path), full_page=False)
+                _finalize_shot(png_path)  # 표준 폭 1600px 정규화
                 captured += 1
                 if progress:
                     progress(i, max_pages, f"page_{i:03d}.png 저장")
@@ -428,7 +446,8 @@ def _new_context(p, headless: bool):
         user_data_dir=str(CHROME_PROFILE_DIR),
         headless=headless,
         args=CHROMIUM_ARGS,
-        viewport={"width": 1400, "height": 1900},
+        # 표준 viewport(단면 세로) + device_scale_factor=2 → 모니터 무관 1920×2880
+        **_cs.playwright_context_kwargs(),
         locale="ko-KR",
         extra_http_headers={
             "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
@@ -790,6 +809,7 @@ def capture_via_library(
             png = out_dir / f"page_{i:03d}.png"
             try:
                 viewer.screenshot(path=str(png), full_page=False)
+                _finalize_shot(png)  # 표준 폭 1600px 정규화
                 captured += 1
                 if progress: progress(i, max_pages, f"page_{i:03d}.png 저장")
             except Exception as e:

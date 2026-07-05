@@ -296,6 +296,53 @@
         </div>
     </div>
 
+    <!-- STEP 2.5 -->
+    <div class="card" style="border-left: 4px solid #ef4444;">
+        <div class="step-head">
+            <span class="step-num" style="background:#ef4444;">2.5</span>
+            <span class="step-title">사이트 액세스 권한 설정 ⚠ 중요</span>
+        </div>
+        <div class="step-body">
+            <p>
+                Tampermonkey가 교보문고 사이트에 접근하려면 <strong>권한 설정</strong>이 필요합니다.
+                이 설정을 하지 않으면 <code>"Tampermonkey has no access to this page"</code> 에러가 발생합니다.
+            </p>
+            <ol style="margin-top:0.8rem;">
+                <li><code>chrome://extensions/</code> 화면에서 <strong>Tampermonkey</strong> 카드의 <strong>[세부정보]</strong> 클릭</li>
+                <li><strong>사이트 액세스</strong> 섹션 찾기</li>
+                <li>드롭다운에서 다음 중 하나 선택:
+                    <ul style="margin-top:0.3rem;">
+                        <li><strong>모든 사이트에서</strong> (권장 - 간편함)</li>
+                        <li><strong>특정 사이트에서</strong> (보안 중시 - 아래 참조)</li>
+                    </ul>
+                </li>
+            </ol>
+            <div class="callout is-info" style="margin-top:1rem;">
+                <strong>특정 사이트만 허용</strong>하려면:
+                <ul style="margin-top:0.4rem;">
+                    <li>"특정 사이트에서" 선택 → <strong>[사이트 추가]</strong> 클릭</li>
+                    <li>다음 두 URL 각각 추가:
+                        <ul style="margin-top:0.3rem;font-family:'IBM Plex Mono',monospace;font-size:0.9em;">
+                            <li><code>https://elibrary.kyobobook.co.kr/*</code></li>
+                            <li><code>https://ebook.kyobobook.co.kr/*</code></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+            <figure class="shot">
+                <img src="install-img/02c-site-access.png" alt="Tampermonkey 세부정보 — 사이트 액세스 섹션 설정" loading="lazy" />
+                <figcaption class="shot-cap">▶ chrome://extensions/ → Tampermonkey [세부정보] → 사이트 액세스 섹션</figcaption>
+            </figure>
+            <div class="callout" style="margin-top:1rem;">
+                ⚠ <strong>이 단계를 건너뛰면 16인치 맥에서는 되는데 14인치 맥에서 안 되는 식의 문제가 발생</strong>합니다.
+                각 브라우저/기기마다 Tampermonkey 권한 설정이 다를 수 있으므로 반드시 확인하세요.
+            </div>
+            <p style="margin-top:1rem;">
+                설정 완료 후 교보문고 페이지를 <strong>새로고침 (<span class="keys"><kbd>Ctrl</kbd>+<kbd>F5</kbd></span>)</strong> 하면 적용됩니다.
+            </p>
+        </div>
+    </div>
+
     <!-- STEP 3 -->
     <div class="card">
         <div class="step-head">
