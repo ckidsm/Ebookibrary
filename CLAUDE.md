@@ -24,8 +24,9 @@
 
 | 항목 | 값 |
 |---|---|
-| 원격 저장소 | (미생성 — 로컬 git만 운용. 필요해지면 `ckidsm` 계정에 KyoboLibrary 생성 예정) |
-| 인증 패턴 | `../NasVideoTrimmer/CLAUDE.md` 의 GitHub 인증 절 참고 (`github-com-ckidsm` host alias) |
+| 원격 저장소 | **`git@github-com-ckidsm:ckidsm/Ebookibrary.git`** (개인 ckidsm 계정, **Private**, 2026-07-05 생성·최초 push) |
+| 인증 패턴 | `github-com-ckidsm` SSH host alias (개인 키 `~/.ssh/id_ed25519_ckidsm`). ⚠️ gh CLI 는 회사 `Redocde` 로 인증돼 있으니 리포 생성/API 는 계정 주의 |
+| ⚠️ 비밀 금지 | **NAS 비밀번호·API 키를 스크립트에 하드코딩 절대 금지.** 배포는 `book-capture/scripts/publish_book.sh`(비번=`NAS_PASS` 환경변수)로. 비번 출처는 `인증서/나스인증/`(repo 밖). |
 
 ---
 
@@ -1028,3 +1029,8 @@ powershell -ExecutionPolicy Bypass -File .\install-worker-windows.ps1 -BridgeUrl
 **캡처 개선(6월 작업 반영)** — `win_app.py`/`linux_app.py`/`wviewer.py`/`mac_wviewer_capture.py`: dxcam 상단 크롬 크롭, 그림자/bbox 트림, 브라우저(no_crop) 경로 적용.
 
 **NAS 배포 메모(확정)** — SSH password 폴백은 `-o PubkeyAuthentication=no -o PreferredAuthentications=password -o NumberOfPasswordPrompts=1` 필수(빼면 keyboard-interactive로 timeout). scp는 Synology에서 자주 끊김 → `ssh "cat > 원격" < 로컬` 우회. zsh는 미따옴표 변수 단어분할 안 함 → 옵션 인라인 또는 bash 스크립트.
+
+### 2026-07-05: GitHub 최초 발행 + 비밀번호 이력 스크럽 (보안)
+- **원격 최초 생성**: 개인 `ckidsm` 계정에 **Private** 리포 `Ebookibrary` 생성, main 최초 push(`github-com-ckidsm` SSH alias). 122개 파일.
+- **보안 사고·조치**: `_archive/deploy_to_nas.sh`(초기 커밋부터 방치된 옛 스크립트)와 `_quick_deploy.sh`(미추적 스크래치)에 **NAS 비밀번호가 하드코딩**돼 있었음. push 전 발견 → (1) 두 파일 삭제, (2) `git filter-branch`로 **전체 이력에서 `_archive/` 제거**(refs/original·reflog·gc까지 정리), (3) 전 리비전 스캔으로 비번 0 확인 후 push. 리모트엔 비번 흔적 없음.
+- **재발 방지 규칙**: 스크립트에 비밀 하드코딩 금지. 배포는 `publish_book.sh`(`NAS_PASS` env). `.gitignore`에 `.env` 유지. **비번이 로컬 이력·OneDrive에 노출됐던 값이므로 NAS 비밀번호 교체 권장**(교체 시 `인증서/나스인증/`·메모리 [[reference-nas-ssh-deploy]]만 갱신).
