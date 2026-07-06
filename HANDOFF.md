@@ -1,6 +1,7 @@
 # 교보 라이브러리 — 인계 / 이어가기 문서
 
-> 마지막 갱신: **2026-06-11**. 다른 PC/Mac에서 이 repo(OneDrive·git)를 받아 이어갈 때 **이 문서부터** 읽으세요.
+> 마지막 갱신: **2026-07-06**. 다른 PC/Mac에서 이 repo(OneDrive·git)를 받아 이어갈 때 **이 문서부터** 읽으세요.
+> 2026-07-06 보안 점검: 코드/문서 하드코딩 비밀 재스캔 → 통과. HANDOFF에 있던 우분투 노트북 평문 비번을 `인증서/우분투노트북66/`로 이전(하드코딩 제거). ⚠️ 이 비번은 과거 커밋 이력엔 남아 있을 수 있음(필요 시 `git filter-branch`로 스크럽 — 2026-07-05 `_archive` 스크럽 선례 참조).
 
 ---
 
@@ -29,7 +30,7 @@
    - 백엔드(`kyobo-bridge/app/*`): 변경 시 **docker 이미지 재빌드** 필요(영구). 빠른 반영은 `docker cp` + `docker restart` 지만 컨테이너 재생성 시 사라짐. 재빌드 절차는 메모리 [[reference_kyobo_bridge_rebuild]] 참고 (tar→NAS→`docker build`→`docker-compose`(v1)).
 2. **워커 코드 갱신**: 워커는 각 PC의 로컬 복사본(예: Windows=`LOCALAPPDATA\KyoboLibrary\book-capture`)에서 돈다 — OneDrive 동기화로 안 닿음! **`book-capture.zip`을 서버에 재배포**한 뒤 각 PC에서 부트스트랩 재실행해야 워커가 최신이 됨. (worker가 capture-auto를 매번 새 subprocess로 실행하므로, zip만 갱신되면 재설치 시 반영)
    - zip 재생성: repo 루트에서 `zip -rq /tmp/book-capture.zip book-capture -x 'book-capture/.venv/*' -x 'book-capture/books/*' ...` → `scp` to `/volume1/web/kyobo/`.
-3. **SSH**: NAS = `RedCode@192.168.10.205`(키인증). Ubuntu 노트북 = `ckidsm@192.168.0.66`(pw REDACTED-see-cert-file, sshpass).
+3. **SSH**: NAS = `RedCode@192.168.10.205`(키인증). Ubuntu 노트북 = `ckidsm@192.168.0.66`(비밀번호는 `인증서/우분투노트북66/접속정보.md` 참조 — **하드코딩 금지**, sshpass).
 4. **여러 워커 주의**: 잡은 first-come claim. 캡처할 PC만 워커 켜고 나머지는 끌 것.
 
 ## 4. 남은 고도화 (PENDING — 차후)
