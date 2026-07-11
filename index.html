@@ -1273,6 +1273,63 @@
             return ans === 'force';
         }
 
+        // ── 워커 준비 확인 게이트 ─────────────────────────────────────────
+        // 규칙: 로컬 매크로/브라우저 캡처(워커 의존 모드)로 [분석 시작] 시,
+        //   job 을 등록하기 전에 워커가 (1)실행 중(alive) (2)최근 동작(ping) (3)최신 버전인지 먼저 확인.
+        //   미충족이면 차단 + 안내(워커 시작/업데이트) — 워커 없이 job 만 등록돼 pending 방치되는 것 방지.
+        //   반환: true=진행, false=중단.  (fetchWorkerStatus / buildWorkerInstallHint 재사용)
+        async function ensureWorkerReady() {
+            while (true) {
+                const ws = await fetchWorkerStatus().catch(() => ({ alive: false }));
+                // (1)(2) 살아있고 최근 ping 하는가?
+                if (!ws || !ws.alive) {
+                    const body = `
+                        <div style="font-size:0.85rem;color:#cbd5e1;line-height:1.7;">
+                            <div style="padding:10px 12px;border-radius:6px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;color:#fca5a5;margin-bottom:12px;">
+                                ✗ <b>워커가 실행 중이 아닙니다.</b> 로컬 매크로·브라우저 캡처는 이 PC의 <b>워커</b>가 캡처를 수행합니다 —
+                                워커가 없으면 분석이 <b>등록만 되고 진행되지 않습니다(pending)</b>.
+                            </div>
+                            ${buildWorkerInstallHint(ws)}
+                            <div style="margin-top:10px;font-size:0.74rem;color:#94a3b8;">워커를 켠 뒤 <b>[🔄 다시 확인]</b> 을 누르세요.</div>
+                        </div>`;
+                    const ans = await showCustomConfirm({
+                        title: '🛑 워커 필요 — 먼저 실행하세요',
+                        body,
+                        options: [
+                            { label: '취소', value: 'cancel' },
+                            { label: '🔄 다시 확인', value: 'recheck', kind: 'primary' },
+                        ],
+                    });
+                    if (ans === 'recheck') continue;
+                    return false;
+                }
+                // (3) 최신 버전인가? (구버전이면 최신 캡처·게이트 미적용)
+                if (ws.worker_version && ws.server_version && !ws.up_to_date) {
+                    const body = `
+                        <div style="font-size:0.85rem;color:#cbd5e1;line-height:1.7;">
+                            <div style="padding:10px 12px;border-radius:6px;background:rgba(245,158,11,0.12);border:1px solid #f59e0b;color:#fcd34d;margin-bottom:12px;">
+                                ⚠️ <b>워커가 구버전입니다.</b> 현재 <code>${escapeHtml(ws.worker_version)}</code> → 최신 <code>${escapeHtml(ws.server_version)}</code>.<br>
+                                워커는 유휴 시 <b>~5분 내 자동 업데이트</b>됩니다. 최신으로 올라간 뒤 시작하면 최신 캡처·해상도 게이트가 적용됩니다.
+                            </div>
+                            <div style="font-size:0.78rem;color:#94a3b8;">지금 진행하면 <b>구버전 워커</b>가 처리합니다(해상도 사전 게이트 등 최신 기능 미적용).</div>
+                        </div>`;
+                    const ans = await showCustomConfirm({
+                        title: '⚠️ 워커 업데이트 필요',
+                        body,
+                        options: [
+                            { label: '취소', value: 'cancel' },
+                            { label: '🔄 다시 확인 (업데이트 대기)', value: 'recheck' },
+                            { label: '구버전으로 진행', value: 'force', kind: 'danger' },
+                        ],
+                    });
+                    if (ans === 'recheck') continue;
+                    if (ans === 'force') return true;
+                    return false;
+                }
+                return true;   // alive + 최신
+            }
+        }
+
         async function showCapturePrep(book, slug, isWin, startPage) {
             const title = escapeHtml(book.title || slug);
             const pageStep = startPage > 1
@@ -1731,6 +1788,11 @@
                     // 파일 선택 → 업로드 (별도 흐름)
                     openUploadFlow(book, slug);
                     return;
+                }
+                // 워커 준비 확인(워커 의존 모드: 로컬 매크로/브라우저 캡처) — 실행·동작·최신 버전 먼저 확인
+                if (mode === 'auto' || mode === 'capture-only' || mode === 'capture-browser') {
+                    const okWorker = await ensureWorkerReady();
+                    if (!okWorker) return;   // 워커 없음/구버전 + '취소' → 중단(pending 방치 방지)
                 }
                 // 캡처 — 준비 팝업으로 사용자와 싱크 맞춘 뒤 시작
                 const sp = parseInt(document.getElementById('cap-start-page')?.value || '1', 10) || 1;

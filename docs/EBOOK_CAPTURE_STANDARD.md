@@ -46,6 +46,7 @@
 - **패널 한계 주의**: 외장 패널의 최대 백킹이 2800px 미만이면(예: **1920×1200 패널 → 최대 HiDPI 백킹 2560px**) 그 모니터에선 **양면 표준이 물리적으로 불가** → 조치는 ①단면 전환 또는 ③내장 Retina로 수렴.
 - **2단 방어**: (a) **웹 UI 게이트**(`index.html` `ensureCaptureResolutionOK()`) = 브라우저가 있는 모니터 기준 1차 경고·차단. (b) **워커 게이트**(권장) = 캡처 직전 `capture_preflight()`로 실제 캡처 모니터를 재검증해 미달 시 job 실패(웹은 브라우저 모니터만 알아 다중 모니터에선 부정확할 수 있으므로 워커가 최종 판정).
 - **적용 범위**: 물리 화면 캡처 모드(`auto`=Mac, `capture-only`=Win)만. **`capture-browser`(Playwright 오프스크린 렌더)는 모니터 무관이라 게이트 제외.**
+- **워커 준비 사전 게이트(선행)**: 해상도 게이트보다 **먼저**, 워커 의존 모드(`auto`/`capture-only`/`capture-browser`)로 [분석 시작] 시 워커가 **(1)실행 중(alive) (2)최근 동작(ping) (3)최신 버전(up_to_date)** 인지 확인한다. 미충족이면 **job 등록 전에 차단 + 안내**(워커 시작/업데이트, 재확인 루프) — 워커 없이 job 만 등록돼 `pending` 방치되는 사고를 막는다. (`index.html` `ensureWorkerReady()`, `fetchWorkerStatus`+`buildWorkerInstallHint` 재사용). 워커가 alive 여야 해상도 게이트도 "실제 캡처 모니터"(`capture_display`) 권위 판정을 쓸 수 있으므로 순서상 선행.
 
 ## 2. Raw 캡처 (전체창, 크롭 안 함 → 견고)
 `scratchpad/capture_raws.py` 패턴:
