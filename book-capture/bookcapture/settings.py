@@ -13,9 +13,12 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
 
+# 기본 백엔드 = 도메인 기반(어디서든 도달). LAN IP 하드코딩 금지 — VPN/네트워크 무관하게 동작해야 함.
+#   외부/일반: https://redcodeme.synology.me:9443 (Synology Reverse Proxy → 컨테이너 9000)
+#   LAN 전용 설치 등 특수 상황은 KYOBO_BRIDGE_URL 환경변수로 오버라이드(예: http://192.168.10.205:9000).
 DEFAULT_BRIDGE_URL = os.environ.get(
     "KYOBO_BRIDGE_URL",
-    "http://192.168.10.205:9000",
+    "https://redcodeme.synology.me:9443",
 )
 
 

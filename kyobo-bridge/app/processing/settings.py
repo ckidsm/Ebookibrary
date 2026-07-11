@@ -13,9 +13,10 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
 
+# 기본 백엔드 = 도메인 기반(LAN IP 하드코딩 금지). 컨테이너 내부는 보통 DB 직접 사용이라 미호출.
 DEFAULT_BRIDGE_URL = os.environ.get(
     "KYOBO_BRIDGE_URL",
-    "http://192.168.10.205:9000",
+    "https://redcodeme.synology.me:9443",
 )
 
 

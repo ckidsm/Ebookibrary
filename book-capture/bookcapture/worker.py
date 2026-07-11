@@ -516,7 +516,7 @@ def _static_base(bridge: str) -> str:
         return "http://192.168.10.205:8080"
     if "redcodeme" in bridge:
         return "https://redcodeme.synology.me/kyobo"
-    return "http://192.168.10.205:8080"
+    return "https://redcodeme.synology.me/kyobo"   # 기본 = 도메인(LAN IP 하드코딩 금지)
 
 
 def _local_version() -> str:
