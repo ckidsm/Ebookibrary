@@ -156,7 +156,9 @@ def cmd_capture_auto(args) -> int:
     # 규칙: capture_standard.CaptureStandardV1 / docs/EBOOK_CAPTURE_STANDARD.md §1.5
     try:
         from . import mac_displays
-        rd = mac_displays.capture_readiness(pages_per_spread=2)
+        # 레이아웃 분리: 브라우저 wviewer(--no-app)=단면(1), 데스크탑 앱=양면(2)
+        _pages = 1 if getattr(args, "no_app", False) else 2
+        rd = mac_displays.capture_readiness(pages_per_spread=_pages)
         for ln in rd["lines"]:
             print("[preflight] " + ln)
         if not rd["ok"]:
