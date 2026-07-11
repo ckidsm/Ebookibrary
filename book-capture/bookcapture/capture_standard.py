@@ -175,3 +175,161 @@ def safe_normalize(im):
         return normalize_page(im)
     except Exception:
         return im
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  로컬 매크로(물리 화면 캡처) 디스플레이 규칙 엔진 — 기기·모니터 무관 상대 판정
+#  ------------------------------------------------------------------------
+#  규칙: 물리 화면 캡처는 페이지당_픽셀 = 창폭(pt) × scale ÷ 페이지수.
+#  양면(스프레드) 표준 = 페이지당 ≥ MIN_SOURCE_WIDTH(1400px) → 백킹 폭 ≥ 2800px.
+#  이 클래스가 "어느 모니터/기기든" 동일 규칙으로 판정·추천한다(11"·14"·16" 내장,
+#  외장 1x/HiDPI 무관). Quartz 비의존(순수 계산) → Win/Linux 에서도 import 가능.
+#  실제 모니터 감지(Quartz)는 mac_displays.detect_displays() 가 DisplaySpec 리스트로 공급.
+# ══════════════════════════════════════════════════════════════════════════
+
+DEFAULT_PAGES_PER_SPREAD = 2   # 교보 데스크탑 앱 기본 = 두 페이지 보기(양면). 런북 §1.
+
+
+class DisplaySpec:
+    """한 모니터의 캡처 능력(물리 화면 캡처 기준). 순수 데이터 + 판정."""
+
+    def __init__(self, name, width_pt, height_pt, scale,
+                 builtin=False, main=False, display_id=None):
+        self.name = name
+        self.width_pt = float(width_pt)
+        self.height_pt = float(height_pt)
+        self.scale = float(scale)
+        self.builtin = bool(builtin)
+        self.main = bool(main)
+        self.display_id = display_id
+
+    @property
+    def backing_width(self) -> int:
+        """최대화(창=화면 폭) 시 캡처되는 실제 픽셀 폭 = 창폭(pt) × scale."""
+        return int(round(self.width_pt * self.scale))
+
+    def page_px(self, pages_per_spread=DEFAULT_PAGES_PER_SPREAD, coverage=1.0) -> int:
+        """이 모니터에서 최대화·coverage 시 페이지당 픽셀 폭."""
+        return int(self.width_pt * self.scale * coverage / max(1, pages_per_spread))
+
+    def meets(self, pages_per_spread=DEFAULT_PAGES_PER_SPREAD) -> bool:
+        return self.page_px(pages_per_spread) >= MIN_SOURCE_WIDTH
+
+    def best_layout(self) -> str | None:
+        """이 모니터가 표준을 만족하는 최선 레이아웃. 양면>단면>불가(None)."""
+        if self.meets(2):
+            return "spread"      # 양면 가능(최선 — 배포 표준과 동일 레이아웃)
+        if self.meets(1):
+            return "single"      # 단면만 가능
+        return None              # 어떤 레이아웃도 표준 미달
+
+    def kind(self) -> str:
+        return "내장" if self.builtin else "외장"
+
+    def __repr__(self):
+        return (f"DisplaySpec({self.name!r} {self.kind()} "
+                f"{self.width_pt:.0f}x{self.height_pt:.0f}pt {self.scale:.1f}x "
+                f"backing={self.backing_width}px)")
+
+
+class CaptureStandardV1:
+    """KyoboCaptureStandard v1 규칙 엔진 — 디스플레이가 캡처 표준을 만족하는지
+    상대적으로 판정하고, 여러 모니터 중 어디에 앱을 띄울지 계획한다.
+
+    핵심 규칙(문서: docs/EBOOK_CAPTURE_STANDARD.md §1.5):
+      - 양면 표준: 페이지당 ≥ MIN_PAGE_PX(1400px) → 백킹 폭 ≥ 2*MIN_PAGE_PX.
+      - 외장 사용은 강제 아님: 표준 충족 모니터를 '추천'하되 강요하지 않는다.
+      - 미달이면 조치 안내(단면 전환 / 해상도 올리기 / 내장 Retina).
+    """
+    MIN_PAGE_PX = MIN_SOURCE_WIDTH   # 1400
+    STANDARD = STANDARD_VERSION      # "v1"
+
+    def required_backing_width(self, pages_per_spread=DEFAULT_PAGES_PER_SPREAD) -> int:
+        """이 페이지수(양면=2)로 표준을 채우는 데 필요한 백킹 폭(px)."""
+        return self.MIN_PAGE_PX * max(1, pages_per_spread)
+
+    def evaluate(self, disp: DisplaySpec,
+                 pages_per_spread=DEFAULT_PAGES_PER_SPREAD) -> dict:
+        """한 디스플레이 판정. Returns dict(name, kind, builtin, page_px,
+        meets, backing_width, need_backing, best_layout, advice[])."""
+        page_px = disp.page_px(pages_per_spread)
+        meets = page_px >= self.MIN_PAGE_PX
+        need = self.required_backing_width(pages_per_spread)
+        best = disp.best_layout()
+        advice = []
+        if not meets:
+            if disp.meets(1):
+                advice.append(
+                    f"단면(1페이지) 보기로 전환하면 페이지당 {disp.page_px(1)}px 로 충족")
+            advice.append(
+                f"양면 표준(백킹 ≥{need}px)에 {need - disp.backing_width}px 부족"
+                f" — 해상도를 더 높은 HiDPI로 올리면 개선"
+                if disp.backing_width < need else "")
+            if not disp.meets(1):
+                advice.append("이 모니터로는 단면조차 미달 — 내장 Retina 등 고해상 디스플레이 권장")
+        return {
+            "name": disp.name,
+            "kind": disp.kind(),
+            "builtin": disp.builtin,
+            "main": disp.main,
+            "display_id": disp.display_id,
+            "width_pt": int(disp.width_pt),
+            "height_pt": int(disp.height_pt),
+            "scale": disp.scale,
+            "backing_width": disp.backing_width,
+            "page_px": page_px,
+            "single_page_px": disp.page_px(1),   # 단면(1p) 전환 시 페이지당 픽셀
+            "need_backing": need,
+            "meets": meets,
+            "meets_single": disp.meets(1),
+            "best_layout": best,
+            "advice": [a for a in advice if a],
+        }
+
+    def plan(self, displays, pages_per_spread=DEFAULT_PAGES_PER_SPREAD,
+             prefer_id=None) -> dict:
+        """여러 모니터 중 어디에 교보 앱을 띄워 캡처할지 계획.
+
+        prefer_id: 사용자가 이미 앱을 띄운(또는 원하는) 디스플레이 id.
+          그게 표준을 만족하면 그대로 존중(외장 강제 아님).
+        Returns dict(evaluations[], any_meets, chosen(dict|None), chosen_reason,
+                     override_needed, advice[]).
+        """
+        evals = [self.evaluate(d, pages_per_spread) for d in displays]
+        meeting = [e for e in evals if e["meets"]]
+        any_meets = bool(meeting)
+
+        chosen = None
+        reason = ""
+        if prefer_id is not None:
+            pe = next((e for e in evals if e["display_id"] == prefer_id), None)
+            if pe and pe["meets"]:
+                chosen, reason = pe, "사용자가 선택한 모니터가 표준 충족 — 그대로 사용"
+        if chosen is None and meeting:
+            # 표준 충족 중 페이지당 픽셀 최고 → 동률이면 내장 우선(안정)
+            chosen = max(meeting, key=lambda e: (e["page_px"], e["builtin"]))
+            reason = "표준을 만족하는 모니터 중 페이지당 픽셀이 가장 큰 화면을 추천"
+
+        advice = []
+        if not any_meets:
+            # 아무 모니터도 양면 미달 → 단면 가능 화면/조치 제시
+            single_ok = [e for e in evals if e["meets_single"]]
+            if single_ok:
+                best_single = max(single_ok, key=lambda e: e["single_page_px"])
+                advice.append(
+                    f"양면 표준을 만족하는 모니터가 없습니다. "
+                    f"단면(1페이지)이면 '{best_single['name']}'({best_single['kind']}) 에서 "
+                    f"페이지당 {best_single['single_page_px']}px 로 가능 — 앱을 단면 보기로 전환하세요.")
+            advice.append(
+                "또는 외장 모니터 해상도를 더 높은 HiDPI(백킹 ≥"
+                f"{self.required_backing_width(pages_per_spread)}px)로 올리거나, "
+                "내장 Retina 디스플레이에서 캡처하세요.")
+        return {
+            "pages_per_spread": pages_per_spread,
+            "evaluations": evals,
+            "any_meets": any_meets,
+            "chosen": chosen,
+            "chosen_reason": reason,
+            "override_needed": not any_meets,   # 표준 충족 화면 없음 → 진행하려면 override
+            "advice": advice,
+        }

@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -150,6 +151,26 @@ def cmd_capture_auto(args) -> int:
         if not (bot.is_app_running() and bot.has_app_window()):
             print("[capture-auto] 교보eBook 창 확보 시도...")
             bot.launch_app()
+    # ── 로컬 매크로 해상도 사전 게이트(규칙 엔진) — 캡처 대상 모니터가 양면 표준 만족? ──
+    # 미달이면 저해상 캡처가 되므로 차단(override: KYOBO_ALLOW_SUBSTANDARD=1).
+    # 규칙: capture_standard.CaptureStandardV1 / docs/EBOOK_CAPTURE_STANDARD.md §1.5
+    try:
+        from . import mac_displays
+        rd = mac_displays.capture_readiness(pages_per_spread=2)
+        for ln in rd["lines"]:
+            print("[preflight] " + ln)
+        if not rd["ok"]:
+            if os.environ.get("KYOBO_ALLOW_SUBSTANDARD") == "1":
+                print("[preflight] ⚠ 표준 미달이지만 KYOBO_ALLOW_SUBSTANDARD=1 → 그대로 진행(저해상 감수)")
+            else:
+                print(f"[preflight] ⛔ 캡처 중단: {rd['reason']}", file=sys.stderr)
+                print("[preflight]   조치: 단면(1p) 전환 / 해상도 HiDPI 상향 / 내장 Retina 사용 후 재시도. "
+                      "강제 진행은 KYOBO_ALLOW_SUBSTANDARD=1", file=sys.stderr)
+                return 3
+        else:
+            print(f"[preflight] ✅ {rd['reason']}")
+    except Exception as _e:
+        print(f"[preflight] (게이트 스킵 — {_e})")
     bot.take_multiple_screenshots(
         count=args.count,
         interval=args.interval,
@@ -160,6 +181,23 @@ def cmd_capture_auto(args) -> int:
         noninteractive=True,
     )
     return 0
+
+
+def cmd_preflight(args) -> int:
+    """로컬 매크로 캡처 사전점검 — 연결된 모니터 + 교보 앱 위치로 양면 표준 충족 판정.
+    규칙 엔진: capture_standard.CaptureStandardV1. 종료코드 0=충족, 3=미달, 0=스킵(non-mac)."""
+    import platform
+    if platform.system() != "Darwin":
+        print("[preflight] macOS 전용 (물리 화면 캡처 해상도 게이트).")
+        return 0
+    from . import mac_displays
+    rd = mac_displays.capture_readiness(pages_per_spread=args.pages)
+    print(f"[preflight] {rd['reason']}\n")
+    for ln in rd["lines"]:
+        print(ln)
+    print()
+    print("판정:", "✅ 캡처 진행 OK" if rd["ok"] else "⛔ 표준 미달 — 조치 후 재시도 (강제: KYOBO_ALLOW_SUBSTANDARD=1)")
+    return 0 if rd["ok"] else 3
 
 
 def _resolve_book_dir(args) -> Path:
@@ -510,6 +548,10 @@ def build_parser() -> argparse.ArgumentParser:
     pca.add_argument("--next-key", default=None,
                      help="페이지 넘김 키 (right/left/space/pagedown/pageup/down). 미지정 시 설정값.")
     pca.set_defaults(func=cmd_capture_auto)
+
+    ppf = sub.add_parser("preflight", help="로컬 매크로 캡처 사전점검(모니터 양면 표준 충족 판정)")
+    ppf.add_argument("--pages", type=int, default=2, help="스프레드 페이지수(양면=2, 단면=1). 기본 2")
+    ppf.set_defaults(func=cmd_preflight)
 
     pu = sub.add_parser("upload", help="책 폴더 PNG 를 백엔드로 업로드(원격 캡처→백엔드 처리)")
     pu.add_argument("--slug")

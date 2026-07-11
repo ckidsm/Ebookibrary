@@ -316,10 +316,12 @@ class WorkerPing(BaseModel):
     platform: str | None = None  # "mac" | "windows" | "linux"
     version: str | None = None   # 워커 코드 버전(_version.txt)
     app_title: str | None = None # 교보 앱 창 제목(열린 책 확인용)
+    capture_display: dict | None = None  # macOS 캡처 모니터 양면 표준 준비상태(웹 게이트가 실제 캡처 모니터로 판정)
 
 
 _last_worker_version: str | None = None  # 최근 ping 한 워커의 버전
 _last_app_title: str | None = None       # 최근 ping 한 워커가 본 교보 창 제목
+_last_capture_display: dict | None = None  # 최근 ping 한 워커의 캡처 모니터 준비상태
 
 
 def _read_server_version() -> str:
@@ -340,7 +342,7 @@ def worker_ping(request: Request, body: WorkerPing | None = None) -> dict:
     if not _is_lan(client):
         raise HTTPException(403, "LAN 전용")
     import time as _t
-    global _last_worker_version, _last_app_title
+    global _last_worker_version, _last_app_title, _last_capture_display
     _worker_last_seen[client] = _t.time()
     hostname = (body.hostname if body else None) or ''
     platform = body.platform if body else None
@@ -348,6 +350,7 @@ def worker_ping(request: Request, body: WorkerPing | None = None) -> dict:
         _last_worker_version = body.version
     if body is not None:
         _last_app_title = body.app_title or ""   # 매 ping 갱신(책 바뀌면 반영)
+        _last_capture_display = body.capture_display   # None 이면 비-mac/미보고(웹은 브라우저 폴백)
     upsert_worker_client(client, hostname=hostname, platform=platform)
     return {"ok": True, "client": client}
 
@@ -399,6 +402,7 @@ def worker_status(request: Request) -> dict:
         "server_version": server_ver or None,
         "up_to_date": bool(wv and server_ver and wv == server_ver),
         "app_title": _last_app_title or None,
+        "capture_display": _last_capture_display,   # macOS 캡처 모니터 준비상태(웹 게이트가 실제 캡처 모니터로 판정)
     }
 
 

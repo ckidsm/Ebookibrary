@@ -405,10 +405,47 @@ def _app_window_title() -> str:
     return ""
 
 
+def _capture_display_meta():
+    """macOS: 로컬 매크로 캡처 대상 모니터의 양면 표준 준비상태(compact).
+    웹 게이트가 '브라우저 모니터'가 아니라 '실제 캡처 모니터'로 판정하게 실어 보낸다.
+    비-mac/실패 시 None. (규칙 엔진: capture_standard.CaptureStandardV1)"""
+    try:
+        import platform as _pf
+        if _pf.system() != "Darwin":
+            return None
+        from . import mac_displays
+        rd = mac_displays.capture_readiness(2)
+        plan = rd.get("plan")
+        if not plan:
+            return None
+        app_eval = rd.get("app_eval")
+        return {
+            "ok": rd["ok"],
+            "reason": rd["reason"],
+            "app_detected": rd["app_display_id"] is not None,
+            "app_meets": (app_eval["meets"] if app_eval else None),
+            "app_page_px": (app_eval["page_px"] if app_eval else None),
+            "any_meets": plan["any_meets"],
+            "chosen": (plan["chosen"]["name"] if plan["chosen"] else None),
+            "displays": [
+                {"kind": e["kind"], "name": e["name"], "backing": e["backing_width"],
+                 "page_px": e["page_px"], "single_page_px": e["single_page_px"],
+                 "meets": e["meets"], "is_app": (e["display_id"] == rd["app_display_id"])}
+                for e in plan["evaluations"]
+            ],
+            "advice": (app_eval["advice"] if app_eval and app_eval["advice"] else plan["advice"]),
+        }
+    except Exception:
+        return None
+
+
 def ping(bridge: str) -> None:
     try:
         body = dict(_ping_meta())
         body["app_title"] = _app_window_title()   # 동적(열린 책에 따라 변함)
+        cd = _capture_display_meta()               # macOS 캡처 모니터 준비상태(웹 게이트용)
+        if cd is not None:
+            body["capture_display"] = cd
         _http("POST", f"{bridge}/api/worker/ping", body=body, timeout=3.0)
     except Exception:
         pass  # silent — heartbeat 실패해도 worker 자체는 계속

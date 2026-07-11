@@ -1181,6 +1181,98 @@
             return true;
         }
 
+        // ── 로컬 매크로(물리 화면 캡처) 해상도 사전 게이트 ─────────────────
+        // 규칙: 로컬 매크로(교보 데스크탑 앱 캡처)는 물리 화면을 찍으므로
+        //   페이지당_픽셀 = 화면폭(pt) × devicePixelRatio ÷ 페이지수.
+        //   양면(스프레드) 표준 = 페이지당 ≥1400px → 백킹 폭 ≥2800px.
+        //   미달이면 저해상 캡처가 되므로 분석 시작을 '차단' + 조치 안내(권장 해상도/단면/내장 Retina).
+        //   (근거·정량: book-capture/bookcapture/capture_standard.py, docs/EBOOK_CAPTURE_STANDARD.md §로컬 매크로 게이트)
+        //   ※ Playwright 브라우저 캡처(capture-browser)는 오프스크린 렌더라 모니터 무관 → 게이트 제외.
+        const CAP_MIN_PAGE_PX = 1400;   // = capture_standard.MIN_SOURCE_WIDTH
+        function measureCaptureDisplay() {
+            const ptw = (window.screen && window.screen.width) ? window.screen.width : null;
+            const dpr = window.devicePixelRatio || null;
+            if (!ptw || !dpr) return null;              // 못 읽으면 게이트 생략(fail-open)
+            const backing = Math.round(ptw * dpr);
+            return {
+                ptw, dpr, backing,
+                spreadPage: Math.floor(backing / 2),    // 양면 페이지당 픽셀
+                singlePage: backing,                    // 단면 페이지당 픽셀
+                meetsSpread: (backing / 2) >= CAP_MIN_PAGE_PX,
+                meetsSingle: backing >= CAP_MIN_PAGE_PX,
+            };
+        }
+        // 반환: true=진행, false=중단. 미달이면 차단 팝업(‘그래도 진행’으로만 우회).
+        // 우선순위: (1) 워커가 보고한 '실제 캡처 모니터'(capture_display) — 브라우저 위치와 무관(사각지대 해소)
+        //          (2) 폴백 — 워커 미보고 시 '브라우저가 있는 모니터' 휴리스틱.
+        async function ensureCaptureResolutionOK() {
+            // (1) 워커 권위 판정 — macOS 워커가 실제 캡처할 모니터를 규칙 엔진으로 판정해 보고
+            let cd = null;
+            try { const ws = await fetchWorkerStatus(); cd = (ws && ws.capture_display) || null; }
+            catch (_) { cd = null; }
+            if (cd) {
+                if (cd.ok) return true;                 // 실제 캡처 모니터가 양면 표준 충족
+                const dispLines = (cd.displays || []).map(x => {
+                    const tag = x.is_app ? ' <b style="color:#fcd34d;">←교보앱</b>' : '';
+                    const ok = x.meets ? '✅' : '❌';
+                    return `<li><b>[${escapeHtml(x.kind)}]</b> ${escapeHtml(x.name)} · 백킹 ${x.backing}px · 양면 페이지당 <b style="color:${x.meets ? '#6ee7b7' : '#fca5a5'};">${x.page_px}px</b> ${ok}${tag} <span style="color:#94a3b8;font-size:0.72rem;">(단면이면 ${x.single_page_px}px)</span></li>`;
+                }).join('');
+                const advLines = (cd.advice || []).map(a => `<li>${escapeHtml(a)}</li>`).join('');
+                const body = `
+                    <div style="font-size:0.85rem;color:#cbd5e1;line-height:1.7;">
+                        <div style="padding:10px 12px;border-radius:6px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;color:#fca5a5;margin-bottom:12px;">
+                            ⛔ <b>실제 캡처 모니터가 양면 표준(페이지당 ≥${CAP_MIN_PAGE_PX}px)에 미달합니다.</b><br>
+                            <span style="color:#e5e7eb;">${escapeHtml(cd.reason || '')}</span>
+                        </div>
+                        <div style="margin-bottom:6px;color:#fff;">연결된 모니터:</div>
+                        <ul style="margin:0 0 12px;padding-left:1.2em;">${dispLines}</ul>
+                        ${advLines ? `<div style="margin-bottom:6px;color:#fff;">조치:</div><ul style="margin:0 0 12px;padding-left:1.2em;">${advLines}</ul>` : ''}
+                        <div style="font-size:0.74rem;color:#6ee7b7;background:rgba(16,185,129,0.08);border-radius:5px;padding:8px 10px;">
+                            ✅ 이 판정은 <b>워커가 실제 캡처할 모니터</b> 기준입니다(브라우저 위치와 무관).
+                        </div>
+                    </div>`;
+                const ans = await showCustomConfirm({
+                    title: '⛔ 해상도 미달 — 실제 캡처 모니터',
+                    body,
+                    options: [
+                        { label: '취소 (해상도 조정 후 다시)', value: 'cancel' },
+                        { label: '그래도 진행 (저해상 감수)', value: 'force', kind: 'danger' },
+                    ],
+                });
+                return ans === 'force';
+            }
+            // (2) 폴백 — 워커 미보고(비-mac 워커/워커 꺼짐/외부망): 브라우저 모니터 휴리스틱
+            const d = measureCaptureDisplay();
+            if (!d || d.meetsSpread) return true;       // 못 재거나 양면 표준 충족 → 통과
+            const needBacking = CAP_MIN_PAGE_PX * 2;    // 2800
+            const body = `
+                <div style="font-size:0.85rem;color:#cbd5e1;line-height:1.7;">
+                    <div style="padding:10px 12px;border-radius:6px;background:rgba(239,68,68,0.12);border:1px solid #ef4444;color:#fca5a5;margin-bottom:12px;">
+                        ⛔ <b>캡처 화면 해상도가 양면 표준에 미달합니다.</b><br>
+                        <span style="color:#e5e7eb;">현재 화면 <b>${d.ptw}pt × ${d.dpr.toFixed(1)}x = 백킹 ${d.backing}px</b> →
+                        양면 페이지당 <b style="color:#fca5a5;">${d.spreadPage}px</b> &lt; 표준 ${CAP_MIN_PAGE_PX}px</span>
+                    </div>
+                    <div style="margin-bottom:8px;color:#fff;">조치 (권장 순):</div>
+                    <ol style="margin:0 0 12px;padding-left:1.3em;">
+                        ${d.meetsSingle ? `<li><b>단면(1페이지) 보기로 전환</b> — 이 화면 그대로도 페이지당 <b style="color:#6ee7b7;">${d.singlePage}px</b> ✅ (한 장에 1페이지로 레이아웃이 달라짐)</li>` : ''}
+                        <li><b>해상도 올리기</b> — 시스템 설정 &gt; 디스플레이에서 <b>‘모든 해상도 보기’</b>를 켜고 <b>백킹 폭이 ≥${needBacking}px</b> 되는 더 높은 HiDPI 해상도를 선택하세요. (지금 ${d.backing}px)</li>
+                        <li><b>내장 Retina 디스플레이에서 캡처</b> — 양면 표준을 여유 있게 충족합니다.</li>
+                    </ol>
+                    <div style="font-size:0.74rem;color:#94a3b8;background:rgba(148,163,184,0.08);border-radius:5px;padding:8px 10px;">
+                        ℹ️ 이 검사는 <b>이 브라우저가 있는 모니터</b> 기준입니다. 책을 다른 모니터에 두셨다면 실제 캡처 모니터는 워커가 최종 검증합니다.
+                    </div>
+                </div>`;
+            const ans = await showCustomConfirm({
+                title: '⛔ 해상도 미달 — 저해상 캡처 방지',
+                body,
+                options: [
+                    { label: '취소 (해상도 조정 후 다시)', value: 'cancel' },
+                    { label: '그래도 진행 (저해상 감수)', value: 'force', kind: 'danger' },
+                ],
+            });
+            return ans === 'force';
+        }
+
         async function showCapturePrep(book, slug, isWin, startPage) {
             const title = escapeHtml(book.title || slug);
             const pageStep = startPage > 1
@@ -1642,6 +1734,11 @@
                 }
                 // 캡처 — 준비 팝업으로 사용자와 싱크 맞춘 뒤 시작
                 const sp = parseInt(document.getElementById('cap-start-page')?.value || '1', 10) || 1;
+                // 로컬 매크로(데스크탑 앱=물리 화면 캡처)면 해상도 사전 게이트 — 양면 표준 미달 시 차단
+                if (mode === 'auto' || mode === 'capture-only') {
+                    const okRes = await ensureCaptureResolutionOK();
+                    if (!okRes) return;   // 미달 + '취소' → 중단
+                }
                 const ready = (mode === 'capture-browser')
                     ? await showBrowserPrep(book, slug, sp)        // 🌐 브라우저 웹뷰어
                     : await showCapturePrep(book, slug, isWin, sp); // 🖥 데스크탑 앱
