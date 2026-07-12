@@ -105,6 +105,57 @@ def _build_page_card(page: dict, prev_num: int | None, next_num: int | None, ima
 </div>"""
 
 
+# ── 팝업(모달) 뷰어 레이아웃 규칙 상수 (단일 관리처) ──────────────────────
+# 하드코딩 금지: 모달 확대 뷰의 레이아웃 수치는 이 클래스 한 곳에서만 관리한다.
+# 이 값들이 '이미지 밖 화살표 · 사방 여백 · 비침 없는 배경 · 원본 로드' 규칙을 정의.
+# (2026-07-12 '클로드코드' 뷰어와 동일 구조로 확정 — 반복 버그를 규칙화로 봉인.)
+#
+# 왜 이 값들인가 (규칙 근거 — 과거 버그):
+#   · OVERLAY_BG 는 **솔리드**여야 한다. rgba(…,0.9) 반투명이면 여백에 뒤 페이지/요약이
+#     비쳐 지저분(“여전히 개선 안 됨” 버그). → 절대 반투명 금지.
+#   · STAGE_MARGIN_* 로 이미지를 스테이지 안으로 들여, 화살표가 **이미지 밖**(좌우 여백)에
+#     오게 한다. 여백 0 이면 화살표가 이미지를 가림(“화살표는 이미지 밖에 있어야지” 버그).
+#   · 상하 여백(MARGIN_V)도 필수 — 없으면 이미지가 위아래 가장자리에 붙음(“상하 마진 없다” 버그).
+#   · 모달은 썸네일(src)이 아니라 **원본**(page_NNN.png)을 로드해야 선명(원본 로드 규칙).
+class ViewerLayout:
+    """모달 뷰어 레이아웃 규칙 상수(단일 관리처). 인스턴스 X — 클래스 상수로 참조.
+    값 조정이 필요하면 여기만 고친다 → modal_css() 가 생성한 CSS 가 _CSS 를 오버라이드."""
+    OVERLAY_BG    = "#0a0e14"  # 오버레이 배경(솔리드 다크). 반투명 금지(비침 버그).
+    STAGE_MARGIN_V = 64        # 스테이지 상하 여백(px) — 툴바/닫기 아래, 이미지 숨쉴 공간.
+    STAGE_MARGIN_H = 96        # 스테이지 좌우 여백(px) — 이 안에 화살표(이미지 밖).
+    NAV_W          = 54        # 이전/다음 화살표 버튼 폭(px).
+    NAV_H          = 92        # 화살표 버튼 높이(px).
+    NAV_OFFSET     = 18        # 화살표 가장자리로부터 여백(px).
+    TEXT_PANEL_W   = 440       # 우측 OCR/코드/메모 패널 폭(px).
+    TEXT_PANEL_GAP = 12        # 패널 열렸을 때 이미지·다음화살표와 패널 사이 간격(px).
+    FULLRES_FROM_THUMB = True  # 모달은 썸네일 src 를 원본(/thumbs/→/ 치환)으로 바꿔 로드.
+    CACHE_BUST         = True  # 이미지 src 에 ?v=<빌드시각> — 재크롭 시 옛 캐시 방지.
+
+    @classmethod
+    def text_open_right(cls):
+        """패널 열렸을 때 이미지 스테이지·다음화살표의 우측 경계(px)."""
+        return cls.TEXT_PANEL_W + cls.TEXT_PANEL_GAP
+
+    @classmethod
+    def modal_css(cls):
+        """위 상수로부터 모달 레이아웃 CSS 를 생성. _CSS 뒤에 이어 붙여 오버라이드한다.
+        (같은 선택자를 나중에 재선언 → CSS 캐스케이드로 이 값이 최종 적용 = 클래스가 진실원본.)"""
+        r = cls.text_open_right()
+        # CSS 중괄호는 {{ }} 로 이스케이프, 상수는 {name} 로 치환.
+        return (
+            "/* ↓↓ ViewerLayout(규칙화 클래스)에서 생성 — 레이아웃 수치의 단일 관리처 ↓↓ */\n"
+            ".modal-overlay {{ background: {bg}; }}\n"
+            ".modal-stage {{ inset: {mv}px {mh}px; }}\n"
+            ".modal-nav {{ width: {nw}px; height: {nh}px; }}\n"
+            ".modal-nav.mnav-prev {{ left: {off}px; }}\n"
+            ".modal-nav.mnav-next {{ right: {off}px; }}\n"
+            ".modal-overlay.text-open .modal-stage {{ right: {r}px; }}\n"
+            ".modal-overlay.text-open .mnav-next {{ right: {r}px; }}\n"
+            ".modal-text {{ width: {tp}px; }}\n"
+        ).format(bg=cls.OVERLAY_BG, mv=cls.STAGE_MARGIN_V, mh=cls.STAGE_MARGIN_H,
+                 nw=cls.NAV_W, nh=cls.NAV_H, off=cls.NAV_OFFSET, r=r, tp=cls.TEXT_PANEL_W)
+
+
 # ── 메인 빌드 ──────────────────────────────────────────────
 _CSS = """\
 html { font-size: 18px; }
@@ -171,7 +222,10 @@ body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; backgroun
 .signature { margin-top: 40px; padding: 18px 22px; background: white; border-radius: 8px; border-left: 4px solid #1abc9c; font-size: 0.78rem; color: #555; }
 .signature strong { color: #2c3e50; }
 
-/* Modal — 확대/축소·이동·OCR텍스트·메모 */
+/* Modal — 확대/축소·이동·OCR텍스트·메모
+   ⚠ 레이아웃 수치(배경색·스테이지 여백·화살표 크기/위치·패널 폭)는 아래 기본값을 두되,
+   최종 적용값은 ViewerLayout.modal_css() 가 _CSS 뒤에서 오버라이드한다(단일 관리처).
+   조정은 ViewerLayout 클래스에서 — 여기 숫자를 직접 고치지 말 것. */
 .modal-overlay { display: none; position: fixed; inset: 0; background: #0a0e14; z-index: 1000; }
 .modal-overlay.active { display: block; }
 /* 상하 64px(툴바/닫기 아래) + 좌우 96px(화살표 자리) 여백 — 이미지가 가장자리에 안 붙게 */
@@ -487,6 +541,7 @@ def build_html(
 <title>{html.escape(title)} - 도서 요약</title>
 <style>
 {_CSS}
+{ViewerLayout.modal_css()}
 </style>
 </head>
 <body>
