@@ -744,15 +744,15 @@ class KyoboAppScreenshot:
                 except subprocess.CalledProcessError as e:
                     print(f"⚠️  영역 캡처 실패: {e}")
 
-            # 5. 폴백 3 — 전체 화면 (메인 디스플레이). 메뉴바·다른 창 포함 가능.
-            print("⚠️  WID/영역 다 실패 → 전체 화면 폴백")
-            try:
-                subprocess.run([
-                    "/usr/sbin/screencapture", "-x", "-t", "png", str(filepath)
-                ], check=True)
-                return True
-            except subprocess.CalledProcessError:
-                return False
+            # 5. 전체화면(메인 디스플레이) 폴백 — 제거.
+            #    교보 창을 특정 못하면 메인 디스플레이(다른 창/터미널)를 통째로 찍어
+            #    '콘솔 화면 혼입' 오염이 발생(2026-07 검증). 잘못된 화면을 찍느니 이 페이지를 건너뛴다.
+            #    ⚠️ WID 캡처(-l)는 창이 가려져도 정확히 찍으므로, 교보 앱을 '창(비-전체화면) 모드'로
+            #       두면 WID 로 잡힌다. 전체화면이면 CGWindowList 에서 창이 빠져 WID 실패 → 창 모드 권장.
+            print("⛔ 교보 창 특정 실패(WID·영역 모두) → 이 페이지 캡처 건너뜀 "
+                  "(전체화면 폴백 제거 — 터미널 등 오염 방지). "
+                  "교보 앱을 '창 모드(비-전체화면)'로 두면 WID 캡처가 안정적입니다.")
+            return False
         else:
             # Windows
             try:
