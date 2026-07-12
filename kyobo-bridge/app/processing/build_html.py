@@ -172,7 +172,7 @@ body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; backgroun
 .signature strong { color: #2c3e50; }
 
 /* Modal — 확대/축소·이동·OCR텍스트·메모 */
-.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1000; }
+.modal-overlay { display: none; position: fixed; inset: 0; background: #0a0e14; z-index: 1000; }
 .modal-overlay.active { display: block; }
 /* 상하 64px(툴바/닫기 아래) + 좌우 96px(화살표 자리) 여백 — 이미지가 가장자리에 안 붙게 */
 .modal-stage { position: absolute; inset: 64px 96px; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: grab; }
