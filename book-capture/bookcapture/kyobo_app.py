@@ -705,7 +705,9 @@ class KyoboAppScreenshot:
             time.sleep(0.5)  # activate 완전 반영 대기 — Quartz 검색 신뢰성 ↑
 
             # 2. Quartz 로 창 WID 찾기 → screencapture -l 로 정밀 캡처 (최선)
-            wid = self._find_kyobo_window_id()
+            #    retries=1: WID 실패가 잦은 환경(창 상태 불안정)에서 재시도 지연 낭비(~4s/page) 방지 →
+            #    바로 영역 캡처(SystemEvents 좌표)로 폴백. 영역도 교보 창만 정확히 찍음(터미널은 타 디스플레이).
+            wid = self._find_kyobo_window_id(retries=1)
             if wid:
                 try:
                     subprocess.run([
