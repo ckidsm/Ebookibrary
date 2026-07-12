@@ -174,9 +174,10 @@ body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; backgroun
 /* Modal — 확대/축소·이동·OCR텍스트·메모 */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1000; }
 .modal-overlay.active { display: block; }
-.modal-stage { position: absolute; inset: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: grab; }
+.modal-stage { position: absolute; inset: 0 96px; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: grab; }
 .modal-stage.panning { cursor: grabbing; }
-.modal-stage img { max-width: 96vw; max-height: 96vh; transform-origin: center center; user-select: none; -webkit-user-drag: none; will-change: transform; box-shadow: 0 0 40px rgba(0,0,0,0.5); background: #fff; }
+/* 이미지는 화살표 자리(양쪽 96px)를 뺀 폭까지만 — 화살표가 이미지 밖(여백)에 오도록 */
+.modal-stage img { max-width: 100%; max-height: 94vh; transform-origin: center center; user-select: none; -webkit-user-drag: none; will-change: transform; box-shadow: 0 0 40px rgba(0,0,0,0.5); background: #fff; }
 .modal-bar { position: fixed; top: 14px; left: 16px; z-index: 1002; display: flex; align-items: center; gap: 6px; background: rgba(20,28,40,0.88); padding: 6px 10px; border-radius: 8px; }
 .mbtn { background: #2c3e50; color: #fff; border: 1px solid #46637e; border-radius: 6px; padding: 4px 11px; font-size: 0.85rem; cursor: pointer; line-height: 1.2; font-family: inherit; }
 .mbtn:hover { background: #1abc9c; border-color: #1abc9c; }
@@ -190,6 +191,9 @@ body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; backgroun
 .modal-nav.mnav-prev { left: 18px; }
 .modal-nav.mnav-next { right: 18px; }
 .modal-nav.disabled { opacity: 0.2; pointer-events: none; }
+/* 텍스트/코드 패널(우측 440px) 열리면: 이미지 스테이지를 패널 왼쪽까지만, 다음 화살표는 패널 왼쪽에 */
+.modal-overlay.text-open .modal-stage { right: 452px; }
+.modal-overlay.text-open .mnav-next { right: 452px; }
 .modal-text { position: fixed; top: 0; right: 0; width: 440px; max-width: 94vw; height: 100vh; background: #0f1722; color: #e2e8f0; z-index: 1001; box-shadow: -4px 0 24px rgba(0,0,0,0.5); padding: 62px 14px 16px; display: none; flex-direction: column; gap: 8px; overflow-y: auto; }
 .modal-text.open { display: flex; }
 .modal-text .mt-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; flex: none; }
@@ -303,7 +307,7 @@ function _updateNav(num) {
 function loadModalPage(num) {
     var img = _imgForPage(num);
     if (!img) return false;
-    modalImg.src = img.src;
+    modalImg.src = img.src.replace('/thumbs/', '/');  // 썸네일 → 원본 풀해상도(클로드코드와 동일)
     mPage = String(num);
     mPageLabel.textContent = 'Page ' + num;
     mReset();
@@ -344,7 +348,10 @@ window.addEventListener('keydown', function(e) {
 document.getElementById('mZoomIn').onclick = function() { mZoom(1.2); };
 document.getElementById('mZoomOut').onclick = function() { mZoom(1 / 1.2); };
 document.getElementById('mZoomReset').onclick = mReset;
-document.getElementById('mTextBtn').onclick = function() { mTextPanel.classList.toggle('open'); };
+document.getElementById('mTextBtn').onclick = function() {
+    mTextPanel.classList.toggle('open');
+    modal.classList.toggle('text-open', mTextPanel.classList.contains('open'));
+};
 document.getElementById('mCopyBtn').onclick = function() {
     navigator.clipboard.writeText(mOcrText.textContent || '').then(function() {
         var b = document.getElementById('mCopyBtn'); b.textContent = '✓ 복사됨';
@@ -454,8 +461,11 @@ def build_html(
     pages = pages_data["pages"]
     chapters = pages_data["chapters"]
     if image_pattern is None:
-        # books/<slug>/thumbs/page_NNN.png — capture-auto 표준 출력
-        image_pattern = "../thumbs/page_{num:03d}.png"
+        # books/<slug>/thumbs/page_NNN.png — capture-auto 표준 출력.
+        # ?v=<빌드시각> 캐시버스트: 재크롭/재발행 시 브라우저가 옛 이미지를 안 쓰게(nginx 이미지 캐시 우회).
+        # 모달은 src.replace('/thumbs/','/') 하므로 원본에도 같은 ?v 가 유지됨.
+        import time as _t
+        image_pattern = "../thumbs/page_{num:03d}.png?v=%d" % int(_t.time())
 
     sidebar = _build_sidebar(chapters)
     overview_html = _build_overview(overview)
