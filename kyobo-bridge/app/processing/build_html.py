@@ -301,6 +301,18 @@ body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; backgroun
 .overview .ov-pages a { display: inline-block; min-width: 56px; text-align: center; background: #6c5ce7; color: white; font-weight: 700; text-decoration: none; padding: 2px 8px; border-radius: 6px; margin-right: 8px; font-size: 0.82rem; }
 .overview .ov-pages a:hover { background: #4c3a9e; }
 .overview .ov-guide { font-size: 0.93rem; line-height: 1.8; color: #2c3e50; background: #faf9ff; border-radius: 8px; padding: 14px 16px; }
+/* 챕터별 상세 요약(전체 페이지 요약을 챕터 단위로 집대성) */
+.overview .ov-digests .cd-item { margin-top: 16px; padding: 16px 18px; background: #faf9ff; border-radius: 10px; border-left: 4px solid #a78bfa; }
+.overview .ov-digests .cd-item:first-of-type { margin-top: 6px; }
+.overview .cd-item h4 { font-size: 1.02rem; color: #4c3a9e; margin-bottom: 10px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.overview .cd-item .cd-range { font-size: 0.76rem; font-weight: 700; color: #fff; background: #a78bfa; padding: 2px 9px; border-radius: 20px; text-decoration: none; }
+.overview .cd-item .cd-range:hover { background: #6c5ce7; }
+.overview .cd-item .cd-body { font-size: 0.93rem; line-height: 1.85; color: #2c3e50; }
+.overview .cd-item .cd-body p { margin: 0 0 10px; }
+.overview .cd-item .cd-body p:last-child { margin-bottom: 0; }
+.overview .cd-item .cd-body strong { color: #4c3a9e; }
+.overview .cd-item .cd-body ul { margin: 6px 0 10px 4px; padding-left: 18px; }
+.overview .cd-item .cd-body li { margin-bottom: 5px; }
 .tree-overview { display: block; padding: 9px 20px; color: #c9b8ff; text-decoration: none; font-size: 0.86rem; font-weight: 700; border-bottom: 1px solid #2c3e50; }
 .tree-overview:hover { background: #2c3e50; color: #fff; }
 """
@@ -491,6 +503,18 @@ def _build_overview(ov: dict | None) -> str:
         f'<li><a href="#page-{int(p.get("page"))}">p.{int(p.get("page"))}</a>'
         f'{html.escape(str(p.get("why","")))}</li>'
         for p in (ov.get("must_read_pages") or []) if isinstance(p, dict) and p.get("page"))
+    # 챕터별 상세 요약(전체 페이지 요약을 챕터 단위로 집대성) — 각 항목 body 는 HTML 허용(자체 생성물)
+    digests = ""
+    for c in (ov.get("chapter_digests") or []):
+        if not isinstance(c, dict) or not c.get("body"):
+            continue
+        title = html.escape(str(c.get("title", "")))
+        rng = ""
+        if c.get("start") and c.get("end"):
+            rng = (f'<a class="cd-range" href="#page-{int(c["start"])}">'
+                   f'p.{int(c["start"])}–{int(c["end"])}</a>')
+        digests += (f'<div class="cd-item"><h4>{title}{rng}</h4>'
+                    f'<div class="cd-body">{c["body"]}</div></div>')
     parts = ['<section id="overview" class="overview">', '<h2>📋 책 개요</h2>']
     if reader:
         parts.append(f'<span class="ov-reader">👤 {html.escape(reader)}</span>')
@@ -502,6 +526,8 @@ def _build_overview(ov: dict | None) -> str:
         parts.append(f'<div class="ov-block"><h3>📖 꼭 알아야 할 용어</h3><ul class="ov-terms">{terms}</ul></div>')
     if pages:
         parts.append(f'<div class="ov-block"><h3>⭐ 핵심 페이지</h3><ul class="ov-pages">{pages}</ul></div>')
+    if digests:
+        parts.append(f'<div class="ov-block ov-digests"><h3>📚 챕터별 상세 요약</h3>{digests}</div>')
     if guide:
         parts.append(f'<div class="ov-block"><h3>🧭 학습 가이드</h3><div class="ov-guide">{guide}</div></div>')
     parts.append('</section>')
