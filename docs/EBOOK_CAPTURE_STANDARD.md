@@ -25,6 +25,8 @@
 - **6→7 규칙**: `finalize_book.py` 는 *깨끗한 빌드 결과*에만 돌린다(멱등 아님, 이미 주입 시 중단). chapters.json/page_extras.json 은 **있으면** 자동 주입, 없으면 건너뜀.
 - **8 규칙**: 웹 파일은 root 소유라 RedCode 가 직접 못 덮어씀 → `publish_book.sh` 가 홈 업로드→`sudo cp`→`chown root:root`→`chmod 644`→검증까지 처리. 비번은 `NAS_PASS` 환경변수(하드코딩 금지, 출처 `인증서/나스인증/`).
 - 이미지만 바뀌면 8에서 이미지도 넘기고, HTML 썸네일 src `?v=N` 증가(캐시버스트).
+- **★ 캡처 원본 서버 보관(필수 규칙)**: **모든 정상 캡처 발행 시** 책 폴더의 `source_raws/`(캡처 원본 raw 전량)를 **NAS 책 폴더에 반드시 함께 올린다**. 뷰어는 raws 를 서빙하지 않지만, 재크롭·품질검증·소실복구의 유일한 원본이므로 서버 보관이 원칙(로컬만 두지 않음). 대용량이라 rsync 실패 잦음 → **tar 스트리밍**(`tar cf - -C books <slug> | ssh 'cd <NASbooks> && tar xpf - && chmod -R a+rX <slug>'`)으로 전송. (2026-07-12 이미지 처리 바이블 발행에서 확립: page+thumbs+summary+**source_raws** 전량 서버 보관.)
+- **백업(선택)**: 서버 `source_raws/` 가 1차 보관. 추가 안전이 필요하면 raws 를 별도 백업 볼륨/타르로 2차 복사(운영 판단).
 
 ---
 
