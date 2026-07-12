@@ -174,10 +174,11 @@ body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; backgroun
 /* Modal — 확대/축소·이동·OCR텍스트·메모 */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1000; }
 .modal-overlay.active { display: block; }
-.modal-stage { position: absolute; inset: 0 96px; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: grab; }
+/* 상하 64px(툴바/닫기 아래) + 좌우 96px(화살표 자리) 여백 — 이미지가 가장자리에 안 붙게 */
+.modal-stage { position: absolute; inset: 64px 96px; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: grab; }
 .modal-stage.panning { cursor: grabbing; }
-/* 이미지는 화살표 자리(양쪽 96px)를 뺀 폭까지만 — 화살표가 이미지 밖(여백)에 오도록 */
-.modal-stage img { max-width: 100%; max-height: 94vh; transform-origin: center center; user-select: none; -webkit-user-drag: none; will-change: transform; box-shadow: 0 0 40px rgba(0,0,0,0.5); background: #fff; }
+/* 이미지는 스테이지(여백 뺀 영역) 안에만 — 화살표는 이미지 밖(좌우 여백), 상하도 숨쉴 공간 */
+.modal-stage img { max-width: 100%; max-height: 100%; transform-origin: center center; user-select: none; -webkit-user-drag: none; will-change: transform; box-shadow: 0 0 40px rgba(0,0,0,0.5); background: #fff; }
 .modal-bar { position: fixed; top: 14px; left: 16px; z-index: 1002; display: flex; align-items: center; gap: 6px; background: rgba(20,28,40,0.88); padding: 6px 10px; border-radius: 8px; }
 .mbtn { background: #2c3e50; color: #fff; border: 1px solid #46637e; border-radius: 6px; padding: 4px 11px; font-size: 0.85rem; cursor: pointer; line-height: 1.2; font-family: inherit; }
 .mbtn:hover { background: #1abc9c; border-color: #1abc9c; }
