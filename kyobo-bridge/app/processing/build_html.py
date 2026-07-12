@@ -119,7 +119,17 @@ def _build_page_card(page: dict, prev_num: int | None, next_num: int | None, ima
 #   · 모달은 썸네일(src)이 아니라 **원본**(page_NNN.png)을 로드해야 선명(원본 로드 규칙).
 class ViewerLayout:
     """모달 뷰어 레이아웃 규칙 상수(단일 관리처). 인스턴스 X — 클래스 상수로 참조.
-    값 조정이 필요하면 여기만 고친다 → modal_css() 가 생성한 CSS 가 _CSS 를 오버라이드."""
+    값 조정이 필요하면 여기만 고친다 → modal_css() 가 생성한 CSS 가 _CSS 를 오버라이드.
+
+    ⚠️⚠️ 진단 규칙 (반복 실수 방지 — 2026-07-12) ⚠️⚠️
+    "이미지 상/하/좌/우가 잘린다 · 마진이 없다"는 신고가 오면 **이 모달 CSS를 먼저 고치지 말 것.**
+    실제 원인은 대부분 **소스 PNG의 크롭**(page_crop.crop_page 의 과도한 고정 크롬)이다.
+    모달만 반복 수정하다 사용자를 크게 지치게 한 사례가 있음("여전히 같다 뭐하냐").
+    순서: (1) 브라우저에서 `.modal-stage img` rect vs `.modal-stage` rect 측정 →
+          top/bottom 이 일치하면 모달은 무죄(클립 없음). (2) source_raws/raw_NNN.png 와
+          발행 page_NNN.png 상단을 눈으로 비교 → 헤더가 raw엔 있고 page엔 잘렸으면 크롭이 범인.
+          (3) 앱 raw 는 `scripts/crop_book.py --chrome 20,20,20,20` 로 재크롭(재캡처 0).
+    근거·상세: docs/EBOOK_CAPTURE_STANDARD.md §3(크롭)·§6.1(뷰어)."""
     OVERLAY_BG    = "#0a0e14"  # 오버레이 배경(솔리드 다크). 반투명 금지(비침 버그).
     STAGE_MARGIN_V = 64        # 스테이지 상하 여백(px) — 툴바/닫기 아래, 이미지 숨쉴 공간.
     STAGE_MARGIN_H = 96        # 스테이지 좌우 여백(px) — 이 안에 화살표(이미지 밖).
