@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -200,6 +201,47 @@ def cmd_preflight(args) -> int:
     print()
     print("판정:", "✅ 캡처 진행 OK" if rd["ok"] else "⛔ 표준 미달 — 조치 후 재시도 (강제: KYOBO_ALLOW_SUBSTANDARD=1)")
     return 0 if rd["ok"] else 3
+
+
+def cmd_qc(args) -> int:
+    """캡처 품질·오염 검사(게시 전 게이트). 종료코드 0=통과, 4=플래그 있음."""
+    from . import postcapture as pc
+    book = _resolve_book_dir(args)
+    rep = pc.CaptureQC(book).validate()
+    print(pc.qc_report_text(rep))
+    return 0 if rep["ok"] else 4
+
+
+def cmd_trim_tail(args) -> int:
+    """책 끝 반복 캡처(동일 해시 꼬리) 제거."""
+    from . import postcapture as pc
+    book = _resolve_book_dir(args)
+    r = pc.trim_duplicate_tail(book, min_run=args.min_run, dry_run=args.dry_run)
+    tag = "(dry-run) " if args.dry_run else ""
+    print(f"[trim-tail] {tag}꼬리 반복 {r['tail_run']}장 감지 · 삭제 {len(r['trimmed'])}장 "
+          f"· 남은 {r['kept']}장 · 마지막 {r['last_unique']}")
+    if r["trimmed"]:
+        print("   삭제:", ", ".join(r["trimmed"][:6]) + (" …" if len(r["trimmed"]) > 6 else ""))
+    return 0
+
+
+def cmd_chapters_detect(args) -> int:
+    """빈-OCR 구분 페이지로 챕터 경계 자동 감지 + chapters.json 뼈대 생성."""
+    from . import postcapture as pc
+    book = _resolve_book_dir(args)
+    det = pc.ChapterDetector(book)
+    divs = det.detect()
+    print(f"[chapters] 빈-OCR 구분 페이지 {len(divs)}개: {divs}")
+    scaffold = det.scaffold_chapters()
+    print(f"[chapters] 병합 후 챕터 경계 {len(scaffold)}개:")
+    for c in scaffold:
+        print(f"   {c['num']}장 p.{c['start']}~{c['end']}  title={c['title']}")
+    if args.write:
+        out = book / "summary" / "chapters_scaffold.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(scaffold, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"[chapters] 뼈대 저장: {out} (title/summary 는 이미지 보고 채우세요)")
+    return 0
 
 
 def _resolve_book_dir(args) -> Path:
@@ -554,6 +596,22 @@ def build_parser() -> argparse.ArgumentParser:
     ppf = sub.add_parser("preflight", help="로컬 매크로 캡처 사전점검(모니터 양면 표준 충족 판정)")
     ppf.add_argument("--pages", type=int, default=2, help="스프레드 페이지수(양면=2, 단면=1). 기본 2")
     ppf.set_defaults(func=cmd_preflight)
+
+    # ── 캡처 후처리(정규화): QC · 중복꼬리 · 챕터감지 ──
+    pqc = sub.add_parser("qc", help="캡처 품질·오염 검사(게시 전 게이트)")
+    pqc.add_argument("--slug"); pqc.add_argument("--book-dir"); pqc.add_argument("--bridge")
+    pqc.set_defaults(func=cmd_qc)
+
+    ptt = sub.add_parser("trim-tail", help="책 끝 반복 캡처(동일 해시 꼬리) 제거")
+    ptt.add_argument("--slug"); ptt.add_argument("--book-dir"); ptt.add_argument("--bridge")
+    ptt.add_argument("--min-run", type=int, default=2, help="꼬리 반복 최소 연속 수(기본 2)")
+    ptt.add_argument("--dry-run", action="store_true", help="삭제 안 하고 목록만")
+    ptt.set_defaults(func=cmd_trim_tail)
+
+    pcd = sub.add_parser("chapters-detect", help="빈-OCR 구분페이지로 챕터 경계 자동 감지")
+    pcd.add_argument("--slug"); pcd.add_argument("--book-dir"); pcd.add_argument("--bridge")
+    pcd.add_argument("--write", action="store_true", help="chapters_scaffold.json 저장")
+    pcd.set_defaults(func=cmd_chapters_detect)
 
     pu = sub.add_parser("upload", help="책 폴더 PNG 를 백엔드로 업로드(원격 캡처→백엔드 처리)")
     pu.add_argument("--slug")

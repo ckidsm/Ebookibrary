@@ -102,3 +102,29 @@
 - 컨택트시트(전 페이지 축소 grid)로 잘림/여백/차단화면 일괄 육안 확인.
 - 배포 후 Playwright로 라이브 페이지 렌더 → 여백·정렬 확인.
 - 표 정리본: 라이브 HTML `grep -o 'class="ptable"' | wc -l` 로 표 개수 확인 + Playwright로 표 페이지 렌더 육안 확인.
+
+## 9. 캡처 후처리 정규화 — QC · 중복꼬리 · 챕터감지 (규칙 엔진)
+
+> 2026-07-12 '이미지 처리 바이블'(277장) 발행에서 확립. 매번 손으로 하던 md5비교·컨택트시트·구분페이지 찾기를 **클래스·함수·CLI로 정규화**(`bookcapture/postcapture.py`). 캡처(1)와 크롭(2) 사이에 **QC·trim-tail**, OCR(3) 뒤에 **chapters-detect** 를 넣는다.
+
+### 9.1 정규화된 순서 (§0 파이프라인에 삽입)
+```
+1 Raw캡처 → 1.5 QC(qc) → 1.6 중복꼬리정리(trim-tail) → 2 크롭 → 3 OCR
+→ 3.5 챕터감지(chapters-detect) → 4 요약 → 4.5 코드 → 5 merge+build
+→ 6 chapters.json(제목·요약 확정)+page_extras.json → 7 finalize → 8 발행
+```
+
+### 9.2 규칙·명령
+- **QC (게시 전 게이트)** — `python -m bookcapture qc --book-dir <책>` (종료 0=통과/4=플래그). `postcapture.CaptureQC`.
+  검사(모두 **raw 기준**, `source_raws/raw_*.png` 우선): ①해상도 일관성(주해상도 외 >5% 이상=불일치) ②**터미널 오염**(`TERMINAL_DIMS`=2560×1440 등 메인 디스플레이 통째 캡처 해상도면 오염 의심) ③블랙/블랭크(<80KB) ④중복 해시. **크롭 후 page_*.png 는 내용따라 해상도 가변이라 오탐** → 반드시 raw 로 검사.
+- **중복 꼬리 정리** — `python -m bookcapture trim-tail --book-dir <책> [--dry-run]`. `postcapture.trim_duplicate_tail`.
+  근거: 교보 앱은 **마지막 페이지에서 →키가 안 먹혀 같은 화면을 반복 캡처**하고, 캡처의 dup-hash 정지가 이 경우 안 걸려 마지막 장이 수백 장 복제됨. 뒤에서 동일 해시가 `min_run`(기본2) 이상 연속이면 마지막 unique 1장만 남기고 삭제.
+- **챕터 감지** — `python -m bookcapture chapters-detect --book-dir <책> [--write]`. `postcapture.ChapterDetector`.
+  근거: 각 장은 **'베이지 표지' 구분 페이지**로 시작하며 OCR 이 공백제거 후 <40자(거의 빈값). 이 빈-OCR 페이지가 챕터/섹션 경계. `--write` 로 `chapters_scaffold.json`(경계+빈 제목) 생성 → **제목·요약은 구분 페이지 이미지를 보고 사람/비전으로 확정**(자동 scaffold 는 섹션·서문까지 잡아 over-segment 하므로 병합·명명 필요).
+
+### 9.3 품질·오염 검사 결과 예 (이미지 처리 바이블)
+```
+[QC] 277장 · unique 277 · 주해상도 (3600,2194) · 해상도분포 {3600x2194:277}
+     ✅ 통과 — 오염/블랙/중복/불일치 없음
+```
+→ 전부 3600×2194(내장 1800pt×2x). 터미널해상도(2560×1440) 0장이라 콘솔 오염 구조적으로 없음.
