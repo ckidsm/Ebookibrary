@@ -1034,3 +1034,22 @@ powershell -ExecutionPolicy Bypass -File .\install-worker-windows.ps1 -BridgeUrl
 - **원격 최초 생성**: 개인 `ckidsm` 계정에 **Private** 리포 `Ebookibrary` 생성, main 최초 push(`github-com-ckidsm` SSH alias). 122개 파일.
 - **보안 사고·조치**: `_archive/deploy_to_nas.sh`(초기 커밋부터 방치된 옛 스크립트)와 `_quick_deploy.sh`(미추적 스크래치)에 **NAS 비밀번호가 하드코딩**돼 있었음. push 전 발견 → (1) 두 파일 삭제, (2) `git filter-branch`로 **전체 이력에서 `_archive/` 제거**(refs/original·reflog·gc까지 정리), (3) 전 리비전 스캔으로 비번 0 확인 후 push. 리모트엔 비번 흔적 없음.
 - **재발 방지 규칙**: 스크립트에 비밀 하드코딩 금지. 배포는 `publish_book.sh`(`NAS_PASS` env). `.gitignore`에 `.env` 유지. **비번이 로컬 이력·OneDrive에 노출됐던 값이므로 NAS 비밀번호 교체 권장**(교체 시 `인증서/나스인증/`·메모리 [[reference-nas-ssh-deploy]]만 갱신).
+
+### 2026-07-12: 이북 처리 최종 규칙 확정 — '한 번에' 오케스트레이션 + '이미지 처리 바이블' 완성
+
+**⭐ 다음 책부터 한 명령** (`docs/EBOOK_CAPTURE_STANDARD.md` §0.0, 메모리 [[kyobo-ebook-oneshot-pipeline]]):
+```
+cd book-capture
+NAS_PASS=... ./scripts/process_book.sh <SLUG> --chrome 20,20,20,20 --publish
+```
+crop→qc→trim→ocr→summarize→merge→build→**code**→**book_overview**→finalize→발행 전 과정. 유일한 사람 입력=`summary/chapters.json`(장 제목·경계). `--from`으로 부분 재실행.
+
+**이번에 확정한 규칙(재실수 방지)**
+1. **크롭**: 교보 **데스크탑 앱 raw 는 `--chrome 20,20,20,20`**. 큰 top(150 등)이 섹션 헤더('1.1 …')를 잘라먹음 → "뷰어 잘림" 신고의 진짜 원인은 **모달 아닌 크롭**. `crop_book.py --chrome`(하드코딩 제거). 진단: 모달 DOM 측정(`.modal-stage img` vs stage rect 일치=무클립)으로 모달 먼저 배제. 메모리 [[ebook-viewer-cut-check-crop-first]].
+2. **뷰어 모달 규칙화**: `build_html.ViewerLayout` 클래스 = 레이아웃 단일 관리처(솔리드 배경 #0a0e14·사방여백 64/96·화살표 이미지 밖·원본 풀해상도 로드·캐시버스트). `modal_css()`가 `_CSS` 오버라이드.
+3. **책 개요**: 첫 페이지 `📋 책 개요` = 전체 요약 1개 + **챕터별 상세 요약(각 ~1페이지, 8챕터=~8장)**. `scripts/gen_book_overview.py`가 Claude **tool_use**(구조화 출력 → JSON 이스케이프 문제 0)로 생성, `_build_overview`의 `chapter_digests` 렌더.
+4. **발행**: `publish_book.sh`(요약파일 sudo cp) + `publish_images.sh`(page/thumbs tar 스트리밍, `--raws`로 원본 보관). rsync/scp Synology 불안정 회피.
+
+**'이미지 처리 바이블'(277p) 완성**: 재크롭(헤더 복원)·재발행, 코드추출 85p·285블록($0.81), 책 개요 생성($0.37). 표정리는 대상 없음(코드·다이어그램 중심). 라이브 검증 완료. OCR은 이 책 폰트에서 mojibake라 요약·개요는 비전 경로 기반(OCR 무관).
+
+**신규 자산**: `scripts/process_book.sh`·`publish_images.sh`·`gen_book_overview.py`, `build_html.py`(ViewerLayout·chapter_digests), `crop_book.py --chrome`. 커밋 다수(7c68e8a~56f2b79, YUNDEOKSOO).

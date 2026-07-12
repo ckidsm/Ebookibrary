@@ -1,5 +1,11 @@
 """통합 CLI — `python -m bookcapture <subcommand>`.
 
+⭐ 전체 발행까지 '한 번에'(2026-07-12 확정)는 이 CLI 가 아니라 오케스트레이터로:
+    NAS_PASS=... ./scripts/process_book.sh <SLUG> --chrome 20,20,20,20 --publish
+  = crop→qc→trim→ocr→summarize→merge→build→code→book_overview→finalize→발행.
+  이 CLI 의 `run` 은 capture→ocr→summarize→code→merge→build 까지만(크롭·개요·발행 제외).
+  런북: docs/EBOOK_CAPTURE_STANDARD.md §0.0. (앱 raw 크롭은 --chrome 20,20,20,20)
+
 서브커맨드:
   settings          현재 백엔드 설정 출력
   capture           기존 kyobo_app.py 호출(인터랙티브, 옵션 1/2/3)
@@ -498,7 +504,11 @@ def cmd_wviewer(args) -> int:
 
 
 def cmd_run(args) -> int:
-    """capture → ocr → (summarize) → merge → build 일괄 (대화형)."""
+    """capture → ocr → (summarize) → code → merge → build 일괄 (대화형).
+
+    ⚠️ 크롭·책 개요·챕터트리·발행은 여기 없다. 캡처 원본→발행까지 '한 번에' 는
+       scripts/process_book.sh (런북 §0.0). 이 함수만으로는 라이브 반영이 안 됨.
+    """
     rc = cmd_capture(args)
     if rc != 0: return rc
     rc = cmd_ocr(args)
