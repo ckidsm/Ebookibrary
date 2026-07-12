@@ -17,9 +17,11 @@ from PIL import Image
 import random as _random
 
 
-def _png(path: Path, size=(700, 500), color=(128, 128, 128), blank=False):
-    """content=결정적 시드 노이즈로 >80KB(같은 color=같은 해시). blank=solid(작은 파일).
-    실제 책 페이지(내용=큰 파일, 서로 다름)와 구분페이지(빈=작은 파일)를 흉내."""
+def _png(path: Path, size=None, color=(128, 128, 128), blank=False):
+    """content=결정적 시드 노이즈로 >MIN_PAGE_KB(같은 color=같은 해시). blank=solid(작은 파일).
+    크기·터미널크기 등은 하드코딩 대신 pc.QCRules 상수 참조(단일 관리처)."""
+    if size is None:
+        size = pc.QCRules.FIXTURE_PAGE_SIZE
     if blank:
         Image.new("RGB", size, color).save(path); return
     seed = color[0] * 65536 + color[1] * 256 + color[2]
@@ -50,7 +52,7 @@ class TestCaptureQC(unittest.TestCase):
             raws = self._book(tmp)
             for i in range(1, 5):
                 _png(raws / f"raw_{i:03d}.png", color=(10 * i, 20, 30))
-            _png(raws / "raw_005.png", size=(2560, 1440), color=(0, 0, 0), blank=True)  # 터미널 해상도
+            _png(raws / "raw_005.png", size=pc.QCRules.FIXTURE_TERMINAL_SIZE, color=(0, 0, 0), blank=True)  # 터미널 해상도
             rep = pc.CaptureQC(tmp).validate()
             self.assertFalse(rep["ok"])
             self.assertTrue(rep["terminal_suspect"])

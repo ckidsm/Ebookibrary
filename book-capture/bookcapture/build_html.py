@@ -184,6 +184,12 @@ body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; backgroun
 .modal-bar .mbar-page { color: #7ee787; font-size: 0.82rem; font-weight: 700; margin-left: 8px; }
 .modal-close { position: fixed; top: 16px; right: 24px; color: white; font-size: 2em; cursor: pointer; z-index: 1002; line-height: 1; }
 .modal-close:hover { color: #1abc9c; }
+/* 좌우 이전/다음 페이지 화살표 */
+.modal-nav { position: fixed; top: 50%; transform: translateY(-50%); z-index: 1002; width: 54px; height: 92px; display: flex; align-items: center; justify-content: center; font-size: 2.6em; color: #fff; background: rgba(20,28,40,0.5); cursor: pointer; user-select: none; border-radius: 10px; transition: background 0.12s, opacity 0.12s; }
+.modal-nav:hover { background: rgba(26,188,156,0.85); }
+.modal-nav.mnav-prev { left: 18px; }
+.modal-nav.mnav-next { right: 18px; }
+.modal-nav.disabled { opacity: 0.2; pointer-events: none; }
 .modal-text { position: fixed; top: 0; right: 0; width: 440px; max-width: 94vw; height: 100vh; background: #0f1722; color: #e2e8f0; z-index: 1001; box-shadow: -4px 0 24px rgba(0,0,0,0.5); padding: 62px 14px 16px; display: none; flex-direction: column; gap: 8px; overflow-y: auto; }
 .modal-text.open { display: flex; }
 .modal-text .mt-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; flex: none; }
@@ -282,25 +288,59 @@ function mApply() {
 }
 function mReset() { mScale = 1; mTx = 0; mTy = 0; mApply(); }
 function mZoom(f) { mScale = Math.min(8, Math.max(0.15, mScale * f)); mApply(); }
-function openModal(img) {
+// 전 페이지 목록(정렬) — 이전/다음 네비게이션용
+var mPageList = Array.prototype.map.call(
+    document.querySelectorAll('.page-image img'),
+    function(i) { return parseInt(i.getAttribute('data-page'), 10); }
+).filter(function(n) { return !isNaN(n); }).sort(function(a, b) { return a - b; });
+function _imgForPage(num) { return document.querySelector('.page-image img[data-page="' + num + '"]'); }
+function _updateNav(num) {
+    var i = mPageList.indexOf(num);
+    document.getElementById('mPrev').classList.toggle('disabled', i <= 0);
+    document.getElementById('mNext').classList.toggle('disabled', i < 0 || i >= mPageList.length - 1);
+}
+// 특정 페이지 번호를 모달에 로드(이미지·OCR·코드·메모 갱신) — 화살표/키보드가 재사용
+function loadModalPage(num) {
+    var img = _imgForPage(num);
+    if (!img) return false;
     modalImg.src = img.src;
-    mPage = img.getAttribute('data-page') || '';
-    mPageLabel.textContent = mPage ? ('Page ' + mPage) : '';
+    mPage = String(num);
+    mPageLabel.textContent = 'Page ' + num;
     mReset();
-    modal.classList.add('active');
-    var pad = String(mPage).padStart(3, '0');
+    var pad = String(num).padStart(3, '0');
     mOcrText.textContent = '불러오는 중…';
     fetch('ocr_text/page_' + pad + '.txt?t=' + Date.now())
         .then(function(r) { return r.ok ? r.text() : Promise.reject(); })
         .then(function(t) { mOcrText.textContent = (t || '').trim() || '(OCR 텍스트 없음)'; })
         .catch(function() { mOcrText.textContent = '(이 페이지의 OCR 텍스트를 불러오지 못했습니다)'; });
-    mMemo.value = localStorage.getItem('memo:' + SLUG + ':' + mPage) || '';
-    renderCode(mPage);
+    mMemo.value = localStorage.getItem('memo:' + SLUG + ':' + num) || '';
+    renderCode(String(num));
+    _updateNav(num);
+    return true;
+}
+function navPage(delta) {
+    var i = mPageList.indexOf(parseInt(mPage, 10));
+    if (i < 0) return;
+    var j = i + delta;
+    if (j < 0 || j >= mPageList.length) return;
+    loadModalPage(mPageList[j]);
+}
+function openModal(img) {
+    modal.classList.add('active');
+    loadModalPage(parseInt(img.getAttribute('data-page'), 10));
 }
 document.querySelectorAll('.page-image img').forEach(function(img) {
     img.addEventListener('click', function() { openModal(img); });
 });
 document.getElementById('modalClose').addEventListener('click', function() { modal.classList.remove('active'); });
+document.getElementById('mPrev').addEventListener('click', function() { navPage(-1); });
+document.getElementById('mNext').addEventListener('click', function() { navPage(1); });
+window.addEventListener('keydown', function(e) {
+    if (!modal.classList.contains('active')) return;
+    if (e.key === 'ArrowLeft') { navPage(-1); }
+    else if (e.key === 'ArrowRight') { navPage(1); }
+    else if (e.key === 'Escape') { modal.classList.remove('active'); }
+});
 document.getElementById('mZoomIn').onclick = function() { mZoom(1.2); };
 document.getElementById('mZoomOut').onclick = function() { mZoom(1 / 1.2); };
 document.getElementById('mZoomReset').onclick = mReset;
@@ -485,6 +525,8 @@ def build_html(
         <span class="mbar-page" id="mPageLabel"></span>
     </div>
     <span class="modal-close" id="modalClose" title="닫기 (Esc)">&times;</span>
+    <div class="modal-nav mnav-prev" id="mPrev" title="이전 페이지 (←)">&#8249;</div>
+    <div class="modal-nav mnav-next" id="mNext" title="다음 페이지 (→)">&#8250;</div>
     <div class="modal-stage" id="mStage">
         <img id="modalImg" src="" alt="" draggable="false">
     </div>

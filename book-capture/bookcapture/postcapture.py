@@ -20,11 +20,34 @@ import json
 from pathlib import Path
 
 # ── 규칙 상수 (KyoboCaptureStandard 후처리) ──────────────────────────────
-TERMINAL_DIMS = {(2560, 1440), (2560, 1600), (1920, 1080), (3456, 2234)}
-#   ↑ '메인 디스플레이 통째' 캡처로 오염됐을 때 나오는 흔한 외장/노트북 해상도.
-#     책 페이지는 교보 창 크롭이라 이 값과 일치하지 않음(일치하면 오염 의심).
-MIN_PAGE_KB = 80          # 이 미만이면 블랙/블랭크 의심
-DIVIDER_MAX_OCR_CHARS = 40  # OCR 공백 제거 후 이 미만이면 챕터/섹션 구분 페이지 후보
+# 하드코딩 금지: 모든 임계·픽스처는 이 클래스 한 곳에서만 관리(유지보수·리소스화).
+# 값 튜닝이 필요하면 여기(또는 QCRules.load_overrides 로 외부 JSON)만 고친다.
+class QCRules:
+    """캡처 후처리 규칙 상수(단일 관리처). 인스턴스 X — 클래스 상수로 참조."""
+    # '메인 디스플레이 통째' 캡처로 오염됐을 때 나오는 흔한 외장/노트북 해상도.
+    # 책 페이지는 교보 창 크롭이라 이 값과 일치하지 않음(일치하면 오염 의심).
+    TERMINAL_DIMS = frozenset({(2560, 1440), (2560, 1600), (1920, 1080), (3456, 2234)})
+    MIN_PAGE_KB = 80            # 이 미만이면 블랙/블랭크 의심
+    DIVIDER_MAX_OCR_CHARS = 40  # OCR 공백 제거 후 이 미만이면 챕터/섹션 구분 페이지 후보
+    OFF_DIM_RATIO = 0.05        # 주 해상도 외 페이지가 이 비율 초과면 '해상도 불일치'
+    OFF_DIM_MIN = 3             # (또는 이 장수 초과) — 표지 등 소수 예외 허용
+    TAIL_MIN_RUN = 2            # 꼬리 반복 최소 연속 수
+    DIVIDER_MERGE_GAP = 2       # 인접 구분페이지 병합 간격(±)
+
+    @classmethod
+    def load_overrides(cls, path):
+        """외부 JSON 으로 임계 오버라이드(리소스화). 예: {"MIN_PAGE_KB":100}. 없으면 무시."""
+        try:
+            data = json.loads(Path(path).read_text(encoding="utf-8"))
+            for k, v in data.items():
+                if hasattr(cls, k) and not k.startswith("_"):
+                    setattr(cls, k, frozenset(map(tuple, v)) if k == "TERMINAL_DIMS" else v)
+        except Exception:
+            pass
+
+    # 테스트/합성 픽스처 규격도 상수로(하드코딩 방지)
+    FIXTURE_PAGE_SIZE = (700, 500)      # 합성 '내용' 페이지 크기
+    FIXTURE_TERMINAL_SIZE = (2560, 1440)  # 합성 '터미널 오염' 크기(TERMINAL_DIMS 중 하나)
 
 
 def _md5(path: Path) -> str:
@@ -69,9 +92,9 @@ class CaptureQC:
             w, h = Image.open(f).size
             dims.setdefault((w, h), []).append(f.name)
             kb = f.stat().st_size // 1024
-            if kb < MIN_PAGE_KB:
+            if kb < QCRules.MIN_PAGE_KB:
                 small.append((f.name, kb))
-            if (w, h) in TERMINAL_DIMS:
+            if (w, h) in QCRules.TERMINAL_DIMS:
                 terminal.append((f.name, (w, h)))
             hashes.setdefault(_md5(f), []).append(f.name)
         dup_groups = {h: ns for h, ns in hashes.items() if len(ns) > 1}
@@ -82,11 +105,11 @@ class CaptureQC:
         if terminal:
             flags.append(f"⛔ 터미널 해상도 의심 {len(terminal)}장 (오염): {terminal[:3]}")
         if small:
-            flags.append(f"⚠ 블랙/블랭크 의심 {len(small)}장(<{MIN_PAGE_KB}KB): {small[:3]}")
+            flags.append(f"⚠ 블랙/블랭크 의심 {len(small)}장(<{QCRules.MIN_PAGE_KB}KB): {small[:3]}")
         if dup_groups:
             n = sum(len(v) for v in dup_groups.values())
             flags.append(f"⚠ 중복 페이지 {len(dup_groups)}그룹/{n}장 (꼬리 반복 등)")
-        if main_dim and off_dim > max(3, len(files) * 0.05):
+        if main_dim and off_dim > max(QCRules.OFF_DIM_MIN, len(files) * QCRules.OFF_DIM_RATIO):
             flags.append(f"⚠ 해상도 불일치 {off_dim}장 (주 {main_dim[0]}x{main_dim[1]} 외)")
         return {
             "ok": not flags,
@@ -101,7 +124,7 @@ class CaptureQC:
         }
 
 
-def trim_duplicate_tail(book_dir, min_run: int = 2, dry_run: bool = False) -> dict:
+def trim_duplicate_tail(book_dir, min_run: int = QCRules.TAIL_MIN_RUN, dry_run: bool = False) -> dict:
     """책 끝 반복 캡처(동일 해시 연속) 제거.
 
     규칙: 뒤에서부터 같은 해시가 min_run 이상 연속되면 그건 '마지막 페이지 재캡처'.
@@ -146,7 +169,7 @@ class ChapterDetector:
     detect() → 구분 페이지 리스트(경계). scaffold_chapters() → chapters.json 뼈대 생성.
     """
 
-    def __init__(self, book_dir, max_ocr_chars: int = DIVIDER_MAX_OCR_CHARS):
+    def __init__(self, book_dir, max_ocr_chars: int = QCRules.DIVIDER_MAX_OCR_CHARS):
         self.book_dir = Path(book_dir)
         self.ocr_dir = self.book_dir / "summary" / "ocr_text"
         self.max_ocr_chars = max_ocr_chars
@@ -177,7 +200,7 @@ class ChapterDetector:
         # 인접(±2) 구분 페이지 병합 → 대표 경계
         bounds = []
         for d in divs:
-            if bounds and d - bounds[-1] <= 2:
+            if bounds and d - bounds[-1] <= QCRules.DIVIDER_MERGE_GAP:
                 continue
             bounds.append(d)
         chapters = []
