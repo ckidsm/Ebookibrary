@@ -5,20 +5,34 @@
 
 ## 0. 표준 파이프라인 (순서대로 — 이것만 따라 하면 됨)
 
+### 0.0 ⭐ 한 번에 (2026-07-12 확정 — 다음부터 이거로)
+캡처 원본(`source_raws/`)과 `summary/chapters.json`(장 제목·경계 = 목차에서 작성)만 있으면 **한 명령으로 발행까지**:
+```bash
+NAS_PASS=... ./scripts/process_book.sh <SLUG> --chrome 20,20,20,20 --publish
+```
+`crop → qc → trim-tail → ocr → summarize → merge → build → code(코드추출) → book_overview(책 개요) → finalize(챕터트리+표) → 발행(요약파일 + page/thumbs tar 스트리밍)` 전 과정을 순서대로 실행한다.
+- **유일한 사람 입력**: `summary/chapters.json`(장 제목·시작/끝 페이지). 없으면 `chapters-detect` 로 뼈대 자동 생성하되 제목은 비어 있으니 채우는 걸 권장(책 개요·트리 품질).
+- 특정 단계부터 다시: `--from build`(또는 code/overview/finalize/publish). 재발행만: `--from publish --publish`.
+- 앱 raw 는 `--chrome 20,20,20,20`(§3), 웹뷰어 raw 는 `--chrome` 생략(기본값=웹뷰어용).
+
+### 0.1 단계 표 (process_book.sh 가 자동 수행 — 개별 실행도 가능)
 | # | 단계 | 명령/도구 | 산출물 |
 |---|---|---|---|
-| 1 | Raw 캡처 | `scripts/app_capture_raws.py`(Mac앱) 또는 `scripts/mac_wviewer_capture.py`(웹뷰어) | `raws/raw_NNN.png` |
-| 2 | 크롭+썸네일 | `scripts/crop_book.py <raws> <out> --thumb 1800` | `page_NNN.png` + `thumbs/` |
+| 1 | Raw 캡처 | `scripts/app_capture_raws.py`(Mac앱) 또는 `scripts/mac_wviewer_capture.py`(웹뷰어) | `source_raws/raw_NNN.png` |
+| 2 | 크롭+썸네일 | `scripts/crop_book.py <raws> <out> --chrome 20,20,20,20 --thumb 1800` | `page_NNN.png` + `thumbs/` |
+| 2.5 | QC·중복꼬리 | `bookcapture qc` · `bookcapture trim-tail` | 품질 리포트, 꼬리 정리 |
 | 3 | OCR | `python -m bookcapture ocr --book-dir <책>` | `summary/ocr_text/page_NNN.txt` |
 | 4 | AI 요약 | `python -m bookcapture summarize --book-dir <책>` | `summary/batch_*.json` |
 | 4.5 | **소스코드 추출** | `python -m bookcapture code --book-dir <책>` | `summary/code_blocks.json` |
 | 5 | merge+빌드 | `python -m bookcapture merge && ... build` | 깨끗한 `summary/index.html`(리치 뷰어+코드 패널 포함) |
 | 6 | 챕터·표 정의 | 사람이 작성: `summary/chapters.json`, `summary/page_extras.json` | 정의 JSON |
+| 6.5 | **책 개요 생성** | `scripts/gen_book_overview.py <책>` (전체요약+장별 1장, Claude tool_use) | `summary/book_overview.json` |
 | 7 | **최종화(주입)** | `python scripts/finalize_book.py summary/` | 챕터트리+표정리본 든 `index.html` |
-| 8 | **NAS 발행** | `NAS_PASS=... scripts/publish_book.sh <SLUG> summary/index.html summary/page_extras.json summary/chapters.json summary/code_blocks.json` | 라이브 반영 |
-| 9 | 원본 보관 | raw 전량 → 책 폴더 `source_raws/` (sudo cp) | 재크롭 대비 |
-| 10 | 검증 | 라이브 `grep -o 'class="ptable"'` 개수 + Playwright 렌더(팝업 뷰어·코드 패널) 육안 | — |
+| 8 | **NAS 발행** | `scripts/publish_book.sh`(요약파일) + `scripts/publish_images.sh`(page/thumbs tar) | 라이브 반영 |
+| 9 | 원본 보관 | `publish_images.sh <SLUG> --raws`(source_raws 함께) | 재크롭 대비 서버 보관 |
+| 10 | 검증 | 라이브 HTTP 200 + Playwright/브라우저 렌더(책 개요·팝업 뷰어·코드 패널) 육안 | — |
 
+- **책 개요(6.5)**: 첫 페이지 `📋 책 개요` = **전체 요약 1개 + 챕터별 상세 요약(각 ~1페이지, 8챕터면 ~8장 분량)** + 대상독자·주제·용어·핵심페이지·학습가이드. `chapters.json`+`pages_data.json`(검증된 페이지 요약)에서 `gen_book_overview.py` 가 Claude **tool_use**(구조화 출력 → JSON 이스케이프 문제 0)로 생성. 렌더는 `build_html.ViewerLayout` 이웃의 `_build_overview`(`chapter_digests` 필드). 기준: 클로드코드 뷰어와 동일 구조.
 - **3~5는 `python -m bookcapture run` 한 번으로도** (capture→ocr→summarize→**code**→merge→build). 스킵: `--no-summarize`, `--no-code`.
 - **페이지별 팝업 뷰어(표준)**: `build`가 리치 모달을 생성 — 좌상단 📄 텍스트 토글·줌(−/100%/+/원복), 우측 `📄 OCR 텍스트`(복사, `ocr_text/` fetch)·`💻 소스코드`(언어별 C#/Python 코드 패널, `code_blocks.json` fetch)·`📝 메모`(페이지별 localStorage 자동저장). **build_html.py는 로컬·벤더드(`kyobo-bridge/app/processing/`) 동일 버전 유지**(웹 분석도 같은 뷰어 생성).
 - **소스코드 추출(4.5)**: OCR은 코드 품질 낮음(문자오류·들여쓰기 손실) → `bookcapture/extract_code.py`가 Claude 비전으로 페이지 이미지에서 언어별 코드를 정밀 추출. 코드 자동감지·resume·429재시도. 웹 파이프라인은 `upload_processor.py`가 summarize 뒤 자동 실행.
