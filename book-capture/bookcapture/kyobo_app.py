@@ -819,15 +819,21 @@ class KyoboAppScreenshot:
             print(f"⚠ 크롭 후처리 실패(원본 유지): {e}")
 
     def capture_app_window(self, filepath):
-        """교보eBook 앱 창만 캡처 (Quartz WID + screencapture -l).
-        외장 모니터·다른 Space 도 OK. frontmost 무관.
-        캡처 성공 시 _postprocess_capture 로 raw 보존 + 표준 크롭.
+        """교보eBook 앱 창만 캡처 — **WID(screencapture -l) 전용**.
+
+        ⭐ 오염 방지 근본 설계(2026-07-13): WID 캡처는 **occlusion-safe** = 교보 창 자체의 내용만
+        찍는다(알림배너·다른 창·터미널이 위에 떠 있어도 안 섞임). 그래서 **구조적으로 오염이 불가능**하다.
+        (책 페이지에 코드·터미널 출력·그래프가 인쇄돼 있어도 그건 책 내용이지 오염이 아니다.)
+
+        옛 `-R` 영역 폴백은 제거했다: 교보가 최전면이 아닐 때 그 화면 좌표의 **다른 창(터미널)** 을 찍는
+        유일한 오염원이었고, '내용으로 오염 판별'(비전)은 프로그래밍 책의 코드와 오염을 구분 못 해
+        풍선효과/오탐(코드 페이지 삭제)을 일으킨다. → 방식 자체를 WID 로 고정해 오염원을 없앤다.
+
+        WID 실패(교보 최전면 아님/백킹 해제)면 재활성화 후 재시도, 그래도 안 되면 **그 페이지만 건너뜀**
+        (가비지 캡처 금지). 캡처 성공 시 _finalize_page 로 raw 보존 + 표준 크롭.
         """
         if self.system == "Darwin":
             self._last_capture_method = None
-            # ⭐ WID(-l) 를 **우선 3회** 시도 — WID 캡처는 occlusion-safe(창 내용만, 알림·다른 창 제외)라
-            #    항상 깨끗하다. 교보 최전면이면 성공. -R 영역 폴백은 알림/터미널 오염 위험이라 **최후에 1회만**.
-            #    (2026-07-13: -R 로 18~25p 에 알림·터미널 섞임 → WID 우선으로 오염 최소화.)
             for attempt in range(CaptureTuning.CAPTURE_ATTEMPTS):
                 self._ensure_frontmost()  # 최전면 확보(창 비활성 시 WID 캡처 실패 방지)
                 time.sleep(CaptureTuning.BACKING_WAIT_FIRST if attempt == 0
@@ -840,35 +846,12 @@ class KyoboAppScreenshot:
                             "-x", "-o", "-t", "png", str(filepath),
                         ], check=True)
                         if os.path.exists(filepath) and os.path.getsize(filepath) > CaptureTuning.MIN_CAPTURE_BYTES:
-                            self._last_capture_method = "wid"  # 깨끗(occlusion-safe)
+                            self._last_capture_method = "wid"  # occlusion-safe = 깨끗
                             return True  # raw 반환 — 크롭/raw보존은 _finalize_page 에서
                     except subprocess.CalledProcessError as e:
                         print(f"⚠️  WID({wid}) 캡처 실패: {e}")
 
-            # WID 3회 실패 → **최후 1회** 영역(-R). ⚠️ **교보가 최전면일 때만** — 아니면 그 화면 좌표엔
-            # 다른 창(터미널·알림)이 있어 오염됨(page_369 사고). 최전면 아니면 -R 생략(오염 방지).
-            if self._is_kyobo_frontmost():
-                bounds = self._find_kyobo_window_bounds() or self._get_bounds_via_system_events()
-                if bounds:
-                    x, y, w, h = bounds
-                    tb = CaptureTuning.TITLE_BAR_H
-                    if h > tb + CaptureTuning.MIN_BOOK_AREA_H:  # 책영역이 충분히 남을 때만 타이틀바 크롭
-                        y += tb; h -= tb
-                    try:
-                        subprocess.run([
-                            "/usr/sbin/screencapture", "-R", f"{x},{y},{w},{h}",
-                            "-x", "-t", "png", str(filepath),
-                        ], check=True)
-                        if os.path.exists(filepath) and os.path.getsize(filepath) > CaptureTuning.MIN_CAPTURE_BYTES:
-                            self._last_capture_method = "region"  # ⚠ 오염 가능(알림/오버레이) → 인라인 QC 확인
-                            return True
-                    except subprocess.CalledProcessError as e:
-                        print(f"⚠️  영역 캡처 실패: {e}")
-            else:
-                print("   ⚠ 교보가 최전면 아님 → -R 영역 캡처 생략(터미널 등 오염 방지)")
-
-            print("⛔ 교보 창 특정 실패(WID 3회·영역) → 이 페이지 건너뜀. "
-                  "교보 앱을 '창 모드(비-전체화면)'로 **최전면 유지**하세요.")
+            print("⛔ WID 캡처 3회 실패(교보 최전면/창모드 확인) → 이 페이지 건너뜀(오염 방지 위해 -R 안 씀).")
             return False
         else:
             # Windows

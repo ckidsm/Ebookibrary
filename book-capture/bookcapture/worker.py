@@ -273,7 +273,6 @@ def run_one(bridge: str, job: dict) -> None:
             print(f"[worker] ⚠ salecmdtid 없음 — 사용자가 책 직접 펼친 상태 가정")
         steps = [
             cap,
-            ["contamination-check", "--book-dir", str(book_dir), "--remove"],  # 커서·알림·터미널 오염 제거
             ["ocr", "--book-dir", str(book_dir)],
             ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
             ["code", "--book-dir", str(book_dir)],

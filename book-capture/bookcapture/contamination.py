@@ -19,7 +19,7 @@ _TOOL = {
     "input_schema": {"type": "object", "properties": {
         "cursor": {"type": "boolean", "description": "마우스 커서(화살표 포인터)가 보이면 true"},
         "notification": {"type": "boolean", "description": "macOS 알림배너·토스트·팝업·다이얼로그가 보이면 true"},
-        "non_book": {"type": "boolean", "description": "책 본문이 아닌 것(터미널·바탕화면·다른 앱 창)이 섞였으면 true"},
+        "non_book": {"type": "boolean", "description": "⚠️실제 macOS 앱 창(터미널·코드에디터·바탕화면·독/메뉴바)이 캡처에 섞였으면 true. **주의: 프로그래밍 책은 본문에 코드·터미널 출력(Epoch/loss 로그)·matplotlib를 인쇄로 포함한다 — 그건 책 콘텐츠이지 오염이 아니다(false).** 책 페이지 레이아웃 안의 코드/출력은 non_book=false. 오직 별도 앱 창(창 테두리·OS UI)이 실제로 찍혔을 때만 true.",},
         "note": {"type": "string", "description": "한 줄 근거"},
     }, "required": ["cursor", "notification", "non_book", "note"]},
 }
@@ -39,8 +39,9 @@ def _check_one(key, model, path):
         "model": model, "max_tokens": 250,
         "messages": [{"role": "user", "content": [
             {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": _b64(path)}},
-            {"type": "text", "text": "이 캡처 이미지에 마우스 커서·알림배너·토스트/팝업·비책(터미널 등) 콘텐츠가 "
-                                     "섞였는지 report_contamination 으로 판정."},
+            {"type": "text", "text": "이 캡처가 **실제 다른 앱 창(macOS 터미널/코드에디터/바탕화면)**이나 마우스 커서·알림배너로 오염됐는지 판정. "
+                                     "⚠️ 이건 프로그래밍(머신러닝) 책이라 본문에 코드·터미널 출력·그래프가 인쇄로 들어있다 — 그건 정상 책 콘텐츠(오염 아님). "
+                                     "책 페이지 레이아웃 안의 코드는 절대 non_book 아님. report_contamination 로 판정."},
         ]}],
         "tools": [_TOOL], "tool_choice": {"type": "tool", "name": "report_contamination"},
     }).encode()
@@ -102,7 +103,6 @@ def check_contamination(book_dir, cfg, model=AnthropicAPI.VISION_MODEL, remove=F
             if remove:
                 f.unlink(missing_ok=True)
                 (book_dir / "thumbs" / f.name).unlink(missing_ok=True)
-                (book_dir / "source_raws" / f"raw_{n:03d}.png").unlink(missing_ok=True)
                 removed.append(n)
     print(f"[contamination] {len(pages)}장 검사 · 오염 {len(flagged)}장" +
           (f" · 제거 {len(removed)}장" if remove else ""))
