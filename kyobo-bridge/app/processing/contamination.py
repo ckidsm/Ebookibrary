@@ -9,10 +9,11 @@
 CLI: bookcapture contamination-check --book-dir <책> [--remove]
 """
 from __future__ import annotations
+from .anthropic_api import AnthropicAPI
 import io, base64, json, time, urllib.request, urllib.error
 from pathlib import Path
 
-API_URL = "https://api.anthropic.com/v1/messages"
+API_URL = AnthropicAPI.API_URL
 _TOOL = {
     "name": "report_contamination", "description": "캡처 오염 판정",
     "input_schema": {"type": "object", "properties": {
@@ -24,7 +25,7 @@ _TOOL = {
 }
 
 
-def _b64(path, max_w=1100):
+def _b64(path, max_w=AnthropicAPI.VISION_MAX_W):
     from PIL import Image
     im = Image.open(path).convert("RGB")
     if im.width > max_w:
@@ -44,22 +45,22 @@ def _check_one(key, model, path):
         "tools": [_TOOL], "tool_choice": {"type": "tool", "name": "report_contamination"},
     }).encode()
     req = urllib.request.Request(API_URL, data=body, headers={
-        "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"})
-    for attempt in range(4):
+        "x-api-key": key, "anthropic-version": AnthropicAPI.API_VERSION, "content-type": "application/json"})
+    for attempt in range(AnthropicAPI.MAX_RETRIES):
         try:
-            d = json.load(urllib.request.urlopen(req, timeout=60))
+            d = json.load(urllib.request.urlopen(req, timeout=AnthropicAPI.TIMEOUT_QUICK))
             for b in d.get("content", []):
                 if b.get("type") == "tool_use":
                     return b["input"]
             return None
         except urllib.error.HTTPError as e:
-            if e.code in (429, 500, 502, 503, 529) and attempt < 3:
-                time.sleep(2 ** attempt * 2); continue
+            if AnthropicAPI.is_retryable(e.code) and attempt < AnthropicAPI.MAX_RETRIES - 1:
+                time.sleep(AnthropicAPI.BACKOFF_BASE ** attempt * 2); continue
             raise
     return None
 
 
-def is_contaminated_page(path, cfg, model="claude-haiku-4-5", brightness_gate=125):
+def is_contaminated_page(path, cfg, model=AnthropicAPI.VISION_MODEL, brightness_gate=125):
     """캡처 1장이 오염(커서·알림·비책)인지 판정 → (bool, reasons).
     싼 사전필터: 책 페이지는 밝음(흰 배경, mean≥gate) → 비전 생략(오염 아님).
     어두운 캡처(터미널 등)만 비전 확인 → 비용·시간 절약. 인라인 재캡처용."""
@@ -80,7 +81,7 @@ def is_contaminated_page(path, cfg, model="claude-haiku-4-5", brightness_gate=12
     return bool(reasons), reasons
 
 
-def check_contamination(book_dir, cfg, model="claude-haiku-4-5", remove=False):
+def check_contamination(book_dir, cfg, model=AnthropicAPI.VISION_MODEL, remove=False):
     """책 폴더 page_*.png 전수 오염 검사. 반환 {checked, flagged:[{page,reasons,note}], removed:[]}.
     remove=True 면 오염 페이지 + thumbs/ + source_raws/ 대응분 삭제."""
     book_dir = Path(book_dir)

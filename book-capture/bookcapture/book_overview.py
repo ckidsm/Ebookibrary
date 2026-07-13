@@ -9,15 +9,16 @@ Claude **tool_use**(구조화 출력) → 인용부호/줄바꿈 이스케이프
 CLI(`bookcapture overview`)·scripts/gen_book_overview.py·백엔드 upload_processor 가 공유.
 """
 from __future__ import annotations
+from .anthropic_api import AnthropicAPI
 import json, re, time, urllib.request, urllib.error
 from pathlib import Path
 
-API_URL = "https://api.anthropic.com/v1/messages"
+API_URL = AnthropicAPI.API_URL
 
 
 def _call_tool(cfg, system, user, tool, max_tokens=2600, images=None):
     key = cfg.api_key
-    model = getattr(cfg, "model", "claude-sonnet-4-5") or "claude-sonnet-4-5"
+    model = getattr(cfg, "model", None) or AnthropicAPI.DEFAULT_MODEL
     content = list(images or []) + [{"type": "text", "text": user}]
     body = json.dumps({
         "model": model, "max_tokens": max_tokens, "system": system,
@@ -25,10 +26,10 @@ def _call_tool(cfg, system, user, tool, max_tokens=2600, images=None):
         "tools": [tool], "tool_choice": {"type": "tool", "name": tool["name"]},
     }).encode()
     req = urllib.request.Request(API_URL, data=body, headers={
-        "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"})
-    for attempt in range(4):
+        "x-api-key": key, "anthropic-version": AnthropicAPI.API_VERSION, "content-type": "application/json"})
+    for attempt in range(AnthropicAPI.MAX_RETRIES):
         try:
-            r = urllib.request.urlopen(req, timeout=180)
+            r = urllib.request.urlopen(req, timeout=AnthropicAPI.TIMEOUT_TEXT)
             d = json.load(r)
             u = d.get("usage", {})
             for b in d.get("content", []):
@@ -36,8 +37,8 @@ def _call_tool(cfg, system, user, tool, max_tokens=2600, images=None):
                     return b["input"], u.get("input_tokens", 0), u.get("output_tokens", 0)
             raise RuntimeError("tool_use 응답 없음")
         except urllib.error.HTTPError as e:
-            if e.code in (429, 500, 502, 503, 529) and attempt < 3:
-                time.sleep(2 ** attempt * 2); continue
+            if AnthropicAPI.is_retryable(e.code) and attempt < AnthropicAPI.MAX_RETRIES - 1:
+                time.sleep(AnthropicAPI.BACKOFF_BASE ** attempt * 2); continue
             raise RuntimeError(f"HTTP {e.code}: {e.read().decode()[:200]}")
     raise RuntimeError("재시도 초과")
 

@@ -13,10 +13,11 @@ chapters.json = [{num,title,start,end,summary,topics}] (summary/topics 는 비�
 start=표지 페이지, end=다음 장 표지 직전. 후보가 ~10장이라 비전 호출 소수.
 """
 from __future__ import annotations
+from .anthropic_api import AnthropicAPI
 import io, base64, json, time, urllib.request, urllib.error
 from pathlib import Path
 
-API_URL = "https://api.anthropic.com/v1/messages"
+API_URL = AnthropicAPI.API_URL
 
 
 def _page_files(book_dir: Path):
@@ -55,7 +56,7 @@ def cover_candidates(book_dir, min_frac=0.30):
     return cands
 
 
-def _img_b64(path, max_w=1100):
+def _img_b64(path, max_w=AnthropicAPI.VISION_MAX_W):
     from PIL import Image
     im = Image.open(path).convert("RGB")
     if im.width > max_w:
@@ -94,10 +95,10 @@ def _read_cover(key, model, path):
         "tools": [tool], "tool_choice": {"type": "tool", "name": "report_cover"},
     }).encode()
     req = urllib.request.Request(API_URL, data=body, headers={
-        "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"})
-    for attempt in range(4):
+        "x-api-key": key, "anthropic-version": AnthropicAPI.API_VERSION, "content-type": "application/json"})
+    for attempt in range(AnthropicAPI.MAX_RETRIES):
         try:
-            r = urllib.request.urlopen(req, timeout=90)
+            r = urllib.request.urlopen(req, timeout=AnthropicAPI.TIMEOUT_VISION)
             d = json.load(r)
             for b in d.get("content", []):
                 if b.get("type") == "tool_use":
@@ -105,8 +106,8 @@ def _read_cover(key, model, path):
                     return b["input"], u.get("input_tokens", 0), u.get("output_tokens", 0)
             return None, 0, 0
         except urllib.error.HTTPError as e:
-            if e.code in (429, 500, 502, 503, 529) and attempt < 3:
-                time.sleep(2 ** attempt * 2); continue
+            if AnthropicAPI.is_retryable(e.code) and attempt < AnthropicAPI.MAX_RETRIES - 1:
+                time.sleep(AnthropicAPI.BACKOFF_BASE ** attempt * 2); continue
             raise
     return None, 0, 0
 
@@ -119,7 +120,7 @@ def generate_chapters(book_dir, cfg, min_frac=0.30, include_sections=False):
     last_page = int(files[-1].stem.split("_")[1]) if files else 0
     cands = cover_candidates(book_dir, min_frac=min_frac)
     key = cfg.api_key
-    model = getattr(cfg, "model", "claude-sonnet-4-5") or "claude-sonnet-4-5"
+    model = getattr(cfg, "model", None) or AnthropicAPI.DEFAULT_MODEL
     covers = []
     ci = co = 0
     for c in cands:

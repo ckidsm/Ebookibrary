@@ -8,12 +8,13 @@ code_blocks.json 형식: { "24": [{"lang":"C#","title":"예제 2.7 ...","code":"
 - 코드 자동감지(pages=None) 또는 지정. 증분 저장 + resume. 429/5xx 재시도.
 """
 from __future__ import annotations
+from .anthropic_api import AnthropicAPI
 import sys, json, base64, io, time, re, urllib.request, urllib.error
 from pathlib import Path
 
-API_URL = "https://api.anthropic.com/v1/messages"
-API_VERSION = "2023-06-01"
-_PRICES = {"claude-sonnet-4-5": (3.0, 15.0), "claude-haiku-4-5": (1.0, 5.0), "claude-opus-4": (15.0, 75.0)}
+API_URL = AnthropicAPI.API_URL
+API_VERSION = AnthropicAPI.API_VERSION
+_PRICES = AnthropicAPI.PRICES
 
 _SYS = ("You extract SOURCE CODE from a Korean programming-book page image. "
         "The book teaches OpenCV with C# (OpenCvSharp) and Python (cv2/numpy) examples, "
@@ -30,7 +31,7 @@ _CS = re.compile(r'Cv2\.|using\s+OpenCvSharp|Console\.|new\s+Mat|videoWriter\.|n
 _PY = re.compile(r'cv2\.|import\s+cv2|import\s+numpy|np\.|def\s+\w+\(|print\(|plt\.')
 
 
-def _img_b64(path, max_w=1500):
+def _img_b64(path, max_w=AnthropicAPI.CODE_MAX_W):
     from PIL import Image
     im = Image.open(path).convert("RGB")
     if im.width > max_w:
@@ -53,20 +54,20 @@ def _call(api_key, model, b64):
         headers={"x-api-key": api_key, "anthropic-version": API_VERSION, "content-type": "application/json"})
     for attempt in range(1, 5):
         try:
-            with urllib.request.urlopen(req, timeout=90) as r:
+            with urllib.request.urlopen(req, timeout=AnthropicAPI.TIMEOUT_VISION) as r:
                 d = json.loads(r.read())
             txt = "".join(b.get("text", "") for b in d.get("content", []))
             u = d.get("usage", {})
             return _extract_json(txt), u.get("input_tokens", 0), u.get("output_tokens", 0)
         except urllib.error.HTTPError as e:
             msg = e.read().decode()[:200]
-            if e.code in (429, 500, 502, 503, 504) and attempt < 4:
-                time.sleep(2 ** attempt); continue
+            if AnthropicAPI.is_retryable(e.code) and attempt < 4:
+                time.sleep(AnthropicAPI.BACKOFF_BASE ** attempt); continue
             if "credit balance is too low" in msg:
                 raise RuntimeError("credit balance is too low")
             raise RuntimeError(f"HTTP {e.code}: {msg}")
         except Exception:
-            if attempt < 4: time.sleep(2 ** attempt); continue
+            if attempt < 4: time.sleep(AnthropicAPI.BACKOFF_BASE ** attempt); continue
             raise
     raise RuntimeError("재시도 초과")
 
@@ -89,8 +90,8 @@ def extract_code_blocks(book_dir: Path, ai, pages=None, progress=True) -> dict:
     if not ai or not getattr(ai, "api_key", ""):
         print("[code] API 키 없음 — 코드 추출 건너뜀", file=sys.stderr)
         return {"pages": 0, "blocks": 0, "cost_usd": 0.0, "done": False}
-    model = getattr(ai, "model", "claude-sonnet-4-5")
-    ip, op = _PRICES.get(model, (3.0, 15.0))
+    model = getattr(ai, "model", None) or AnthropicAPI.DEFAULT_MODEL
+    ip, op = AnthropicAPI.price(model)
     if pages is None:
         pages = detect_code_pages(sd)
     out = sd / "code_blocks.json"

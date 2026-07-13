@@ -14,6 +14,7 @@ API: Anthropic Messages API (urllib 만 사용, 의존성 0).
 """
 
 from __future__ import annotations
+from .anthropic_api import AnthropicAPI
 
 import json
 import re
@@ -27,8 +28,8 @@ from typing import Iterable
 
 from .settings import AiCfg
 
-API_URL = "https://api.anthropic.com/v1/messages"
-API_VERSION = "2023-06-01"
+API_URL = AnthropicAPI.API_URL
+API_VERSION = AnthropicAPI.API_VERSION
 
 
 SYSTEM_PROMPT = """\
@@ -83,17 +84,10 @@ class SummarizeResult:
 
 
 # Claude 가격표 (per 1M tokens, 2026-05 시점 — 변경 시 갱신)
-_PRICES = {
-    "claude-sonnet-4-5":   (3.0, 15.0),
-    "claude-sonnet-4-7":   (3.0, 15.0),
-    "claude-haiku-4-5":    (1.0,  5.0),
-    "claude-haiku-4-5-20251001": (1.0, 5.0),
-    "claude-opus-4":      (15.0, 75.0),
-    "claude-opus-4-7":    (15.0, 75.0),
-}
+_PRICES = AnthropicAPI.PRICES
 
 def _price(model: str, in_tok: int, out_tok: int) -> float:
-    in_p, out_p = _PRICES.get(model, (3.0, 15.0))
+    in_p, out_p = AnthropicAPI.price(model)
     return in_tok / 1_000_000 * in_p + out_tok / 1_000_000 * out_p
 
 
@@ -187,7 +181,7 @@ def summarize_page(
     last_err = None
     for attempt in range(1, max_retries + 1):
         try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
+            with urllib.request.urlopen(req, timeout=AnthropicAPI.TIMEOUT_QUICK) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))
                 text = payload["content"][0]["text"]
                 usage = payload.get("usage", {})
@@ -209,7 +203,7 @@ def summarize_page(
         except urllib.error.HTTPError as e:
             body_txt = e.read().decode("utf-8", errors="replace")[:300]
             last_err = f"HTTP {e.code} {e.reason}: {body_txt}"
-            if e.code in (429, 500, 502, 503, 504) and attempt < max_retries:
+            if AnthropicAPI.is_retryable(e.code) and attempt < max_retries:
                 wait = 2 ** attempt
                 print(f"[summarize] {last_err} — {wait}초 후 재시도 ({attempt}/{max_retries})")
                 time.sleep(wait)
