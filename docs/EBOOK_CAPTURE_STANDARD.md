@@ -5,42 +5,26 @@
 
 ## 0. 표준 파이프라인 (순서대로 — 이것만 따라 하면 됨)
 
-### 0.0 ⭐ 한 번에 (2026-07-12 확정 — 다음부터 이거로)
-캡처 원본(`source_raws/`)과 `summary/chapters.json`(장 제목·경계 = 목차에서 작성)만 있으면 **한 명령으로 발행까지**:
-```bash
-NAS_PASS=... ./scripts/process_book.sh <SLUG> --chrome 20,20,20,20 --publish
-```
-`crop → qc → trim-tail → ocr → summarize → merge → build → code(코드추출) → book_overview(책 개요) → finalize(챕터트리+표) → 발행(요약파일 + page/thumbs tar 스트리밍)` 전 과정을 순서대로 실행한다.
-- **유일한 사람 입력**: `summary/chapters.json`(장 제목·시작/끝 페이지). 없으면 `chapters-detect` 로 뼈대 자동 생성하되 제목은 비어 있으니 채우는 걸 권장(책 개요·트리 품질).
-- 특정 단계부터 다시: `--from build`(또는 code/overview/finalize/publish). 재발행만: `--from publish --publish`.
-- 앱 raw 는 `--chrome 20,20,20,20`(§3), 웹뷰어 raw 는 `--chrome` 생략(기본값=웹뷰어용).
-
-### 0.1 단계 표 (process_book.sh 가 자동 수행 — 개별 실행도 가능)
 | # | 단계 | 명령/도구 | 산출물 |
 |---|---|---|---|
-| 1 | Raw 캡처 | `scripts/app_capture_raws.py`(Mac앱) 또는 `scripts/mac_wviewer_capture.py`(웹뷰어) | `source_raws/raw_NNN.png` |
-| 2 | 크롭+썸네일 | `scripts/crop_book.py <raws> <out> --chrome 20,20,20,20 --thumb 1800` | `page_NNN.png` + `thumbs/` |
-| 2.5 | QC·중복꼬리 | `bookcapture qc` · `bookcapture trim-tail` | 품질 리포트, 꼬리 정리 |
+| 1 | Raw 캡처 | `scripts/app_capture_raws.py`(Mac앱) 또는 `scripts/mac_wviewer_capture.py`(웹뷰어) | `raws/raw_NNN.png` |
+| 2 | 크롭+썸네일 | `scripts/crop_book.py <raws> <out> --thumb 1800` | `page_NNN.png` + `thumbs/` |
 | 3 | OCR | `python -m bookcapture ocr --book-dir <책>` | `summary/ocr_text/page_NNN.txt` |
 | 4 | AI 요약 | `python -m bookcapture summarize --book-dir <책>` | `summary/batch_*.json` |
 | 4.5 | **소스코드 추출** | `python -m bookcapture code --book-dir <책>` | `summary/code_blocks.json` |
 | 5 | merge+빌드 | `python -m bookcapture merge && ... build` | 깨끗한 `summary/index.html`(리치 뷰어+코드 패널 포함) |
 | 6 | 챕터·표 정의 | 사람이 작성: `summary/chapters.json`, `summary/page_extras.json` | 정의 JSON |
-| 6.5 | **책 개요 생성** | `scripts/gen_book_overview.py <책>` (전체요약+장별 1장, Claude tool_use) | `summary/book_overview.json` |
 | 7 | **최종화(주입)** | `python scripts/finalize_book.py summary/` | 챕터트리+표정리본 든 `index.html` |
-| 8 | **NAS 발행** | `scripts/publish_book.sh`(요약파일) + `scripts/publish_images.sh`(page/thumbs tar) | 라이브 반영 |
-| 9 | 원본 보관 | `publish_images.sh <SLUG> --raws`(source_raws 함께) | 재크롭 대비 서버 보관 |
-| 10 | 검증 | 라이브 HTTP 200 + Playwright/브라우저 렌더(책 개요·팝업 뷰어·코드 패널) 육안 | — |
+| 8 | **NAS 발행** | `NAS_PASS=... scripts/publish_book.sh <SLUG> summary/index.html summary/page_extras.json summary/chapters.json summary/code_blocks.json` | 라이브 반영 |
+| 9 | 원본 보관 | raw 전량 → 책 폴더 `source_raws/` (sudo cp) | 재크롭 대비 |
+| 10 | 검증 | 라이브 `grep -o 'class="ptable"'` 개수 + Playwright 렌더(팝업 뷰어·코드 패널) 육안 | — |
 
-- **책 개요(6.5)**: 첫 페이지 `📋 책 개요` = **전체 요약 1개 + 챕터별 상세 요약(각 ~1페이지, 8챕터면 ~8장 분량)** + 대상독자·주제·용어·핵심페이지·학습가이드. `chapters.json`+`pages_data.json`(검증된 페이지 요약)에서 `gen_book_overview.py` 가 Claude **tool_use**(구조화 출력 → JSON 이스케이프 문제 0)로 생성. 렌더는 `build_html.ViewerLayout` 이웃의 `_build_overview`(`chapter_digests` 필드). 기준: 클로드코드 뷰어와 동일 구조.
 - **3~5는 `python -m bookcapture run` 한 번으로도** (capture→ocr→summarize→**code**→merge→build). 스킵: `--no-summarize`, `--no-code`.
 - **페이지별 팝업 뷰어(표준)**: `build`가 리치 모달을 생성 — 좌상단 📄 텍스트 토글·줌(−/100%/+/원복), 우측 `📄 OCR 텍스트`(복사, `ocr_text/` fetch)·`💻 소스코드`(언어별 C#/Python 코드 패널, `code_blocks.json` fetch)·`📝 메모`(페이지별 localStorage 자동저장). **build_html.py는 로컬·벤더드(`kyobo-bridge/app/processing/`) 동일 버전 유지**(웹 분석도 같은 뷰어 생성).
 - **소스코드 추출(4.5)**: OCR은 코드 품질 낮음(문자오류·들여쓰기 손실) → `bookcapture/extract_code.py`가 Claude 비전으로 페이지 이미지에서 언어별 코드를 정밀 추출. 코드 자동감지·resume·429재시도. 웹 파이프라인은 `upload_processor.py`가 summarize 뒤 자동 실행.
 - **6→7 규칙**: `finalize_book.py` 는 *깨끗한 빌드 결과*에만 돌린다(멱등 아님, 이미 주입 시 중단). chapters.json/page_extras.json 은 **있으면** 자동 주입, 없으면 건너뜀.
 - **8 규칙**: 웹 파일은 root 소유라 RedCode 가 직접 못 덮어씀 → `publish_book.sh` 가 홈 업로드→`sudo cp`→`chown root:root`→`chmod 644`→검증까지 처리. 비번은 `NAS_PASS` 환경변수(하드코딩 금지, 출처 `인증서/나스인증/`).
 - 이미지만 바뀌면 8에서 이미지도 넘기고, HTML 썸네일 src `?v=N` 증가(캐시버스트).
-- **★ 캡처 원본 서버 보관(필수 규칙)**: **모든 정상 캡처 발행 시** 책 폴더의 `source_raws/`(캡처 원본 raw 전량)를 **NAS 책 폴더에 반드시 함께 올린다**. 뷰어는 raws 를 서빙하지 않지만, 재크롭·품질검증·소실복구의 유일한 원본이므로 서버 보관이 원칙(로컬만 두지 않음). 대용량이라 rsync 실패 잦음 → **tar 스트리밍**(`tar cf - -C books <slug> | ssh 'cd <NASbooks> && tar xpf - && chmod -R a+rX <slug>'`)으로 전송. (2026-07-12 이미지 처리 바이블 발행에서 확립: page+thumbs+summary+**source_raws** 전량 서버 보관.)
-- **백업(선택)**: 서버 `source_raws/` 가 1차 보관. 추가 안전이 필요하면 raws 를 별도 백업 볼륨/타르로 2차 복사(운영 판단).
 
 ---
 
@@ -49,41 +33,17 @@ NAS_PASS=... ./scripts/process_book.sh <SLUG> --chrome 20,20,20,20 --publish
 - **Mac 앱(교보eBook.app, 번들 `kr.co.kyobobook.iPadB2C`)은 제한 없음** + DRM 화면캡처 차단 없음(Mac 한정). → 246장 한 번에 성공.
 - 뷰어 레이아웃: **두 페이지 보기(오른쪽 시작)** = 표지 단독 + 이후 양면(배포 구조와 일치).
 
-## 1.5 로컬 매크로 해상도 사전 게이트 (필수 규칙) — 저해상 캡처 원천 차단
-
-**로컬 매크로(교보 데스크탑 앱 캡처 = 물리 화면 캡처)** 는 결과 해상도가 **모니터 해상도 × scale**에 종속된다(§CAPTURE_SHARPNESS 실측). 그래서 도서 라이브러리 웹 UI에서 **로컬 매크로 선택 후 [분석 시작] 시 캡처 대상 화면이 표준을 만족하는지 먼저 검증**하고, 미달이면 **차단 + 조치 안내**한다.
-
-- **정량 기준**: `페이지당_픽셀 = 화면폭(pt) × devicePixelRatio ÷ 페이지수`. 양면(스프레드) 표준 = **페이지당 ≥ `MIN_SOURCE_WIDTH`(1400px)** → **백킹 폭 ≥ 2800px**. (단면이면 백킹 ≥1400px.) 상수·수식은 `book-capture/bookcapture/capture_standard.py`(`MIN_SOURCE_WIDTH`, `required_window_width_pt`, `capture_preflight`)가 단일 진실원본.
-- **동작(미달 시 = 차단)**: 분석 시작을 막고, `그래도 진행(저해상 감수)`으로만 우회. 조치 안내를 권장 순으로 제시:
-  1. **단면(1페이지) 보기로 전환** — 백킹 폭 전체를 한 페이지가 쓰므로 대개 즉시 충족(단, 레이아웃이 한 장에 1페이지로 달라짐).
-  2. **해상도 올리기** — 시스템 설정 > 디스플레이 > `모든 해상도 보기`에서 **백킹 폭 ≥2800px** 되는 더 높은 HiDPI 해상도 선택.
-  3. **내장 Retina 디스플레이에서 캡처** — 양면 표준을 여유 있게 충족.
-- **외장 모니터는 강제 아님**: 멀티태스킹하며 외장으로 캡처하는 것은 정당한 선택. 그래서 규칙은 "내장을 써라"가 아니라 **"권장 해상도를 제시하고 사용자가 직접 맞추게"** 안내한다(코드가 시스템 해상도를 자동 변경하지 않음).
-- **패널 한계 주의**: 외장 패널의 최대 백킹이 2800px 미만이면(예: **1920×1200 패널 → 최대 HiDPI 백킹 2560px**) 그 모니터에선 **양면 표준이 물리적으로 불가** → 조치는 ①단면 전환 또는 ③내장 Retina로 수렴.
-- **2단 방어**: (a) **웹 UI 게이트**(`index.html` `ensureCaptureResolutionOK()`) = 브라우저가 있는 모니터 기준 1차 경고·차단. (b) **워커 게이트**(권장) = 캡처 직전 `capture_preflight()`로 실제 캡처 모니터를 재검증해 미달 시 job 실패(웹은 브라우저 모니터만 알아 다중 모니터에선 부정확할 수 있으므로 워커가 최종 판정).
-- **모드별 레이아웃 분리(중요)**: 캡처 방식마다 레이아웃이 달라 **표준 임계가 다르다**.
-  - **데스크탑 앱**(`auto`/`capture-only`) = **양면(2p)** → 페이지당 ≥1400px = **백킹 ≥2800px**.
-  - **브라우저 wviewer**(`capture-browser`, `capture-auto --no-app`, 물리 화면 캡처) = **단면(1p, F11)** → 페이지당 ≥1400px = **백킹 ≥1400px**.
-  - 게이트는 모드에서 `pages_per_spread`(앱 2 / 브라우저 1)를 정해 판정한다. 웹: `ensureCaptureResolutionOK(pages)` (앱 2, 브라우저 1). 워커: `capture_readiness(1 if --no-app else 2)`. 워커가 보고하는 `capture_display.displays[]`는 `page_px`(양면)·`single_page_px`(단면)를 모두 담아 웹이 모드별로 재판정한다.
-  - ~~capture-browser 게이트 제외~~ (구): 브라우저 캡처를 "모니터 무관"으로 오판했으나 실제로는 물리 화면 캡처(단면)라 **단면 표준으로 게이트 적용**이 맞다.
-- **워커 준비 사전 게이트(선행)**: 해상도 게이트보다 **먼저**, 워커 의존 모드(`auto`/`capture-only`/`capture-browser`)로 [분석 시작] 시 워커가 **(1)실행 중(alive) (2)최근 동작(ping) (3)최신 버전(up_to_date)** 인지 확인한다. 미충족이면 **job 등록 전에 차단 + 안내**(워커 시작/업데이트, 재확인 루프) — 워커 없이 job 만 등록돼 `pending` 방치되는 사고를 막는다. (`index.html` `ensureWorkerReady()`, `fetchWorkerStatus`+`buildWorkerInstallHint` 재사용). 워커가 alive 여야 해상도 게이트도 "실제 캡처 모니터"(`capture_display`) 권위 판정을 쓸 수 있으므로 순서상 선행.
-
 ## 2. Raw 캡처 (전체창, 크롭 안 함 → 견고)
-`scratchpad/capture_raws.py` 패턴:
-- `screencapture -l<wid>` 로 앱 창 전체를 raw로 저장(크롭 로직 없음 → 캡처가 안 깨짐).
-- **키보드만**(오른쪽 화살표 `key code 124`), 마우스 이동 안 함(screencapture는 커서 미포함).
-- **매 키 입력 전 앱 재활성화**(`osascript ... activate`) — 포커스 유실로 멈추는 것 방지(안 하면 8장쯤서 멈춤).
-- 표지로 복귀: 왼쪽 화살표 반복(앱은 anti-bot 없어 빠르게 OK), 해시 안 변하면 표지 도착.
-- 끝 감지: 연속 2장 동일 해시 → 종료. 결과 raw_NNN.png (배포 페이지수와 1:1).
+`bookcapture/kyobo_app.py` 워커 캡처 경로. **모든 튜닝 매직넘버는 `CaptureTuning` 규칙화 클래스**(파일 상단, 단일 관리처 — 키코드·대기시간·MAD 임계·크롭·창필터 등, 하드코딩 금지)에서만 관리한다. 값 조정은 여기서만.
+- `screencapture -l<wid>`(WID, **occlusion-safe** = 창 내용만·알림/다른창 제외 → 깨끗) 우선 3회. 실패 시 `-R` 영역은 **교보 최전면일 때만** 최후 1회(오염 방지).
+- **키보드만**(오른쪽 화살표 `CaptureTuning.KEY_RIGHT`), screencapture는 커서 미포함.
+- **매 캡처·페이지넘김 전 최전면 확보**(`_ensure_frontmost`) — 창 비활성 시 →키/캡처 실패 방지(마우스·클릭으로 비활성화돼도 복구).
+- 끝 감지: 직전 캡처와 **축소 grayscale MAD**(`< MAD_SAME_THRESHOLD`, 같은=0/다른≥9) < 임계면 '같은 페이지' → **→키 재전송 3회 확인**(일시적 미스 vs 진짜 끝 구분, 오탐 방지). OCR 깨지는 책도 동작.
+- 오염(커서·알림·비책): WID는 신뢰(스킵), `-R` 캡처만 비전 QC → 오염 시 같은 페이지 재캡처. 발행 전 배치 QC 안전망(`contamination-check`).
+- 집중모드: 캡처 중 `set_focus_mode(True/False)`(Shortcuts KyoboFocusOn/Off) — 싱글 모니터 알림 차단(있으면 보너스).
+- ⚠️ 교보는 iPad앱(`kr.co.kyobobook.iPadB2C`) — owner 이름 NFD 정규화(NFC) 필수. 상세 [[ebook-viewer-cut-check-crop-first]] 계열.
 
 ## 3. 크롭 = `bookcapture/page_crop.py` `crop_page()`
-
-> ⚠️ **크롬(chrome) 보정은 캡처 방식마다 다름 — 앱 raw 는 작게 (2026-07-12 '이미지 처리 바이블' 교훈)**: `crop_page(chrome=(L,T,R,B))` 의 고정 크롭 기본값 `(135,150,135,155)` 은 **웹뷰어(wviewer) 캡처용**이다. **교보 데스크탑 앱 raw 는 상·하 크롬이 거의 없고 흰 여백만** 있어서, 큰 `top=150` 이 **본문(섹션 헤더)을 잘라먹는다.**
-> - 1차 증상: 좌우 `135` 가 본문 좌우(`1.1.1` 섹션번호·문단 첫 글자)를 먹음 → `(20,150,20,155)` 로 1차 교정.
-> - 2차 증상(재발): `top=150` 이 **섹션 시작 페이지의 베이지 헤더('1.1 이미지 처리와 컴퓨터 비전')를 상단 잘라먹음**(p11 등). 사용자에겐 "모달 상하 마진 없음/잘림"으로 보였으나 **원인은 모달이 아니라 크롭**(모달 DOM 측정상 이미지는 스테이지에 정확히 맞음 = 무-클립. 잘린 건 소스 PNG 자체).
-> - **최종 교정**: 앱 raw 는 **`--chrome 20,20,20,20`**(작은 고정 크롭) + `content_crop`(콘텐츠 자동 감지 + 여백 복원)에 맡긴다. 앱 raw 는 content 가 y≈76 부터라 top≤~40 이어야 헤더가 안 잘린다. 하단 진행표시("3% (21/550p)")는 밀도 임계 미달이라 content_crop 이 자동 제외.
-> - **규칙**: `scripts/crop_book.py --chrome L,T,R,B` 로 캡처 방식별 크롬을 **지정**한다(하드코딩 금지). 앱=`20,20,20,20`, 웹뷰어=기본. ★ `source_raws` 보관 덕에 이 모든 교정이 **재캡처 0, 재크롭만으로** 가능.
-
 - **핵심 규칙**(빡빡하게 잘리던 문제 해결):
   1. 콘텐츠 감지 = 채도>18 또는 어두움<155 (흰·회색 배경 제외).
   2. 열/행 밀도 + 연속블록(union), 낮은 임계 → **세로로 짧은 코드블록 등도 안 잘림**.
@@ -105,32 +65,6 @@ NAS_PASS=... ./scripts/process_book.sh <SLUG> --chrome 20,20,20,20 --publish
 - 팝업(모달): **원본 풀해상도**(`../page_NNN.png`) 로드 — `openModal`이 `src.replace('/thumbs/','/')`.
 - **캐시버스트**: 이미지 교체 시 thumb src에 `?v=N` 증가(브라우저 캐시로 옛 이미지 방지). 안 하면 강력새로고침 필요.
 
-### 6.1 팝업(모달) 뷰어 레이아웃 표준 — `ViewerLayout` 규칙화 클래스
-확대 모달의 레이아웃 수치는 **`bookcapture/build_html.py`의 `ViewerLayout` 클래스 한 곳**에서만 관리한다(하드코딩 금지). `ViewerLayout.modal_css()`가 CSS를 생성해 `_CSS` 뒤에 오버라이드로 붙는다 → **클래스가 진실원본**. 벤더드 사본(`kyobo-bridge/app/processing/build_html.py`)도 동일 버전 유지(웹 분석도 같은 뷰어). 기준: 2026-07-12 "클로드코드로 시작하는 실전 에이전틱 코딩" 실물 뷰어와 동일 구조로 확정.
-
-| 규칙 | 상수 / 구현 | 근거(과거 버그) |
-|---|---|---|
-| **배경은 솔리드 다크** | `OVERLAY_BG = #0a0e14` (rgba 반투명 **금지**) | 반투명 0.9면 여백에 뒤 페이지·요약이 비쳐 지저분("여전히 개선 안 됨"). |
-| **화살표는 이미지 밖** | `STAGE_MARGIN_H = 96` (좌우 여백 안에 화살표 배치) | 여백 0이면 `< >` 화살표가 이미지를 가림("화살표는 이미지 밖에 있어야지"). |
-| **상하 여백 확보** | `STAGE_MARGIN_V = 64` | 없으면 이미지가 위아래 가장자리에 붙음("상하 마진 없다"). |
-| **화살표 크기·위치** | `NAV_W/H = 54/92`, `NAV_OFFSET = 18` | — |
-| **텍스트 패널 폭·연동** | `TEXT_PANEL_W = 440`, `text_open_right() = 452`(패널 열리면 이미지·다음화살표를 패널 왼쪽까지만) | 패널이 이미지를 덮지 않게. |
-| **원본 풀해상도 로드** | `FULLRES_FROM_THUMB` — `src.replace('/thumbs/','/')` | 썸네일(축소본) 로드하면 흐림. 반드시 원본. |
-| **캐시버스트** | `CACHE_BUST` — 이미지 src에 `?v=<빌드시각>` | 재크롭 후 옛 이미지가 캐시로 남는 것 방지. |
-
-- **좌우 이동 `< >`**: 모든 페이지에 이전/다음 화살표(키보드 ←/→ 동일). 첫/끝 페이지는 `disabled`.
-- **조정 방법**: 값 바꿀 일 있으면 `ViewerLayout` 상수만 수정 → 재빌드. `_CSS` 안 숫자를 직접 고치지 말 것(오버라이드로 무시됨).
-
-### 6.2 ⚠️ 진단 규칙 — "이미지 잘림/마진 없음" 신고는 **모달이 아니라 크롭을 먼저** (반복 실수 방지)
-2026-07-12, 사용자가 모달에서 "상하/좌우가 잘렸다 · 마진이 없다"고 여러 번 신고했고, 매번 **모달 CSS만 반복 수정**하다 크게 지치게 했다("여전히 같다 뭐하냐"). **진짜 원인은 모달이 아니라 소스 PNG 크롭**(§3의 과도한 고정 top)이었다 — 앱 raw의 섹션 헤더('1.1 …')를 잘라낸 것.
-
-**진단 순서 (이 순서를 지킬 것):**
-1. **모달 무죄부터 확인**: 브라우저에서 `.modal-stage img` 와 `.modal-stage` 의 `getBoundingClientRect()` 를 측정. `top`/`bottom` 이 서로 일치하면 이미지는 스테이지에 정확히 맞은 것 = **클립 없음 = 모달 무죄**. (2026-07-12 실측: 정확히 일치 → 모달은 문제 없었음.)
-2. **소스와 발행본 비교**: `source_raws/raw_NNN.png` 상단 스트립 vs 발행 `page_NNN.png` 상단 스트립을 눈으로 비교. 헤더가 raw엔 온전하고 page엔 잘렸으면 **크롭이 범인** 확정.
-3. **재크롭으로 복구(재캡처 0)**: 앱 raw 는 `python scripts/crop_book.py <raws> <out> --chrome 20,20,20,20`. `source_raws` 보관 덕에 재캡처 없이 재크롭만으로 해결 → 재빌드 → §7 finalize → NAS 재발행(page+thumbs 둘 다, tar 스트리밍) → 라이브 실측.
-
-> 요지: **모달 CSS를 만지기 전에 위 1번(DOM 측정)으로 모달을 먼저 배제**하라. 코드에도 같은 경고가 있음 — `build_html.ViewerLayout` 도크스트링, `page_crop.crop_page` 도크스트링. 메모리 [[ebook-viewer-cut-check-crop-first]].
-
 ## 7. 챕터 그룹화 + 챕터 요약 (사이드바 트리)
 전 페이지 OCR·요약이 있으면 **챕터 단위로 묶어** 사이드바를 접기/펴기 트리로 만들고, 각 챕터에 요약 카드를 넣는다.
 - **챕터 경계·제목 감지**: 목차(차례) 페이지에서 챕터 목록 확보 + 각 페이지 running header의 "CHAPTER N"/제목 + AI요약의 "N장." 도입 문구로 시작 페이지 확정. (OCR 헤더는 노이즈 있으니 목차+요약 교차검증)
@@ -151,29 +85,3 @@ NAS_PASS=... ./scripts/process_book.sh <SLUG> --chrome 20,20,20,20 --publish
 - 컨택트시트(전 페이지 축소 grid)로 잘림/여백/차단화면 일괄 육안 확인.
 - 배포 후 Playwright로 라이브 페이지 렌더 → 여백·정렬 확인.
 - 표 정리본: 라이브 HTML `grep -o 'class="ptable"' | wc -l` 로 표 개수 확인 + Playwright로 표 페이지 렌더 육안 확인.
-
-## 9. 캡처 후처리 정규화 — QC · 중복꼬리 · 챕터감지 (규칙 엔진)
-
-> 2026-07-12 '이미지 처리 바이블'(277장) 발행에서 확립. 매번 손으로 하던 md5비교·컨택트시트·구분페이지 찾기를 **클래스·함수·CLI로 정규화**(`bookcapture/postcapture.py`). 캡처(1)와 크롭(2) 사이에 **QC·trim-tail**, OCR(3) 뒤에 **chapters-detect** 를 넣는다.
-
-### 9.1 정규화된 순서 (§0 파이프라인에 삽입)
-```
-1 Raw캡처 → 1.5 QC(qc) → 1.6 중복꼬리정리(trim-tail) → 2 크롭 → 3 OCR
-→ 3.5 챕터감지(chapters-detect) → 4 요약 → 4.5 코드 → 5 merge+build
-→ 6 chapters.json(제목·요약 확정)+page_extras.json → 7 finalize → 8 발행
-```
-
-### 9.2 규칙·명령
-- **QC (게시 전 게이트)** — `python -m bookcapture qc --book-dir <책>` (종료 0=통과/4=플래그). `postcapture.CaptureQC`.
-  검사(모두 **raw 기준**, `source_raws/raw_*.png` 우선): ①해상도 일관성(주해상도 외 >5% 이상=불일치) ②**터미널 오염**(`TERMINAL_DIMS`=2560×1440 등 메인 디스플레이 통째 캡처 해상도면 오염 의심) ③블랙/블랭크(<80KB) ④중복 해시. **크롭 후 page_*.png 는 내용따라 해상도 가변이라 오탐** → 반드시 raw 로 검사.
-- **중복 꼬리 정리** — `python -m bookcapture trim-tail --book-dir <책> [--dry-run]`. `postcapture.trim_duplicate_tail`.
-  근거: 교보 앱은 **마지막 페이지에서 →키가 안 먹혀 같은 화면을 반복 캡처**하고, 캡처의 dup-hash 정지가 이 경우 안 걸려 마지막 장이 수백 장 복제됨. 뒤에서 동일 해시가 `min_run`(기본2) 이상 연속이면 마지막 unique 1장만 남기고 삭제.
-- **챕터 감지** — `python -m bookcapture chapters-detect --book-dir <책> [--write]`. `postcapture.ChapterDetector`.
-  근거: 각 장은 **'베이지 표지' 구분 페이지**로 시작하며 OCR 이 공백제거 후 <40자(거의 빈값). 이 빈-OCR 페이지가 챕터/섹션 경계. `--write` 로 `chapters_scaffold.json`(경계+빈 제목) 생성 → **제목·요약은 구분 페이지 이미지를 보고 사람/비전으로 확정**(자동 scaffold 는 섹션·서문까지 잡아 over-segment 하므로 병합·명명 필요).
-
-### 9.3 품질·오염 검사 결과 예 (이미지 처리 바이블)
-```
-[QC] 277장 · unique 277 · 주해상도 (3600,2194) · 해상도분포 {3600x2194:277}
-     ✅ 통과 — 오염/블랙/중복/불일치 없음
-```
-→ 전부 3600×2194(내장 1800pt×2x). 터미널해상도(2560×1440) 0장이라 콘솔 오염 구조적으로 없음.

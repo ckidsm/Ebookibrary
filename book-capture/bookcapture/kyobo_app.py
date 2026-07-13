@@ -22,6 +22,51 @@ except ImportError:
     print("⚠️  OCR 기능을 사용하려면 Pillow와 pytesseract를 설치하세요.")
 
 
+# ── 교보 앱 캡처 튜닝 상수 (단일 관리처) ──────────────────────────────────
+# 하드코딩 금지: 캡처 로직의 모든 매직넘버(키코드·대기시간·임계·크롭 등)를 여기 한 곳에서만 관리.
+# 값 조정이 필요하면 여기(또는 환경변수)만 고친다. 각 값의 의미·근거는 주석 참조.
+class CaptureTuning:
+    """교보 데스크탑 앱(iPad앱) 캡처 파라미터. 인스턴스 X — 클래스 상수로 참조. (2026-07-13 규칙화)"""
+    # ── macOS 키 코드 (page turn) ──
+    KEY_RIGHT = 124          # → 다음 페이지
+    KEY_LEFT = 123           # ← 이전 페이지(표지 복귀용)
+
+    # ── 최전면 확보 / 캡처 재시도 ──
+    # 교보 iPad앱은 **최전면일 때만** WID(-l) 캡처 성공(백그라운드=창 백킹 해제). 창이 비활성되면
+    # →키·캡처가 실패하므로 활성 확보 후 진행.
+    CAPTURE_ATTEMPTS = 3       # WID 캡처 시도 횟수(포커스 순간 뺏김 복구)
+    FRONTMOST_TIMEOUT = 2.0    # 최전면 될 때까지 폴링 최대 대기(초)
+    FRONTMOST_POLL = 0.15      # 최전면 폴링 간격(초)
+    BACKING_WAIT_FIRST = 0.3   # 활성 직후 첫 캡처 전 백킹 안정 대기(초)
+    BACKING_WAIT_RETRY = 0.8   # 재시도 시 백킹 안정 대기(초)
+    RECAPTURE_WAIT = 1.0       # 오염 등 재캡처 전 대기(초)
+    MIN_CAPTURE_BYTES = 1024   # 유효 캡처 최소 파일 크기(이하 = 실패로 간주)
+
+    # ── 영역(-R) 폴백 크롭 ──
+    TITLE_BAR_H = 28           # macOS 타이틀바 높이(px) — -R 캡처 시 자동 크롭
+    MIN_BOOK_AREA_H = 200      # 타이틀바 크롭 후 남아야 할 최소 책영역 높이(px). 이보다 작으면 크롭 안 함(sanity)
+
+    # ── 표준 크롭(page_crop) ──
+    APP_CHROME = (20, 20, 20, 20)  # 앱 raw 고정 크롭(L,T,R,B). 나머지 여백은 content_crop 이 처리(§3)
+
+    # ── 마지막 페이지 감지 (perceptual MAD) ──
+    SIG_SIZE = 100             # 축소 grayscale 서명 한 변(px). 미세 렌더 차이 무시 + 페이지 변화 감지
+    MAD_SAME_THRESHOLD = 4.0   # 이 미만이면 '같은 페이지'. 검증: 같은=0, 다른≥9 → 여유 threshold
+    END_CONFIRM_TRIES = 3      # '같은 페이지' 감지 시 →키 재전송해 확인하는 횟수(일시적 미스 vs 진짜 끝 구분)
+
+    # ── 오염 인라인 재캡처 ──
+    CONTAM_RECAPTURE_TRIES = 2  # 오염(-R 캡처) 시 같은 페이지 재캡처 시도 횟수
+
+    # ── 창 탐지 필터(_find_kyobo_window_id / bounds) ──
+    MIN_WIN_W = 800            # 교보 책 창 최소 폭(px) — 작은 보조창·팝업 배제
+    MIN_WIN_H = 500            # 교보 책 창 최소 높이(px)
+
+    @classmethod
+    def sig_pixels(cls):
+        """MAD 정규화 분모(서명 픽셀 수)."""
+        return cls.SIG_SIZE * cls.SIG_SIZE
+
+
 class KyoboAppScreenshot:
     def __init__(self, output_dir="kyobo_app_screenshots", book_folder=None):
         """
@@ -604,7 +649,7 @@ class KyoboAppScreenshot:
 
         return None
 
-    def _ensure_frontmost(self, timeout=2.5):
+    def _ensure_frontmost(self, timeout=CaptureTuning.FRONTMOST_TIMEOUT):
         """교보를 활성화하고 **최전면이 될 때까지** 짧게 대기. 창이 비활성이면 →키/캡처가 실패하므로
         페이지 넘김·캡처 직전에 호출. 반환: 최전면 확보 여부."""
         if self.system != "Darwin":
@@ -614,7 +659,7 @@ class KyoboAppScreenshot:
         while time.monotonic() < deadline:
             if self._is_kyobo_frontmost():
                 return True
-            time.sleep(0.15)
+            time.sleep(CaptureTuning.FRONTMOST_POLL)
             self.activate_app()
         return self._is_kyobo_frontmost()
 
@@ -622,7 +667,7 @@ class KyoboAppScreenshot:
         """교보 활성 확인 후 →키 전송 — 창 비활성/포커스 뺏김 시 페이지 안 넘어가는 문제 방지.
         (2026-07-13 사용자 지적: 마우스·클릭 등으로 창이 비활성화되면 →키가 교보로 안 감)."""
         self._ensure_frontmost()
-        self.press_key(124)  # 오른쪽 화살표(다음 페이지)
+        self.press_key(CaptureTuning.KEY_RIGHT)
 
     def _is_kyobo_frontmost(self):
         """교보 앱이 최전면(frontmost)인지 — -R 영역 캡처 오염(터미널 등) 방지 게이트."""
@@ -674,7 +719,7 @@ class KyoboAppScreenshot:
                     if require_onscreen and not w.get('kCGWindowIsOnscreen', False):
                         continue
                     b = w.get('kCGWindowBounds', {})
-                    if int(b.get('Width', 0)) < 800 or int(b.get('Height', 0)) < 500:
+                    if int(b.get('Width', 0)) < CaptureTuning.MIN_WIN_W or int(b.get('Height', 0)) < CaptureTuning.MIN_WIN_H:
                         continue
                     cands.append(w)
                 if debug:
@@ -744,7 +789,7 @@ class KyoboAppScreenshot:
             if w.get('kCGWindowLayer', 99) != 0:
                 continue
             b = w.get('kCGWindowBounds', {})
-            if int(b.get('Width', 0)) < 800 or int(b.get('Height', 0)) < 500:
+            if int(b.get('Width', 0)) < CaptureTuning.MIN_WIN_W or int(b.get('Height', 0)) < CaptureTuning.MIN_WIN_H:
                 continue
             cands.append(w)
         if not cands:
@@ -771,7 +816,7 @@ class KyoboAppScreenshot:
             raws.mkdir(exist_ok=True)
             if m:
                 shutil.copy2(fp, raws / f"raw_{int(m.group(1)):03d}.png")
-            cropped = page_crop.crop_page(Image.open(fp), chrome=(20, 20, 20, 20))
+            cropped = page_crop.crop_page(Image.open(fp), chrome=CaptureTuning.APP_CHROME)
             cropped.save(fp)
         except Exception as e:
             print(f"⚠ 크롭 후처리 실패(원본 유지): {e}")
@@ -786,9 +831,10 @@ class KyoboAppScreenshot:
             # ⭐ WID(-l) 를 **우선 3회** 시도 — WID 캡처는 occlusion-safe(창 내용만, 알림·다른 창 제외)라
             #    항상 깨끗하다. 교보 최전면이면 성공. -R 영역 폴백은 알림/터미널 오염 위험이라 **최후에 1회만**.
             #    (2026-07-13: -R 로 18~25p 에 알림·터미널 섞임 → WID 우선으로 오염 최소화.)
-            for attempt in range(3):
-                self._ensure_frontmost(timeout=2.0)  # 최전면 확보(창 비활성 시 WID 캡처 실패 방지)
-                time.sleep(0.3 if attempt == 0 else 0.8)  # 백킹 안정 대기
+            for attempt in range(CaptureTuning.CAPTURE_ATTEMPTS):
+                self._ensure_frontmost()  # 최전면 확보(창 비활성 시 WID 캡처 실패 방지)
+                time.sleep(CaptureTuning.BACKING_WAIT_FIRST if attempt == 0
+                           else CaptureTuning.BACKING_WAIT_RETRY)  # 백킹 안정 대기
                 wid = self._find_kyobo_window_id(retries=1)
                 if wid:
                     try:
@@ -796,7 +842,7 @@ class KyoboAppScreenshot:
                             "/usr/sbin/screencapture", "-l", str(wid),
                             "-x", "-o", "-t", "png", str(filepath),
                         ], check=True)
-                        if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
+                        if os.path.exists(filepath) and os.path.getsize(filepath) > CaptureTuning.MIN_CAPTURE_BYTES:
                             self._last_capture_method = "wid"  # 깨끗(occlusion-safe)
                             return True  # raw 반환 — 크롭/raw보존은 _finalize_page 에서
                     except subprocess.CalledProcessError as e:
@@ -808,15 +854,15 @@ class KyoboAppScreenshot:
                 bounds = self._find_kyobo_window_bounds() or self._get_bounds_via_system_events()
                 if bounds:
                     x, y, w, h = bounds
-                    TITLE_BAR_H = 28  # macOS 타이틀바 자동 크롭
-                    if h > TITLE_BAR_H + 200:
-                        y += TITLE_BAR_H; h -= TITLE_BAR_H
+                    tb = CaptureTuning.TITLE_BAR_H
+                    if h > tb + CaptureTuning.MIN_BOOK_AREA_H:  # 책영역이 충분히 남을 때만 타이틀바 크롭
+                        y += tb; h -= tb
                     try:
                         subprocess.run([
                             "/usr/sbin/screencapture", "-R", f"{x},{y},{w},{h}",
                             "-x", "-t", "png", str(filepath),
                         ], check=True)
-                        if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
+                        if os.path.exists(filepath) and os.path.getsize(filepath) > CaptureTuning.MIN_CAPTURE_BYTES:
                             self._last_capture_method = "region"  # ⚠ 오염 가능(알림/오버레이) → 인라인 QC 확인
                             return True
                     except subprocess.CalledProcessError as e:
@@ -949,9 +995,9 @@ class KyoboAppScreenshot:
                 if contam_check is not None and getattr(self, "_last_capture_method", None) == "region":
                     bad, reasons = contam_check(str(temp_filepath))
                     tries = 0
-                    while bad and tries < 2:
+                    while bad and tries < CaptureTuning.CONTAM_RECAPTURE_TRIES:
                         print(f"   🧹 오염 감지({reasons}, -R) → 같은 페이지 재캡처 {tries + 1}/2")
-                        self.activate_app(); time.sleep(1.0)
+                        self.activate_app(); time.sleep(CaptureTuning.RECAPTURE_WAIT)
                         if not self.capture_app_window(str(temp_filepath)):
                             break
                         if getattr(self, "_last_capture_method", None) == "wid":
@@ -973,29 +1019,29 @@ class KyoboAppScreenshot:
                 cur_sig = None
                 try:
                     from PIL import Image as _I, ImageChops as _IC
-                    cur_sig = _I.open(temp_filepath).convert("L").resize((100, 100))
+                    cur_sig = _I.open(temp_filepath).convert("L").resize((CaptureTuning.SIG_SIZE, CaptureTuning.SIG_SIZE))
                 except Exception:
                     cur_sig = None
                 def _mad_vs_prev(sig):
                     return sum(_i * _n for _i, _n in enumerate(
-                        _IC.difference(sig, prev_sig).histogram())) / 10000.0
+                        _IC.difference(sig, prev_sig).histogram())) / CaptureTuning.sig_pixels()
                 if cur_sig is not None and prev_sig is not None:
                     _mad = _mad_vs_prev(cur_sig)
-                    if _mad < 4.0:
+                    if _mad < CaptureTuning.MAD_SAME_THRESHOLD:
                         # 같은 페이지 = →키가 **일시적으로 안 먹혔을** 수도, **진짜 책 끝**일 수도.
                         # 오탐(242p 조기종료) 방지: →키 재전송+재캡처로 확인. 바뀌면 계속, 계속 같으면 끝.
                         confirmed_end = True
-                        for _rt in range(3):
+                        for _rt in range(CaptureTuning.END_CONFIRM_TRIES):
                             print(f"   … 같은 페이지(MAD={_mad:.1f}) — 활성화+→키 재전송 후 확인 {_rt + 1}/3")
                             self._turn_next_page(); time.sleep(max(interval, 1.5))
                             if not self.capture_app_window(str(temp_filepath)):
                                 continue
                             try:
-                                re_sig = _I.open(temp_filepath).convert("L").resize((100, 100))
+                                re_sig = _I.open(temp_filepath).convert("L").resize((CaptureTuning.SIG_SIZE, CaptureTuning.SIG_SIZE))
                             except Exception:
                                 continue
                             _mad = _mad_vs_prev(re_sig)
-                            if _mad >= 4.0:          # 페이지가 바뀜 → 일시적 미스였음, 계속 진행
+                            if _mad >= CaptureTuning.MAD_SAME_THRESHOLD:  # 페이지가 바뀜 → 일시적 미스였음, 계속 진행
                                 print(f"   ▶ 페이지 넘어감(MAD={_mad:.1f}) — 일시적 →키 미스, 계속")
                                 cur_sig = re_sig
                                 confirmed_end = False
