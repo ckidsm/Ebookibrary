@@ -698,17 +698,17 @@ class KyoboAppScreenshot:
         b = main['kCGWindowBounds']
         return int(b['X']), int(b['Y']), int(b['Width']), int(b['Height'])
 
-    def _postprocess_capture(self, filepath):
-        """캡처 raw(창 grab) → 표준 정규화: (1) source_raws/raw_NNN.png 원본 보존,
-        (2) page_crop.crop_page(chrome=20,20,20,20)로 content-aware 크롭(헤더 안 잘림·크롬 제거).
-        수동 파이프라인(app_capture_raws→crop_book --chrome 20,20,20,20)과 동일 규칙.
-        실패해도 원본 유지하고 True(캡처 자체는 성공)."""
+    def _finalize_page(self, page_path):
+        """확정된 page_NNN.png(raw)를 표준 정규화: (1) source_raws/raw_NNN.png 원본 보존,
+        (2) page_crop.crop_page(chrome=20,20,20,20) content-aware 크롭(헤더 안 잘림·크롬 제거).
+        ⚠️ **페이지 번호 확정(rename) 후** 호출해야 raw_NNN 이 올바르게 붙는다(temp 이름이면 오번호).
+        실패해도 원본 유지(캡처 자체는 성공)."""
         try:
             import re
             import shutil
             from PIL import Image
             from . import page_crop
-            fp = Path(filepath)
+            fp = Path(page_path)
             m = re.search(r"(\d+)", fp.stem)
             raws = fp.parent / "source_raws"
             raws.mkdir(exist_ok=True)
@@ -718,7 +718,6 @@ class KyoboAppScreenshot:
             cropped.save(fp)
         except Exception as e:
             print(f"⚠ 크롭 후처리 실패(원본 유지): {e}")
-        return True
 
     def capture_app_window(self, filepath):
         """교보eBook 앱 창만 캡처 (Quartz WID + screencapture -l).
@@ -742,7 +741,7 @@ class KyoboAppScreenshot:
                             "-x", "-o", "-t", "png", str(filepath),
                         ], check=True)
                         if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
-                            return self._postprocess_capture(filepath)
+                            return True  # raw 반환 — 크롭/raw보존은 페이지번호 확정 후 _finalize_page 에서
                     except subprocess.CalledProcessError as e:
                         print(f"⚠️  WID({wid}) 캡처 실패: {e}")
 
@@ -759,7 +758,7 @@ class KyoboAppScreenshot:
                             "-x", "-t", "png", str(filepath),
                         ], check=True)
                         if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
-                            return self._postprocess_capture(filepath)
+                            return True  # raw 반환 — 크롭/raw보존은 페이지번호 확정 후 _finalize_page 에서
                     except subprocess.CalledProcessError as e:
                         print(f"⚠️  영역 캡처 실패: {e}")
 
@@ -864,6 +863,7 @@ class KyoboAppScreenshot:
 
         results = []
         duplicates = []
+        prev_sig = None  # 직전 raw 이미지 축소본(마지막 페이지 perceptual 감지용)
 
         for i in range(count):
             fallback_page = start_page + i
@@ -881,6 +881,26 @@ class KyoboAppScreenshot:
                     continue
 
                 print(f"📸 임시 저장: {temp_filepath.name}")
+
+                # 🔚 마지막 페이지 감지 (OCR 무관, perceptual): 직전 캡처와 **거의 동일**하면
+                #    →키가 안 먹힌 것 = 책 끝. 축소 grayscale MAD 로 비교(같은 페이지=0, 다른 페이지≥9 검증).
+                #    옛 방식(OCR 페이지번호 중복)은 OCR 깨지는 책에서 순차번호가 늘 unique 라 끝을 못 잡고
+                #    무한 캡처했음(2026-07-13 근본원인). 정확한 exact-hash 도 프레임 미세차로 매번 달라 부적합.
+                cur_sig = None
+                try:
+                    from PIL import Image as _I, ImageChops as _IC
+                    cur_sig = _I.open(temp_filepath).convert("L").resize((100, 100))
+                except Exception:
+                    cur_sig = None
+                if cur_sig is not None and prev_sig is not None:
+                    _d = _IC.difference(cur_sig, prev_sig)
+                    _mad = sum(_i * _n for _i, _n in enumerate(_d.histogram())) / 10000.0
+                    if _mad < 4.0:
+                        print(f"   🔚 직전 페이지와 거의 동일(MAD={_mad:.1f}) → 책 끝 도달, 캡처 종료 "
+                              f"(수집 {len([r for r in results if r])}장)")
+                        temp_filepath.unlink(missing_ok=True)  # 반복분 폐기(마지막 unique 1장은 이미 저장됨)
+                        break
+                prev_sig = cur_sig
 
                 # OCR로 페이지 번호 추출
                 actual_page_num = None
@@ -913,8 +933,9 @@ class KyoboAppScreenshot:
 
                 final_filepath = self.output_dir / final_filename
 
-                # 파일명 변경
+                # 파일명 변경 (raw 상태) → raw 보존 + 표준 크롭 (페이지번호 확정 후라 raw_NNN 정확)
                 temp_filepath.rename(final_filepath)
+                self._finalize_page(final_filepath)
                 print(f"   ✅ 최종 저장: {final_filepath.name}")
 
                 # 기존 페이지 목록에 추가
