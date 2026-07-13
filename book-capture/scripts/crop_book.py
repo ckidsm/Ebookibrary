@@ -11,7 +11,7 @@
 import sys, argparse
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "bookcapture"))
-from page_crop import crop_page  # noqa: E402
+from page_crop import crop_page, CropRules  # noqa: E402
 from PIL import Image  # noqa: E402
 
 
@@ -26,7 +26,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("raws_dir")
     ap.add_argument("out_dir")
-    ap.add_argument("--thumb", type=int, default=1800, help="썸네일 최대 폭(px)")
+    ap.add_argument("--thumb", type=int, default=CropRules.THUMB_MAX_W, help="썸네일 최대 폭(px)")
     ap.add_argument("--chrome", type=_parse_chrome, default=None,
                     help="고정 크롭 'L,T,R,B'(px). 미지정=crop_page 기본(웹뷰어용). 앱 raw 는 '20,20,20,20' 권장.")
     a = ap.parse_args()

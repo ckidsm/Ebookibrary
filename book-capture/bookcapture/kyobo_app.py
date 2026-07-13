@@ -46,9 +46,6 @@ class CaptureTuning:
     TITLE_BAR_H = 28           # macOS 타이틀바 높이(px) — -R 캡처 시 자동 크롭
     MIN_BOOK_AREA_H = 200      # 타이틀바 크롭 후 남아야 할 최소 책영역 높이(px). 이보다 작으면 크롭 안 함(sanity)
 
-    # ── 표준 크롭(page_crop) ──
-    APP_CHROME = (20, 20, 20, 20)  # 앱 raw 고정 크롭(L,T,R,B). 나머지 여백은 content_crop 이 처리(§3)
-
     # ── 마지막 페이지 감지 (perceptual MAD) ──
     SIG_SIZE = 100             # 축소 grayscale 서명 한 변(px). 미세 렌더 차이 무시 + 페이지 변화 감지
     MAD_SAME_THRESHOLD = 4.0   # 이 미만이면 '같은 페이지'. 검증: 같은=0, 다른≥9 → 여유 threshold
@@ -816,7 +813,7 @@ class KyoboAppScreenshot:
             raws.mkdir(exist_ok=True)
             if m:
                 shutil.copy2(fp, raws / f"raw_{int(m.group(1)):03d}.png")
-            cropped = page_crop.crop_page(Image.open(fp), chrome=CaptureTuning.APP_CHROME)
+            cropped = page_crop.crop_page(Image.open(fp), chrome=page_crop.CropRules.CHROME_APP)
             cropped.save(fp)
         except Exception as e:
             print(f"⚠ 크롭 후처리 실패(원본 유지): {e}")

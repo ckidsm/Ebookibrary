@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 
 from .settings import OcrCfg
+from .page_crop import CropRules
 
 try:
     from PIL import Image
@@ -38,7 +39,7 @@ def ocr_one(img_path: Path, lang: str = "kor+eng") -> str:
         return f"[OCR_ERROR] {e}"
 
 
-def make_thumbnails(book_dir: Path, max_px: int = 1800) -> Path:
+def make_thumbnails(book_dir: Path, max_px: int = CropRules.THUMB_MAX_W) -> Path:
     """원본 PNG가 max_px 초과면 thumbs/ 에 리사이즈본 생성. thumbs 경로 반환."""
     thumbs = book_dir / "thumbs"
     if not HAS_OCR:
@@ -74,7 +75,7 @@ def ocr_book(
         print("[ocr] Pillow·pytesseract 미설치 — 스킵")
         return {}
 
-    src_dir = make_thumbnails(book_dir, max_px=1800) if cfg.use_thumbs else book_dir
+    src_dir = make_thumbnails(book_dir, max_px=CropRules.THUMB_MAX_W) if cfg.use_thumbs else book_dir
     ocr_dir = book_dir / "summary" / "ocr_text"
     ocr_dir.mkdir(parents=True, exist_ok=True)
 
