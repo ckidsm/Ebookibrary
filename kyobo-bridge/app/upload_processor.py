@@ -112,6 +112,15 @@ def process_upload_job(job: dict) -> None:
                           error=f"업로드 이미지 없음: {book_dir}")
             return
 
+        # ── 0.5) 오염 검사(커서·알림·비책) — OCR 전에 오염 페이지 제거 ──
+        if cfg.api_key:
+            try:
+                from .processing.contamination import check_contamination
+                db.update_job(jid, progress=_progress(1, N, "ocr", 0, len(pngs), "오염 검사..."))
+                check_contamination(book_dir, cfg, remove=True)
+            except Exception as e:
+                log.warning("오염 검사 실패(무시): %s", e)
+
         # ── 1) OCR ───────────────────────────────────────────
         db.update_job(jid, progress=_progress(1, N, "ocr", 0, len(pngs), "OCR 시작..."))
         if _cancelling(jid):

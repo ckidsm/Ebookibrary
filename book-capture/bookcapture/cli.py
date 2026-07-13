@@ -390,6 +390,15 @@ def cmd_finalize(args) -> int:
     return 0
 
 
+def cmd_contamination_check(args) -> int:
+    """캡처 오염 검사(비전) — 마우스커서·알림·토스트·비책(터미널) 혼입 페이지 표시/제거."""
+    from . import contamination as CT
+    s = cfg.load(bridge_url=args.bridge)
+    book_dir = _resolve_book_dir(args)
+    rep = CT.check_contamination(book_dir, s.ai, remove=getattr(args, "remove", False))
+    return 0
+
+
 def cmd_publish(args) -> int:
     """책 산출물(index/code_blocks/book_overview + page/thumbs)을 NAS 에 발행.
     NAS_PASS(또는 SSHPASS) 환경변수 필요 — 없으면 로컬만(발행 스킵, 잡 실패 아님).
@@ -706,6 +715,11 @@ def build_parser() -> argparse.ArgumentParser:
     pfin = sub.add_parser("finalize", help="index.html 에 챕터트리+표정리본 주입")
     pfin.add_argument("--slug"); pfin.add_argument("--book-dir")
     pfin.set_defaults(func=cmd_finalize)
+
+    pcc = sub.add_parser("contamination-check", help="캡처 오염(커서·알림·비책) 비전 검사")
+    pcc.add_argument("--slug"); pcc.add_argument("--book-dir")
+    pcc.add_argument("--remove", action="store_true", help="오염 페이지 삭제(thumbs·raw 포함)")
+    pcc.set_defaults(func=cmd_contamination_check)
 
     ppub = sub.add_parser("publish", help="산출물 NAS 발행(NAS_PASS 필요, 없으면 로컬만)")
     ppub.add_argument("--slug"); ppub.add_argument("--book-dir")

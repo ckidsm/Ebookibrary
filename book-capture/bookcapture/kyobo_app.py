@@ -581,6 +581,20 @@ class KyoboAppScreenshot:
 
         return None
 
+    def _is_kyobo_frontmost(self):
+        """교보 앱이 최전면(frontmost)인지 — -R 영역 캡처 오염(터미널 등) 방지 게이트."""
+        if self.system != "Darwin":
+            return False
+        try:
+            r = subprocess.run([
+                "osascript", "-e",
+                'tell application "System Events" to name of first application process whose frontmost is true',
+            ], capture_output=True, text=True, timeout=3)
+            name = unicodedata.normalize("NFC", (r.stdout or "").strip())
+            return "교보" in name or "iPadB2C" in name or "kyobo" in name.lower()
+        except Exception:
+            return False
+
     def _find_kyobo_window_id(self, retries=3, retry_delay=0.7, debug=False):
         """Quartz CGWindowList 로 교보eBook 메인 창의 WindowID 찾기.
         frontmost / 디스플레이 / Space 무관. retry + 2-tier fallback.
@@ -745,22 +759,26 @@ class KyoboAppScreenshot:
                     except subprocess.CalledProcessError as e:
                         print(f"⚠️  WID({wid}) 캡처 실패: {e}")
 
-                # 폴백: 영역(-R). 교보가 최전면이면 그 좌표 = 책 화면. Quartz→SystemEvents 좌표.
-                bounds = self._find_kyobo_window_bounds() or self._get_bounds_via_system_events()
-                if bounds:
-                    x, y, w, h = bounds
-                    TITLE_BAR_H = 28  # macOS 타이틀바 자동 크롭
-                    if h > TITLE_BAR_H + 200:
-                        y += TITLE_BAR_H; h -= TITLE_BAR_H
-                    try:
-                        subprocess.run([
-                            "/usr/sbin/screencapture", "-R", f"{x},{y},{w},{h}",
-                            "-x", "-t", "png", str(filepath),
-                        ], check=True)
-                        if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
-                            return True  # raw 반환 — 크롭/raw보존은 페이지번호 확정 후 _finalize_page 에서
-                    except subprocess.CalledProcessError as e:
-                        print(f"⚠️  영역 캡처 실패: {e}")
+                # 폴백: 영역(-R). ⚠️ **교보가 최전면일 때만** 한다 — 아니면 그 화면 좌표엔 다른 창
+                # (터미널 등)이 있어 오염됨(2026-07-13 page_369=터미널 캡처 사고). 최전면 아니면 -R 생략.
+                if self._is_kyobo_frontmost():
+                    bounds = self._find_kyobo_window_bounds() or self._get_bounds_via_system_events()
+                    if bounds:
+                        x, y, w, h = bounds
+                        TITLE_BAR_H = 28  # macOS 타이틀바 자동 크롭
+                        if h > TITLE_BAR_H + 200:
+                            y += TITLE_BAR_H; h -= TITLE_BAR_H
+                        try:
+                            subprocess.run([
+                                "/usr/sbin/screencapture", "-R", f"{x},{y},{w},{h}",
+                                "-x", "-t", "png", str(filepath),
+                            ], check=True)
+                            if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
+                                return True  # raw 반환 — 크롭/raw보존은 _finalize_page 에서
+                        except subprocess.CalledProcessError as e:
+                            print(f"⚠️  영역 캡처 실패: {e}")
+                else:
+                    print("   ⚠ 교보가 최전면 아님 → -R 영역 캡처 생략(터미널 등 오염 방지)")
 
                 if attempt < 2:
                     print(f"   ↻ 캡처 실패 — 교보 재활성화 후 재시도 {attempt + 2}/3")
