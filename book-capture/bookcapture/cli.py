@@ -390,6 +390,34 @@ def cmd_finalize(args) -> int:
     return 0
 
 
+def cmd_publish(args) -> int:
+    """책 산출물(index/code_blocks/book_overview + page/thumbs)을 NAS 에 발행.
+    NAS_PASS(또는 SSHPASS) 환경변수 필요 — 없으면 로컬만(발행 스킵, 잡 실패 아님).
+    워커 auto 마지막 단계 = Mac 로컬매크로 결과를 라이브 반영."""
+    import subprocess
+    book_dir = _resolve_book_dir(args)
+    slug = book_dir.name
+    sd = book_dir / "summary"
+    if not (sd / "index.html").exists():
+        print(f"✗ index.html 없음 — 발행 스킵: {sd}", file=sys.stderr); return 0
+    if not (os.environ.get("NAS_PASS") or os.environ.get("SSHPASS")):
+        print("[publish] NAS_PASS 없음 — 로컬만 생성(발행 스킵). 라이브 반영하려면 워커 env 에 NAS_PASS 설정.")
+        return 0
+    scripts = Path(__file__).resolve().parent.parent / "scripts"
+    files = [str(sd / "index.html")]
+    for f in ("code_blocks.json", "book_overview.json"):
+        if (sd / f).exists():
+            files.append(str(sd / f))
+    try:
+        subprocess.run(["bash", str(scripts / "publish_book.sh"), slug, *files], check=True)
+        subprocess.run(["bash", str(scripts / "publish_images.sh"), slug], check=True)
+        print(f"[publish] ✅ 라이브: https://redcodeme.synology.me/kyobo/books/{slug}/summary/index.html")
+        return 0
+    except subprocess.CalledProcessError as e:
+        print(f"[publish] 발행 실패: {e}", file=sys.stderr)
+        return 1
+
+
 def cmd_worker(args) -> int:
     """백엔드 jobs 큐 polling — 한 번 띄워두면 [분석 시작] 클릭마다 자동 처리."""
     return worker_mod.run_worker(bridge=args.bridge, interval=args.interval)
@@ -678,6 +706,10 @@ def build_parser() -> argparse.ArgumentParser:
     pfin = sub.add_parser("finalize", help="index.html 에 챕터트리+표정리본 주입")
     pfin.add_argument("--slug"); pfin.add_argument("--book-dir")
     pfin.set_defaults(func=cmd_finalize)
+
+    ppub = sub.add_parser("publish", help="산출물 NAS 발행(NAS_PASS 필요, 없으면 로컬만)")
+    ppub.add_argument("--slug"); ppub.add_argument("--book-dir")
+    ppub.set_defaults(func=cmd_publish)
 
     pcd = sub.add_parser("chapters-detect", help="빈-OCR 구분페이지로 챕터 경계 자동 감지")
     pcd.add_argument("--slug"); pcd.add_argument("--book-dir"); pcd.add_argument("--bridge")

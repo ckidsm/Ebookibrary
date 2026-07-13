@@ -281,6 +281,7 @@ def run_one(bridge: str, job: dict) -> None:
             ["chapters-auto", "--book-dir", str(book_dir)],          # 비전 장 표지 감지
             ["overview", "--book-dir", str(book_dir), "--title", (job.get("title") or slug)],
             ["finalize", "--book-dir", str(book_dir)],               # 챕터트리+표 주입
+            ["publish", "--book-dir", str(book_dir)],                # NAS 발행(NAS_PASS 있으면)
         ]
 
     print(f"[worker] 📋 실행할 steps ({len(steps)}개):")
