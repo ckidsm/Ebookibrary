@@ -604,6 +604,26 @@ class KyoboAppScreenshot:
 
         return None
 
+    def _ensure_frontmost(self, timeout=2.5):
+        """교보를 활성화하고 **최전면이 될 때까지** 짧게 대기. 창이 비활성이면 →키/캡처가 실패하므로
+        페이지 넘김·캡처 직전에 호출. 반환: 최전면 확보 여부."""
+        if self.system != "Darwin":
+            return True
+        self.activate_app()
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self._is_kyobo_frontmost():
+                return True
+            time.sleep(0.15)
+            self.activate_app()
+        return self._is_kyobo_frontmost()
+
+    def _turn_next_page(self):
+        """교보 활성 확인 후 →키 전송 — 창 비활성/포커스 뺏김 시 페이지 안 넘어가는 문제 방지.
+        (2026-07-13 사용자 지적: 마우스·클릭 등으로 창이 비활성화되면 →키가 교보로 안 감)."""
+        self._ensure_frontmost()
+        self.press_key(124)  # 오른쪽 화살표(다음 페이지)
+
     def _is_kyobo_frontmost(self):
         """교보 앱이 최전면(frontmost)인지 — -R 영역 캡처 오염(터미널 등) 방지 게이트."""
         if self.system != "Darwin":
@@ -767,8 +787,8 @@ class KyoboAppScreenshot:
             #    항상 깨끗하다. 교보 최전면이면 성공. -R 영역 폴백은 알림/터미널 오염 위험이라 **최후에 1회만**.
             #    (2026-07-13: -R 로 18~25p 에 알림·터미널 섞임 → WID 우선으로 오염 최소화.)
             for attempt in range(3):
-                self.activate_app()
-                time.sleep(0.6 if attempt == 0 else 1.1)  # 재시도일수록 백킹 안정 대기 ↑
+                self._ensure_frontmost(timeout=2.0)  # 최전면 확보(창 비활성 시 WID 캡처 실패 방지)
+                time.sleep(0.3 if attempt == 0 else 0.8)  # 백킹 안정 대기
                 wid = self._find_kyobo_window_id(retries=1)
                 if wid:
                     try:
@@ -943,7 +963,7 @@ class KyoboAppScreenshot:
                         temp_filepath.unlink(missing_ok=True)
                         results.append(None)
                         if i < count - 1 and auto_page_turn:
-                            self.press_key(124); time.sleep(interval)
+                            self._turn_next_page(); time.sleep(interval)
                         continue
 
                 # 🔚 마지막 페이지 감지 (OCR 무관, perceptual): 직전 캡처와 **거의 동일**하면
@@ -966,8 +986,8 @@ class KyoboAppScreenshot:
                         # 오탐(242p 조기종료) 방지: →키 재전송+재캡처로 확인. 바뀌면 계속, 계속 같으면 끝.
                         confirmed_end = True
                         for _rt in range(3):
-                            print(f"   … 같은 페이지(MAD={_mad:.1f}) — →키 재전송 후 확인 {_rt + 1}/3")
-                            self.activate_app(); self.press_key(124); time.sleep(max(interval, 1.5))
+                            print(f"   … 같은 페이지(MAD={_mad:.1f}) — 활성화+→키 재전송 후 확인 {_rt + 1}/3")
+                            self._turn_next_page(); time.sleep(max(interval, 1.5))
                             if not self.capture_app_window(str(temp_filepath)):
                                 continue
                             try:
@@ -1038,7 +1058,7 @@ class KyoboAppScreenshot:
             if i < count - 1:
                 if auto_page_turn:
                     print(f"📄 다음 페이지로 이동...")
-                    self.press_key(124)  # 오른쪽 화살표 (다음 페이지)
+                    self._turn_next_page()  # 활성 확인 후 →키(창 비활성 시 페이지 안 넘어감 방지)
                 print(f"⏳ {interval}초 대기 중...")
                 time.sleep(interval)
         finally:
