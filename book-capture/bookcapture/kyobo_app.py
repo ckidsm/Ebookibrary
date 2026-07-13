@@ -726,60 +726,49 @@ class KyoboAppScreenshot:
         캡처 성공 시 _postprocess_capture 로 raw 보존 + 표준 크롭.
         """
         if self.system == "Darwin":
-            # 1. 앱 활성화 (캡처는 frontmost 무관이지만, 직후 키 입력을 위해 활성화 유지)
-            self.activate_app()
-            time.sleep(0.5)  # activate 완전 반영 대기 — Quartz 검색 신뢰성 ↑
+            # 교보(iPad앱)는 **최전면일 때만** WID(-l) 캡처가 성공한다(백그라운드면 창 백킹 해제 →
+            # -l 실패). 포커스를 순간 뺏기면 그 페이지가 스킵되므로, 실패 시 **재활성화+대기 후 재시도**
+            # (최대 3회). 검증(2026-07-13): 교보 최전면이면 5/5 성공, 타 앱 최전면일 때만 실패.
+            for attempt in range(3):
+                self.activate_app()
+                time.sleep(0.6 if attempt == 0 else 1.1)  # 재시도일수록 백킹 안정 대기 ↑
 
-            # 2. Quartz 로 창 WID 찾기 → screencapture -l 로 정밀 캡처 (최선)
-            #    retries=1: WID 실패가 잦은 환경(창 상태 불안정)에서 재시도 지연 낭비(~4s/page) 방지 →
-            #    바로 영역 캡처(SystemEvents 좌표)로 폴백. 영역도 교보 창만 정확히 찍음(터미널은 타 디스플레이).
-            wid = self._find_kyobo_window_id(retries=1)
-            if wid:
-                try:
-                    subprocess.run([
-                        "/usr/sbin/screencapture", "-l", str(wid),
-                        "-x", "-o", "-t", "png", str(filepath),
-                    ], check=True)
-                    if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
-                        return self._postprocess_capture(filepath)
-                except subprocess.CalledProcessError as e:
-                    print(f"⚠️  WID({wid}) 캡처 실패: {e}")
+                # 최선: WID -l (창이 가려져도 정확). 교보 최전면이면 성공.
+                wid = self._find_kyobo_window_id(retries=1)
+                if wid:
+                    try:
+                        subprocess.run([
+                            "/usr/sbin/screencapture", "-l", str(wid),
+                            "-x", "-o", "-t", "png", str(filepath),
+                        ], check=True)
+                        if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
+                            return self._postprocess_capture(filepath)
+                    except subprocess.CalledProcessError as e:
+                        print(f"⚠️  WID({wid}) 캡처 실패: {e}")
 
-            # 3. 폴백 1 — Quartz 좌표 + screencapture -R 영역 캡처
-            bounds = self._find_kyobo_window_bounds()
-            source = "Quartz"
+                # 폴백: 영역(-R). 교보가 최전면이면 그 좌표 = 책 화면. Quartz→SystemEvents 좌표.
+                bounds = self._find_kyobo_window_bounds() or self._get_bounds_via_system_events()
+                if bounds:
+                    x, y, w, h = bounds
+                    TITLE_BAR_H = 28  # macOS 타이틀바 자동 크롭
+                    if h > TITLE_BAR_H + 200:
+                        y += TITLE_BAR_H; h -= TITLE_BAR_H
+                    try:
+                        subprocess.run([
+                            "/usr/sbin/screencapture", "-R", f"{x},{y},{w},{h}",
+                            "-x", "-t", "png", str(filepath),
+                        ], check=True)
+                        if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
+                            return self._postprocess_capture(filepath)
+                    except subprocess.CalledProcessError as e:
+                        print(f"⚠️  영역 캡처 실패: {e}")
 
-            # 4. 폴백 2 — System Events 좌표 (Quartz 못 잡을 때도 SE 는 잡음)
-            if not bounds:
-                bounds = self._get_bounds_via_system_events()
-                source = "SystemEvents"
+                if attempt < 2:
+                    print(f"   ↻ 캡처 실패 — 교보 재활성화 후 재시도 {attempt + 2}/3")
 
-            if bounds:
-                x, y, w, h = bounds
-                # macOS 표준 타이틀바 (빨강/노랑/초록 + 제목) ~28px 자동 크롭
-                TITLE_BAR_H = 28
-                if h > TITLE_BAR_H + 200:  # 의미 있는 책 영역 남도록 sanity check
-                    y += TITLE_BAR_H
-                    h -= TITLE_BAR_H
-                print(f"   ℹ {source} 영역 캡처(타이틀바 -{TITLE_BAR_H}px): ({x},{y}) {w}x{h}")
-                try:
-                    subprocess.run([
-                        "/usr/sbin/screencapture", "-R", f"{x},{y},{w},{h}",
-                        "-x", "-t", "png", str(filepath),
-                    ], check=True)
-                    if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
-                        return self._postprocess_capture(filepath)
-                except subprocess.CalledProcessError as e:
-                    print(f"⚠️  영역 캡처 실패: {e}")
-
-            # 5. 전체화면(메인 디스플레이) 폴백 — 제거.
-            #    교보 창을 특정 못하면 메인 디스플레이(다른 창/터미널)를 통째로 찍어
-            #    '콘솔 화면 혼입' 오염이 발생(2026-07 검증). 잘못된 화면을 찍느니 이 페이지를 건너뛴다.
-            #    ⚠️ WID 캡처(-l)는 창이 가려져도 정확히 찍으므로, 교보 앱을 '창(비-전체화면) 모드'로
-            #       두면 WID 로 잡힌다. 전체화면이면 CGWindowList 에서 창이 빠져 WID 실패 → 창 모드 권장.
-            print("⛔ 교보 창 특정 실패(WID·영역 모두) → 이 페이지 캡처 건너뜀 "
-                  "(전체화면 폴백 제거 — 터미널 등 오염 방지). "
-                  "교보 앱을 '창 모드(비-전체화면)'로 두면 WID 캡처가 안정적입니다.")
+            # 3회 모두 실패 — 전체화면 폴백은 안 함(메인 디스플레이 통째 캡처 = 터미널 오염 위험).
+            print("⛔ 교보 창 특정 실패(WID·영역 3회) → 이 페이지 건너뜀. "
+                  "교보 앱을 '창 모드(비-전체화면)'로 **최전면 유지**하세요(다른 창이 위에 오면 실패).")
             return False
         else:
             # Windows
