@@ -695,9 +695,32 @@ class KyoboAppScreenshot:
         b = main['kCGWindowBounds']
         return int(b['X']), int(b['Y']), int(b['Width']), int(b['Height'])
 
+    def _postprocess_capture(self, filepath):
+        """캡처 raw(창 grab) → 표준 정규화: (1) source_raws/raw_NNN.png 원본 보존,
+        (2) page_crop.crop_page(chrome=20,20,20,20)로 content-aware 크롭(헤더 안 잘림·크롬 제거).
+        수동 파이프라인(app_capture_raws→crop_book --chrome 20,20,20,20)과 동일 규칙.
+        실패해도 원본 유지하고 True(캡처 자체는 성공)."""
+        try:
+            import re
+            import shutil
+            from PIL import Image
+            from . import page_crop
+            fp = Path(filepath)
+            m = re.search(r"(\d+)", fp.stem)
+            raws = fp.parent / "source_raws"
+            raws.mkdir(exist_ok=True)
+            if m:
+                shutil.copy2(fp, raws / f"raw_{int(m.group(1)):03d}.png")
+            cropped = page_crop.crop_page(Image.open(fp), chrome=(20, 20, 20, 20))
+            cropped.save(fp)
+        except Exception as e:
+            print(f"⚠ 크롭 후처리 실패(원본 유지): {e}")
+        return True
+
     def capture_app_window(self, filepath):
         """교보eBook 앱 창만 캡처 (Quartz WID + screencapture -l).
         외장 모니터·다른 Space 도 OK. frontmost 무관.
+        캡처 성공 시 _postprocess_capture 로 raw 보존 + 표준 크롭.
         """
         if self.system == "Darwin":
             # 1. 앱 활성화 (캡처는 frontmost 무관이지만, 직후 키 입력을 위해 활성화 유지)
@@ -715,7 +738,7 @@ class KyoboAppScreenshot:
                         "-x", "-o", "-t", "png", str(filepath),
                     ], check=True)
                     if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
-                        return True
+                        return self._postprocess_capture(filepath)
                 except subprocess.CalledProcessError as e:
                     print(f"⚠️  WID({wid}) 캡처 실패: {e}")
 
@@ -742,7 +765,7 @@ class KyoboAppScreenshot:
                         "-x", "-t", "png", str(filepath),
                     ], check=True)
                     if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
-                        return True
+                        return self._postprocess_capture(filepath)
                 except subprocess.CalledProcessError as e:
                     print(f"⚠️  영역 캡처 실패: {e}")
 
