@@ -59,6 +59,27 @@ def _check_one(key, model, path):
     return None
 
 
+def is_contaminated_page(path, cfg, model="claude-haiku-4-5", brightness_gate=125):
+    """캡처 1장이 오염(커서·알림·비책)인지 판정 → (bool, reasons).
+    싼 사전필터: 책 페이지는 밝음(흰 배경, mean≥gate) → 비전 생략(오염 아님).
+    어두운 캡처(터미널 등)만 비전 확인 → 비용·시간 절약. 인라인 재캡처용."""
+    try:
+        from PIL import Image, ImageStat
+        mean = ImageStat.Stat(Image.open(path).convert("L")).mean[0]
+    except Exception:
+        return False, []
+    if mean >= brightness_gate:
+        return False, []
+    key = cfg.api_key
+    if not key:
+        return False, []
+    info = _check_one(key, getattr(cfg, "model", None) or model, path)
+    if not info:
+        return False, []
+    reasons = [k for k in ("cursor", "notification", "non_book") if info.get(k)]
+    return bool(reasons), reasons
+
+
 def check_contamination(book_dir, cfg, model="claude-haiku-4-5", remove=False):
     """책 폴더 page_*.png 전수 오염 검사. 반환 {checked, flagged:[{page,reasons,note}], removed:[]}.
     remove=True 면 오염 페이지 + thumbs/ + source_raws/ 대응분 삭제."""

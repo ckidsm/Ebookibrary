@@ -800,7 +800,7 @@ class KyoboAppScreenshot:
 
     def take_multiple_screenshots(self, count=1, interval=3, custom_prefix=None,
                                   auto_page_turn=True, start_page=1, continue_from_last=False,
-                                  use_ocr=True, noninteractive=False):
+                                  use_ocr=True, noninteractive=False, contam_check=None):
         """
         여러 장의 스크린샷을 간격을 두고 캡처 (자동 페이지 넘김 포함)
 
@@ -899,6 +899,26 @@ class KyoboAppScreenshot:
                     continue
 
                 print(f"📸 임시 저장: {temp_filepath.name}")
+
+                # 🧹 오염 인라인 재캡처: 오염(커서·알림·비책)이면 **같은 페이지**를 재활성화+재캡처(최대 2회).
+                #    사용자 요청(2026-07-13): 오염 시 삭제만 말고 그 자리에서 다시 시도. →키 안 누름(같은 페이지).
+                if contam_check is not None:
+                    bad, reasons = contam_check(str(temp_filepath))
+                    tries = 0
+                    while bad and tries < 2:
+                        print(f"   🧹 오염 감지({reasons}) → 같은 페이지 재캡처 {tries + 1}/2")
+                        self.activate_app(); time.sleep(1.0)
+                        if not self.capture_app_window(str(temp_filepath)):
+                            break
+                        bad, reasons = contam_check(str(temp_filepath))
+                        tries += 1
+                    if bad:
+                        print(f"   ⚠ 재캡처 후에도 오염({reasons}) → 이 페이지 스킵(배치 QC 가 최종 정리)")
+                        temp_filepath.unlink(missing_ok=True)
+                        results.append(None)
+                        if i < count - 1 and auto_page_turn:
+                            self.press_key(124); time.sleep(interval)
+                        continue
 
                 # 🔚 마지막 페이지 감지 (OCR 무관, perceptual): 직전 캡처와 **거의 동일**하면
                 #    →키가 안 먹힌 것 = 책 끝. 축소 grayscale MAD 로 비교(같은 페이지=0, 다른 페이지≥9 검증).

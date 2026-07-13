@@ -180,6 +180,11 @@ def cmd_capture_auto(args) -> int:
             print(f"[preflight] ✅ {rd['reason']}")
     except Exception as _e:
         print(f"[preflight] (게이트 스킵 — {_e})")
+    # 오염 인라인 재캡처 콜백 — 오염(커서·알림·비책) 감지 시 같은 페이지 재캡처(밝기 사전필터로 비용↓).
+    contam_check = None
+    if s.ai.api_key:
+        from . import contamination as _ct
+        contam_check = lambda p: _ct.is_contaminated_page(p, s.ai)
     bot.take_multiple_screenshots(
         count=args.count,
         interval=args.interval,
@@ -188,6 +193,7 @@ def cmd_capture_auto(args) -> int:
         continue_from_last=args.continue_from_last,
         use_ocr=not args.no_ocr,
         noninteractive=True,
+        contam_check=contam_check,
     )
     return 0
 
