@@ -180,11 +180,11 @@ def cmd_capture_auto(args) -> int:
             print(f"[preflight] ✅ {rd['reason']}")
     except Exception as _e:
         print(f"[preflight] (게이트 스킵 — {_e})")
-    # 오염 인라인 재캡처 콜백 — 오염(커서·알림·비책) 감지 시 같은 페이지 재캡처(밝기 사전필터로 비용↓).
+    # 오염 인라인 재캡처 콜백 — 영역(-R) 캡처만 검사하므로(WID 는 깨끗) 밝기 게이트 없이 항상 비전 확인.
     contam_check = None
     if s.ai.api_key:
         from . import contamination as _ct
-        contam_check = lambda p: _ct.is_contaminated_page(p, s.ai)
+        contam_check = lambda p: _ct.is_contaminated_page(p, s.ai, brightness_gate=999)
     bot.take_multiple_screenshots(
         count=args.count,
         interval=args.interval,

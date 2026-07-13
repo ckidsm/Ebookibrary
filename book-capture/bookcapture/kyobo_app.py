@@ -762,14 +762,13 @@ class KyoboAppScreenshot:
         캡처 성공 시 _postprocess_capture 로 raw 보존 + 표준 크롭.
         """
         if self.system == "Darwin":
-            # 교보(iPad앱)는 **최전면일 때만** WID(-l) 캡처가 성공한다(백그라운드면 창 백킹 해제 →
-            # -l 실패). 포커스를 순간 뺏기면 그 페이지가 스킵되므로, 실패 시 **재활성화+대기 후 재시도**
-            # (최대 3회). 검증(2026-07-13): 교보 최전면이면 5/5 성공, 타 앱 최전면일 때만 실패.
+            self._last_capture_method = None
+            # ⭐ WID(-l) 를 **우선 3회** 시도 — WID 캡처는 occlusion-safe(창 내용만, 알림·다른 창 제외)라
+            #    항상 깨끗하다. 교보 최전면이면 성공. -R 영역 폴백은 알림/터미널 오염 위험이라 **최후에 1회만**.
+            #    (2026-07-13: -R 로 18~25p 에 알림·터미널 섞임 → WID 우선으로 오염 최소화.)
             for attempt in range(3):
                 self.activate_app()
                 time.sleep(0.6 if attempt == 0 else 1.1)  # 재시도일수록 백킹 안정 대기 ↑
-
-                # 최선: WID -l (창이 가려져도 정확). 교보 최전면이면 성공.
                 wid = self._find_kyobo_window_id(retries=1)
                 if wid:
                     try:
@@ -778,37 +777,35 @@ class KyoboAppScreenshot:
                             "-x", "-o", "-t", "png", str(filepath),
                         ], check=True)
                         if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
-                            return True  # raw 반환 — 크롭/raw보존은 페이지번호 확정 후 _finalize_page 에서
+                            self._last_capture_method = "wid"  # 깨끗(occlusion-safe)
+                            return True  # raw 반환 — 크롭/raw보존은 _finalize_page 에서
                     except subprocess.CalledProcessError as e:
                         print(f"⚠️  WID({wid}) 캡처 실패: {e}")
 
-                # 폴백: 영역(-R). ⚠️ **교보가 최전면일 때만** 한다 — 아니면 그 화면 좌표엔 다른 창
-                # (터미널 등)이 있어 오염됨(2026-07-13 page_369=터미널 캡처 사고). 최전면 아니면 -R 생략.
-                if self._is_kyobo_frontmost():
-                    bounds = self._find_kyobo_window_bounds() or self._get_bounds_via_system_events()
-                    if bounds:
-                        x, y, w, h = bounds
-                        TITLE_BAR_H = 28  # macOS 타이틀바 자동 크롭
-                        if h > TITLE_BAR_H + 200:
-                            y += TITLE_BAR_H; h -= TITLE_BAR_H
-                        try:
-                            subprocess.run([
-                                "/usr/sbin/screencapture", "-R", f"{x},{y},{w},{h}",
-                                "-x", "-t", "png", str(filepath),
-                            ], check=True)
-                            if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
-                                return True  # raw 반환 — 크롭/raw보존은 _finalize_page 에서
-                        except subprocess.CalledProcessError as e:
-                            print(f"⚠️  영역 캡처 실패: {e}")
-                else:
-                    print("   ⚠ 교보가 최전면 아님 → -R 영역 캡처 생략(터미널 등 오염 방지)")
+            # WID 3회 실패 → **최후 1회** 영역(-R). ⚠️ **교보가 최전면일 때만** — 아니면 그 화면 좌표엔
+            # 다른 창(터미널·알림)이 있어 오염됨(page_369 사고). 최전면 아니면 -R 생략(오염 방지).
+            if self._is_kyobo_frontmost():
+                bounds = self._find_kyobo_window_bounds() or self._get_bounds_via_system_events()
+                if bounds:
+                    x, y, w, h = bounds
+                    TITLE_BAR_H = 28  # macOS 타이틀바 자동 크롭
+                    if h > TITLE_BAR_H + 200:
+                        y += TITLE_BAR_H; h -= TITLE_BAR_H
+                    try:
+                        subprocess.run([
+                            "/usr/sbin/screencapture", "-R", f"{x},{y},{w},{h}",
+                            "-x", "-t", "png", str(filepath),
+                        ], check=True)
+                        if os.path.exists(filepath) and os.path.getsize(filepath) > 1024:
+                            self._last_capture_method = "region"  # ⚠ 오염 가능(알림/오버레이) → 인라인 QC 확인
+                            return True
+                    except subprocess.CalledProcessError as e:
+                        print(f"⚠️  영역 캡처 실패: {e}")
+            else:
+                print("   ⚠ 교보가 최전면 아님 → -R 영역 캡처 생략(터미널 등 오염 방지)")
 
-                if attempt < 2:
-                    print(f"   ↻ 캡처 실패 — 교보 재활성화 후 재시도 {attempt + 2}/3")
-
-            # 3회 모두 실패 — 전체화면 폴백은 안 함(메인 디스플레이 통째 캡처 = 터미널 오염 위험).
-            print("⛔ 교보 창 특정 실패(WID·영역 3회) → 이 페이지 건너뜀. "
-                  "교보 앱을 '창 모드(비-전체화면)'로 **최전면 유지**하세요(다른 창이 위에 오면 실패).")
+            print("⛔ 교보 창 특정 실패(WID 3회·영역) → 이 페이지 건너뜀. "
+                  "교보 앱을 '창 모드(비-전체화면)'로 **최전면 유지**하세요.")
             return False
         else:
             # Windows
@@ -926,16 +923,19 @@ class KyoboAppScreenshot:
 
                 print(f"📸 임시 저장: {temp_filepath.name}")
 
-                # 🧹 오염 인라인 재캡처: 오염(커서·알림·비책)이면 **같은 페이지**를 재활성화+재캡처(최대 2회).
-                #    사용자 요청(2026-07-13): 오염 시 삭제만 말고 그 자리에서 다시 시도. →키 안 누름(같은 페이지).
-                if contam_check is not None:
+                # 🧹 오염 인라인 재캡처: WID(-l) 캡처는 occlusion-safe(깨끗)라 스킵, **영역(-R)만** 검사.
+                #    오염(커서·알림·비책)이면 같은 페이지 재활성화+재캡처(최대 2회). 재캡처가 WID 로 성공하면 깨끗.
+                #    사용자 요청(2026-07-13): 오염 시 삭제만 말고 그 자리에서 다시 시도.
+                if contam_check is not None and getattr(self, "_last_capture_method", None) == "region":
                     bad, reasons = contam_check(str(temp_filepath))
                     tries = 0
                     while bad and tries < 2:
-                        print(f"   🧹 오염 감지({reasons}) → 같은 페이지 재캡처 {tries + 1}/2")
+                        print(f"   🧹 오염 감지({reasons}, -R) → 같은 페이지 재캡처 {tries + 1}/2")
                         self.activate_app(); time.sleep(1.0)
                         if not self.capture_app_window(str(temp_filepath)):
                             break
+                        if getattr(self, "_last_capture_method", None) == "wid":
+                            bad = False; break  # WID 로 재캡처 성공 = 깨끗
                         bad, reasons = contam_check(str(temp_filepath))
                         tries += 1
                     if bad:
@@ -956,14 +956,35 @@ class KyoboAppScreenshot:
                     cur_sig = _I.open(temp_filepath).convert("L").resize((100, 100))
                 except Exception:
                     cur_sig = None
+                def _mad_vs_prev(sig):
+                    return sum(_i * _n for _i, _n in enumerate(
+                        _IC.difference(sig, prev_sig).histogram())) / 10000.0
                 if cur_sig is not None and prev_sig is not None:
-                    _d = _IC.difference(cur_sig, prev_sig)
-                    _mad = sum(_i * _n for _i, _n in enumerate(_d.histogram())) / 10000.0
+                    _mad = _mad_vs_prev(cur_sig)
                     if _mad < 4.0:
-                        print(f"   🔚 직전 페이지와 거의 동일(MAD={_mad:.1f}) → 책 끝 도달, 캡처 종료 "
-                              f"(수집 {len([r for r in results if r])}장)")
-                        temp_filepath.unlink(missing_ok=True)  # 반복분 폐기(마지막 unique 1장은 이미 저장됨)
-                        break
+                        # 같은 페이지 = →키가 **일시적으로 안 먹혔을** 수도, **진짜 책 끝**일 수도.
+                        # 오탐(242p 조기종료) 방지: →키 재전송+재캡처로 확인. 바뀌면 계속, 계속 같으면 끝.
+                        confirmed_end = True
+                        for _rt in range(3):
+                            print(f"   … 같은 페이지(MAD={_mad:.1f}) — →키 재전송 후 확인 {_rt + 1}/3")
+                            self.activate_app(); self.press_key(124); time.sleep(max(interval, 1.5))
+                            if not self.capture_app_window(str(temp_filepath)):
+                                continue
+                            try:
+                                re_sig = _I.open(temp_filepath).convert("L").resize((100, 100))
+                            except Exception:
+                                continue
+                            _mad = _mad_vs_prev(re_sig)
+                            if _mad >= 4.0:          # 페이지가 바뀜 → 일시적 미스였음, 계속 진행
+                                print(f"   ▶ 페이지 넘어감(MAD={_mad:.1f}) — 일시적 →키 미스, 계속")
+                                cur_sig = re_sig
+                                confirmed_end = False
+                                break
+                        if confirmed_end:
+                            print(f"   🔚 →키 3회 재전송에도 동일 → 책 끝 확정, 종료 "
+                                  f"(수집 {len([r for r in results if r])}장)")
+                            temp_filepath.unlink(missing_ok=True)
+                            break
                 prev_sig = cur_sig
 
                 # OCR로 페이지 번호 추출
