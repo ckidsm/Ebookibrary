@@ -341,6 +341,55 @@ def cmd_code(args) -> int:
     return 0 if res.get("done") else 1
 
 
+def cmd_chapters_auto(args) -> int:
+    """비전으로 장 표지 감지 → summary/chapters.json (OCR 깨진 책도 동작)."""
+    from . import chapters_detect as CD
+    s = cfg.load(bridge_url=args.bridge)
+    book_dir = _resolve_book_dir(args)
+    chs = CD.generate_chapters(book_dir, s.ai)
+    return 0 if chs else 1
+
+
+def cmd_overview(args) -> int:
+    """chapters.json + pages_data.json → summary/book_overview.json (전체요약+장별 1장)."""
+    from . import book_overview as BO
+    s = cfg.load(bridge_url=args.bridge)
+    book_dir = _resolve_book_dir(args)
+    ov = BO.generate_overview(book_dir, s.ai, title=(args.title or None))
+    return 0 if ov else 1
+
+
+def cmd_finalize(args) -> int:
+    """빌드된 index.html 에 챕터트리 + 표정리본 주입 (chapters.json / page_extras.json)."""
+    import importlib.util
+    book_dir = _resolve_book_dir(args)
+    sd = book_dir / "summary"
+    idx = sd / "index.html"
+    if not idx.exists():
+        print(f"✗ index.html 없음: {idx}", file=sys.stderr); return 2
+    scripts = Path(__file__).resolve().parent.parent / "scripts"
+
+    def _load(name):
+        p = scripts / f"{name}.py"
+        spec = importlib.util.spec_from_file_location(name, p)
+        m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m); return m
+    html = idx.read_text(encoding="utf-8")
+    pages_total = len(list(book_dir.glob("page_*.png")))
+    ch = sd / "chapters.json"
+    if ch.exists() and "chapter-summary" not in html:
+        act = _load("add_chapter_tree")
+        html = act.build(html, json.loads(ch.read_text(encoding="utf-8")), pages_total)
+        print("[finalize] 챕터트리 주입")
+    pe = sd / "page_extras.json"
+    if pe.exists() and "page-extra" not in html:
+        ape = _load("add_page_extras")
+        html = ape.build(html, json.loads(pe.read_text(encoding="utf-8")))
+        print("[finalize] 표정리본 주입")
+    idx.write_text(html, encoding="utf-8")
+    print(f"[finalize] {idx} ({len(html)} bytes)")
+    return 0
+
+
 def cmd_worker(args) -> int:
     """백엔드 jobs 큐 polling — 한 번 띄워두면 [분석 시작] 클릭마다 자동 처리."""
     return worker_mod.run_worker(bridge=args.bridge, interval=args.interval)
@@ -617,6 +666,18 @@ def build_parser() -> argparse.ArgumentParser:
     ptt.add_argument("--min-run", type=int, default=2, help="꼬리 반복 최소 연속 수(기본 2)")
     ptt.add_argument("--dry-run", action="store_true", help="삭제 안 하고 목록만")
     ptt.set_defaults(func=cmd_trim_tail)
+
+    pca2 = sub.add_parser("chapters-auto", help="비전으로 장 표지 감지 → chapters.json(OCR 무관)")
+    pca2.add_argument("--slug"); pca2.add_argument("--book-dir")
+    pca2.set_defaults(func=cmd_chapters_auto)
+
+    pov = sub.add_parser("overview", help="chapters+pages_data → book_overview.json(전체요약+장별)")
+    pov.add_argument("--slug"); pov.add_argument("--book-dir"); pov.add_argument("--title", default=None)
+    pov.set_defaults(func=cmd_overview)
+
+    pfin = sub.add_parser("finalize", help="index.html 에 챕터트리+표정리본 주입")
+    pfin.add_argument("--slug"); pfin.add_argument("--book-dir")
+    pfin.set_defaults(func=cmd_finalize)
 
     pcd = sub.add_parser("chapters-detect", help="빈-OCR 구분페이지로 챕터 경계 자동 감지")
     pcd.add_argument("--slug"); pcd.add_argument("--book-dir"); pcd.add_argument("--bridge")

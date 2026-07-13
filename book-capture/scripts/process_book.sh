@@ -64,28 +64,22 @@ run_stage build    && { say "⑤ build";     $PY -m bookcapture build     --book
 # 3) 코드 추출
 run_stage code && { say "⑥ 코드 추출(비전)"; $PY -m bookcapture code --book-dir "$BOOK" || echo "코드추출 일부 실패(계속)"; }
 
-# 4) 책 개요 (chapters.json 필요 — 없으면 뼈대 자동)
+# 4) 챕터 자동 감지(비전) + 책 개요
 if run_stage overview; then
   if [ ! -f "$SUM/chapters.json" ]; then
-    echo "⚠ chapters.json 없음 → 뼈대 자동 생성(제목은 나중에 채우세요)"
-    $PY -m bookcapture chapters-detect --book-dir "$BOOK" || true
+    say "⑦ 챕터 자동 감지(비전 — 장 표지)"
+    $PY -m bookcapture chapters-auto --book-dir "$BOOK" || echo "챕터 감지 실패(계속)"
   fi
   if [ -f "$SUM/chapters.json" ]; then
     say "⑦ 책 개요(전체요약+장별 1장)"
-    $PY scripts/gen_book_overview.py "$BOOK" --title "${SLUG//_/ }"
+    $PY -m bookcapture overview --book-dir "$BOOK" --title "${SLUG//_/ }" || echo "책개요 실패(계속)"
   else
     echo "⚠ chapters.json 없어 책 개요 건너뜀"
   fi
 fi
 
 # 5) 최종화 (챕터트리 + 표 정리본)
-if run_stage finalize; then
-  if [ -f "$SUM/chapters.json" ]; then
-    say "⑧ 최종화(챕터트리+표)"; $PY scripts/finalize_book.py "$SUM" --force
-  else
-    echo "⚠ chapters.json 없어 최종화 건너뜀"
-  fi
-fi
+run_stage finalize && { say "⑧ 최종화(챕터트리+표)"; $PY -m bookcapture finalize --book-dir "$BOOK" || echo "최종화 실패(계속)"; }
 
 # 6) 발행
 if run_stage publish && [ "$PUBLISH" = 1 ]; then

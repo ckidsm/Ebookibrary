@@ -261,10 +261,9 @@ def run_one(bridge: str, job: dict) -> None:
             ["merge", "--book-dir", str(book_dir)],
             ["build", "--book-dir", str(book_dir)],
         ]
-    else:  # auto = capture + ocr + summarize + merge + build (5단계, 로컬 매크로)
+    else:  # auto = 로컬 매크로 최종 파이프라인 (capture→…→build→챕터→개요→최종화)
         print(f"[worker] 🖥 mode={mode!r} (로컬 매크로 분기) — capture-auto 실행 예정")
-        # #68 재검증 — 30장 임시
-        cap = ["capture-auto", "--slug", slug, "--count", "30", "--interval", "1.5"]
+        cap = ["capture-auto", "--slug", slug, "--count", "1500", "--interval", "1.5"]
         # salecmdtid 가 있으면 deep link 책 자동 열기 (kyoboebook://book/<id>)
         sale_id = job.get("salecmdtid") or _lookup_salecmdtid(bridge, slug)
         if sale_id:
@@ -279,6 +278,9 @@ def run_one(bridge: str, job: dict) -> None:
             ["code", "--book-dir", str(book_dir)],
             ["merge", "--book-dir", str(book_dir)],
             ["build", "--book-dir", str(book_dir)],
+            ["chapters-auto", "--book-dir", str(book_dir)],          # 비전 장 표지 감지
+            ["overview", "--book-dir", str(book_dir), "--title", (job.get("title") or slug)],
+            ["finalize", "--book-dir", str(book_dir)],               # 챕터트리+표 주입
         ]
 
     print(f"[worker] 📋 실행할 steps ({len(steps)}개):")

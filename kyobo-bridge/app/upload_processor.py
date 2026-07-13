@@ -47,6 +47,31 @@ def _ocr_cfg() -> OcrCfg:
     return OcrCfg(lang=o.get("lang", "kor+eng"), use_thumbs=bool(o.get("use_thumbs", True)))
 
 
+def _finalize_html(book_dir) -> None:
+    """빌드된 index.html 에 챕터트리(chapters.json) + 표정리본(page_extras.json) 주입.
+    이미 주입돼 있으면 스킵(멱등). CLI/finalize_book.py 와 동일 규칙."""
+    from pathlib import Path as _P
+    sd = _P(book_dir) / "summary"
+    idx = sd / "index.html"
+    if not idx.exists():
+        return
+    html = idx.read_text(encoding="utf-8")
+    changed = False
+    ch = sd / "chapters.json"
+    if ch.exists() and "chapter-summary" not in html:
+        from .processing.add_chapter_tree import build as _tree
+        pages_total = len(list(_P(book_dir).glob("page_*.png")))
+        html = _tree(html, json.loads(ch.read_text(encoding="utf-8")), pages_total)
+        changed = True
+    pe = sd / "page_extras.json"
+    if pe.exists() and "page-extra" not in html:
+        from .processing.add_page_extras import build as _extras
+        html = _extras(html, json.loads(pe.read_text(encoding="utf-8")))
+        changed = True
+    if changed:
+        idx.write_text(html, encoding="utf-8")
+
+
 def _progress(stage: int, total: int, name: str, cur: int = 0, tot: int = 0, msg: str = "") -> str:
     sub = (cur / tot) if tot > 0 else 0.0
     pct = ((stage - 1) + sub) / total * 100
@@ -140,7 +165,16 @@ def process_upload_job(job: dict) -> None:
         db.update_job(jid, progress=_progress(3, N, "merge", 0, 0, "병합..."))
         merge_batches(book_dir / "summary", fallback_title=title)
 
-        # ── 3.5) 책 전체 개요(AI 1회) — 머리말 카드(요약·핵심용어·핵심페이지) ──
+        # ── 3.4) 챕터 자동 감지(비전, 장 표지) → chapters.json (OCR 깨진 책도 동작) ──
+        if cfg.api_key and not (book_dir / "summary" / "chapters.json").exists():
+            try:
+                from .processing.chapters_detect import generate_chapters
+                db.update_job(jid, progress=_progress(3, N, "merge", 1, 1, "챕터 감지..."))
+                generate_chapters(book_dir, cfg)
+            except Exception as e:
+                log.warning("챕터 감지 실패(무시): %s", e)
+
+        # ── 3.5) 책 개요(전체요약+장별 상세요약) — 머리말 카드 ──
         if cfg.api_key:
             try:
                 from .processing.book_overview import generate_overview
@@ -154,6 +188,12 @@ def process_upload_job(job: dict) -> None:
             return
         db.update_job(jid, progress=_progress(4, N, "build", 0, 0, "HTML 생성..."))
         idx = build_index(book_dir, title=title)
+
+        # ── 4.5) 최종화 — 챕터트리 + 표정리본 주입(chapters.json / page_extras.json) ──
+        try:
+            _finalize_html(book_dir)
+        except Exception as e:
+            log.warning("최종화(챕터트리) 실패(무시): %s", e)
 
         # ── analysis_meta.json — 분석 히스토리(날짜·비용·토큰·페이지·모델). 모달이 읽어 표시 ──
         try:
