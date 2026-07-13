@@ -320,6 +320,29 @@ class KyoboAppScreenshot:
             except ImportError:
                 print("⚠️  pyautogui가 필요합니다: pip install pyautogui")
 
+    def set_focus_mode(self, on: bool) -> bool:
+        """캡처 중 집중모드(방해금지) 켜기/끄기 — 알림 배너·포커스 뺏김 원천 차단(싱글 모니터 대비).
+        macOS 최신(Sequoia)은 DND 를 CLI 로 직접 못 켜므로 **Shortcuts** 를 쓴다.
+        단축어 이름: 환경변수 KYOBO_FOCUS_ON/OFF, 기본 'KyoboFocusOn'/'KyoboFocusOff'.
+        단축어가 없으면 조용히 skip(캡처는 WID occlusion-safe 라 알림 안 찍힘 — 집중모드는 보너스).
+        반환: 성공 여부."""
+        if self.system != "Darwin":
+            return False
+        import os as _os
+        name = _os.environ.get("KYOBO_FOCUS_ON" if on else "KYOBO_FOCUS_OFF",
+                               "KyoboFocusOn" if on else "KyoboFocusOff")
+        try:
+            r = subprocess.run(["shortcuts", "run", name], capture_output=True, text=True, timeout=10)
+            if r.returncode == 0:
+                print(f"🌙 집중모드 {'ON' if on else 'OFF'} (shortcut '{name}')")
+                return True
+            # 단축어 없음 등 — 조용히 skip
+            print(f"ℹ 집중모드 단축어 '{name}' 없음/실패 → 생략(WID 캡처는 알림 무관). "
+                  f"자동 원하면 Shortcuts 앱에 '{name}' 생성.")
+        except Exception:
+            pass
+        return False
+
     def activate_app(self):
         """교보eBook 앱 활성화 (포커스).
         iPadB2C 프로세스가 없어도 crash 하지 않고 silent fail.
@@ -882,8 +905,11 @@ class KyoboAppScreenshot:
         results = []
         duplicates = []
         prev_sig = None  # 직전 raw 이미지 축소본(마지막 페이지 perceptual 감지용)
+        self.set_focus_mode(True)  # 🌙 캡처 동안 집중모드 ON(알림·포커스 뺏김 차단) — finally 에서 OFF
 
-        for i in range(count):
+      # (아래 for 는 try 로 감싸 finally 에서 집중모드 해제)
+        try:
+         for i in range(count):
             fallback_page = start_page + i
             print(f"\n[{i+1}/{count}] 캡처 중...")
 
@@ -994,6 +1020,8 @@ class KyoboAppScreenshot:
                     self.press_key(124)  # 오른쪽 화살표 (다음 페이지)
                 print(f"⏳ {interval}초 대기 중...")
                 time.sleep(interval)
+        finally:
+            self.set_focus_mode(False)  # 🌙 캡처 종료(정상/오류 무관) → 집중모드 해제
 
         # 결과 요약
         success_count = len([r for r in results if r])
