@@ -8,6 +8,7 @@ import time
 import os
 import sys
 import re
+import unicodedata
 from pathlib import Path
 from datetime import datetime
 import platform
@@ -606,7 +607,9 @@ class KyoboAppScreenshot:
             for attempt in range(retries):
                 cands = []
                 for w in Quartz.CGWindowListCopyWindowInfo(opts, Quartz.kCGNullWindowID):
-                    owner = w.get('kCGWindowOwnerName', '') or ''
+                    # ⚠️ 교보eBook(iPad앱)의 owner 이름은 NFD(분해형 자모)로 온다 → NFC 정규화 안 하면
+                    #    리터럴 '교보'(NFC)와 substring 매칭 실패해서 창을 영영 못 찾음(2026-07-13 근본원인).
+                    owner = unicodedata.normalize('NFC', w.get('kCGWindowOwnerName', '') or '')
                     if '교보' not in owner and 'iPadB2C' not in owner:
                         continue
                     if w.get('kCGWindowLayer', 99) != 0:
@@ -678,7 +681,7 @@ class KyoboAppScreenshot:
                 | Quartz.kCGWindowListExcludeDesktopElements)
         cands = []
         for w in Quartz.CGWindowListCopyWindowInfo(opts, Quartz.kCGNullWindowID):
-            owner = w.get('kCGWindowOwnerName', '') or ''
+            owner = unicodedata.normalize('NFC', w.get('kCGWindowOwnerName', '') or '')  # NFD→NFC (교보 자모)
             if '교보' not in owner and 'iPadB2C' not in owner:
                 continue
             if w.get('kCGWindowLayer', 99) != 0:
