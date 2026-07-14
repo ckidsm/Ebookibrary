@@ -351,7 +351,10 @@ def cmd_chapters_auto(args) -> int:
     s = cfg.load(bridge_url=args.bridge)
     book_dir = _resolve_book_dir(args)
     chs = CD.generate_chapters(book_dir, s.ai)
-    return 0 if chs else 1
+    # 챕터 0개는 **에러 아님**(챕터 트리는 선택 — 색표지 없는 책 등). exit 0 로 파이프라인 계속.
+    if not chs:
+        print("[chapters] 감지된 장 0개 — 챕터 트리 없이 계속(정상)")
+    return 0
 
 
 def cmd_overview(args) -> int:

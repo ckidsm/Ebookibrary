@@ -263,7 +263,7 @@ def run_one(bridge: str, job: dict) -> None:
         ]
     else:  # auto = 로컬 매크로 최종 파이프라인 (capture→…→build→챕터→개요→최종화)
         print(f"[worker] 🖥 mode={mode!r} (로컬 매크로 분기) — capture-auto 실행 예정")
-        cap = ["capture-auto", "--slug", slug, "--count", "1500", "--interval", "1.5"]
+        cap = ["capture-auto", "--slug", slug, "--count", "1500", "--interval", "0.8", "--no-ocr"]
         # salecmdtid 가 있으면 deep link 책 자동 열기 (kyoboebook://book/<id>)
         sale_id = job.get("salecmdtid") or _lookup_salecmdtid(bridge, slug)
         if sale_id:
@@ -360,6 +360,12 @@ def run_one(bridge: str, job: dict) -> None:
                                              sub_total or 1, sub_total or 1,
                                              f"{step_name} 완료"))
             if rc != 0:
+                # 선택 단계(챕터·개요·최종화·발행)는 실패해도 잡 중단 X — 기본 책(캡처·요약·코드·build)은
+                # 이미 완성이라, 이것들이 실패해도 책은 살린다(2026-07-14: chapters-auto 0개가 잡 전체를
+                # 실패시키던 버그 → 선택 단계는 non-fatal).
+                if step_name in ("chapters-auto", "overview", "finalize", "publish"):
+                    print(f"[worker] ⚠ 선택 단계 '{step_name}' exit {rc} — 건너뛰고 계속(기본 책 유지)")
+                    continue
                 msg = f"step '{step_name}' exit {rc}"
                 report(bridge, jid, status="failed", error=msg,
                        stdout_tail="".join(stdout_buf[-30:]))

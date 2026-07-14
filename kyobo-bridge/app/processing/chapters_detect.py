@@ -45,15 +45,35 @@ def dominant_color_frac(path, grid=160):
     return cnt / (grid * grid), col
 
 
-def cover_candidates(book_dir, min_frac=0.30):
-    """지배색 면적비율이 큰 페이지 = 장/절 표지 후보(번호 오름차순)."""
-    cands = []
-    for f in _page_files(book_dir):
+def text_density(path, grid=(150, 100)):
+    """어두운(텍스트) 픽셀 비율. 챕터 표지·구분 페이지는 대체로 저밀도(큰 제목만)."""
+    from PIL import Image
+    d = list(Image.open(path).convert("L").resize(grid).getdata())
+    return sum(1 for p in d if p < 110) / len(d)
+
+
+def cover_candidates(book_dir, min_frac=0.30, low_density_max=0.010,
+                     blank_min=0.0002, max_low=25):
+    """장/절 표지 후보 — 두 신호를 합침(색표지 없는 책도 감지 넓힘, 2026-07-14):
+      (1) **지배색 큰 페이지**(베이지 등 색표지),
+      (2) **저-텍스트밀도 페이지**(색 없이 큰 제목만 있는 챕터 표지/구분). 단 blank(내용 0)는 제외.
+    최종 '장 표지' 판정은 비전(_read_cover)이 하므로 후보를 넓게 잡아도 됨(퀴즈·본문은 비전이 걸러냄).
+    """
+    files = _page_files(book_dir)
+    cands = {}
+    lows = []
+    for f in files:
+        n = int(f.stem.split("_")[1])
         frac, col = dominant_color_frac(f)
         if frac >= min_frac:
-            n = int(f.stem.split("_")[1])
-            cands.append({"page": n, "frac": round(frac, 3), "color": col})
-    return cands
+            cands[n] = {"page": n, "frac": round(frac, 3), "color": col, "why": "color"}
+        td = text_density(f)
+        if blank_min <= td <= low_density_max:   # 저밀도(제목 위주). blank(td<blank_min) 제외
+            lows.append((td, n))
+    lows.sort()  # 밀도 낮은 순
+    for td, n in lows[:max_low]:
+        cands.setdefault(n, {"page": n, "td": round(td, 4), "why": "low-density"})
+    return sorted(cands.values(), key=lambda c: c["page"])
 
 
 def _img_b64(path, max_w=AnthropicAPI.VISION_MAX_W):
