@@ -427,6 +427,8 @@ def cmd_publish(args) -> int:
     try:
         subprocess.run(["bash", str(scripts / "publish_book.sh"), slug, *files], check=True)
         subprocess.run(["bash", str(scripts / "publish_images.sh"), slug], check=True)
+        # OCR 텍스트 폴더(모달 OCR 패널용) — 빠뜨리면 패널 404(2026-07-14 버그수정)
+        subprocess.run(["bash", str(scripts / "publish_ocr.sh"), slug], check=False)
         print(f"[publish] ✅ 라이브: https://redcodeme.synology.me/kyobo/books/{slug}/summary/index.html")
         return 0
     except subprocess.CalledProcessError as e:

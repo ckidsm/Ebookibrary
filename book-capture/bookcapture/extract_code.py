@@ -106,11 +106,12 @@ def extract_code_blocks(book_dir: Path, ai, pages=None, progress=True) -> dict:
             continue
         try:
             data, it, ot_ = _call(ai.api_key, model, _img_b64(img))
-        except RuntimeError as e:
-            if "credit balance is too low" in str(e):
+        except Exception as e:  # ⚠️ RuntimeError 뿐 아니라 **모든 예외**(타임아웃·연결오류 등)를 잡아야
+            # 한 페이지 실패로 전체 추출이 크래시(조기 종료)하지 않음(2026-07-14 근본원인).
+            if "credit balance is too low" in str(e) or "usage limits" in str(e):
                 out.write_text(json.dumps({k: result[k] for k in sorted(result, key=int)}, ensure_ascii=False, indent=1), encoding="utf-8")
-                print("[code] ⛔ 크레딧 소진 — 충전 후 재실행(resume)", file=sys.stderr); break
-            print(f"[code] ✗ p{n:03d}: {e}", file=sys.stderr); continue
+                print(f"[code] ⛔ API 한도/크레딧 — 충전·상향 후 재실행(resume): {e}", file=sys.stderr); break
+            print(f"[code] ✗ p{n:03d} 건너뜀: {e}", file=sys.stderr); continue
         blocks = [b for b in data.get("blocks", []) if b.get("code", "").strip()]
         if blocks: result[str(n)] = blocks
         cost += it / 1e6 * ip + ot_ / 1e6 * op
