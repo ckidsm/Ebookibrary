@@ -32,16 +32,14 @@ class CropRules:
     MARGIN_SPREAD = (0.06, 0.05)   # 스프레드(landscape): 본문 여백 복원 → 안 빡빡
     MARGIN_PORTRAIT = (0.01, 0.01)  # portrait(표지): 최소(좌우 회색 빈칸 방지)
 
-    # ── 콘텐츠 픽셀 판정: 채도 > SAT_MIN 또는 밝기 < DARK_MAX (흰·회색 배경 제외) ──
-    SAT_MIN = 18
-    DARK_MAX = 155
+    # ── 콘텐츠/종이 픽셀 판정 ──
+    # 종이(흰) 또는 내용은 유지, 앱 회색 여백만 제외 = "가장자리에 내용이 드물어도 안 잘림"(2026-07-14 확정).
+    SAT_MIN = 18           # 채도 > 이 값 = 유채색(내용·베이지 표지). 회색 여백(sat=0) 제외
+    DARK_MAX = 155         # 밝기 < 이 값 = 어두운 내용(텍스트). 회색 여백(~235) 제외
+    PAPER_WHITE_MIN = 245  # min(RGB) ≥ 이 값 = **흰 종이**(255). 앱 회색 여백(~235)과 구분 → 내용 드물어도 종이째 유지
+    PAPER_RATIO = 0.30     # 열/행에서 '종이or내용' 픽셀이 반대축의 이 비율 이상이면 그 열/행은 페이지(=유지)
 
-    # ── 콘텐츠 밀도 분석 ──
     DOWNSCALE = 4          # 분석용 축소 배수(속도). 크롭 좌표는 ×DOWNSCALE 로 원본 복원
-    DENSITY_RATIO = 0.012  # 열/행 콘텐츠 밀도 임계(반대축 길이 대비)
-    DENSITY_MIN = 2        # 밀도 임계 최소값(0 방지)
-    RUN_GAP = 16           # 연속블록 병합 간격(짧은 여백 이어붙임 → 세로 짧은 코드블록도 안 잘림)
-    RUN_MIN = 6            # 최소 연속블록 길이(가장자리 선·노이즈 배제)
 
     # ── 썸네일 ──
     THUMB_MAX_W = 1800     # 썸네일 최대 폭(px) — 카드 그리드/모달 프리뷰용
@@ -75,35 +73,30 @@ def crop_page(im, chrome=CropRules.CHROME_WVIEWER, margin_spread=CropRules.MARGI
 
 
 def content_crop(im, margin_spread=CropRules.MARGIN_SPREAD, margin_portrait=CropRules.MARGIN_PORTRAIT):
-    """크롬 제거가 끝난 이미지에서 책 페이지 콘텐츠만 크롭(여백 유지, 안 잘림).
+    """크롬 제거가 끝난 이미지에서 **책 페이지(종이) 영역**을 크롭 — 앱 회색 여백만 제거, 내용 안 잘림.
 
-    브라우저 캡처 경로(win/linux/mac 웹뷰어)는 각자 크롬을 먼저 제거한 뒤 이걸 호출.
-    앱 raw 는 crop_page()가 고정 크롬 제거 후 이걸 호출.
-    규칙: 콘텐츠(채도>18 or 어두움<155) 열/행 밀도+연속블록 → 세로 짧은 내용도 안 잘림 + 여백.
+    규칙(2026-07-14 확정, '혼자 공부하는 머신러닝' p31 우측 코드 잘림 사고 후):
+      옛 방식은 **내용(어두운 텍스트) 밀도**로 경계를 잡아, 가장자리에 **드문 코드블록**(회색박스+적은
+      글자)이 있으면 밀도 미달로 **잘렸다**(이미지바이블은 내용이 빽빽해 우연히 안 걸렸을 뿐).
+      → 이제 **'종이(흰 255) 또는 내용(유채색/어두움)' 픽셀이 있는 열/행을 유지**하고, 앱 회색 여백
+      (~235, 흰색도 내용도 아님)만 제거한다. 종이 위 내용은 밀도와 무관하게 다 포함 → 절대 안 잘림.
+      베이지 표지(유채색)도 '내용'으로 유지됨. margin_* 인자는 호환용(미사용 — 종이 경계가 곧 여백).
     """
     im = im.convert("RGB"); W, H = im.size
     ds = CropRules.DOWNSCALE
     sw, sh = max(1, W // ds), max(1, H // ds)
     s = im.resize((sw, sh)); d = list(s.getdata())
 
-    def isc(p):  # 콘텐츠 픽셀?(채도 or 어두움)
-        return (max(p) - min(p)) > CropRules.SAT_MIN or max(p) < CropRules.DARK_MAX
-    mask = [isc(p) for p in d]
+    def keep(p):  # 종이(흰) 또는 내용(유채색/어두움) = 유지. 앱 회색 여백만 제외.
+        return ((max(p) - min(p)) > CropRules.SAT_MIN or max(p) < CropRules.DARK_MAX
+                or min(p) >= CropRules.PAPER_WHITE_MIN)
     colc = [0] * sw; rowc = [0] * sh
-    for i, m in enumerate(mask):
-        if m:
+    for i, p in enumerate(d):
+        if keep(p):
             y = i // sw; colc[i - y * sw] += 1; rowc[y] += 1
-    cth = max(CropRules.DENSITY_MIN, sh * CropRules.DENSITY_RATIO)
-    rth = max(CropRules.DENSITY_MIN, sw * CropRules.DENSITY_RATIO)
-    cr = [r for r in _runs([c > cth for c in colc], CropRules.RUN_GAP) if r[1] - r[0] >= CropRules.RUN_MIN]
-    rr = [r for r in _runs([c > rth for c in rowc], CropRules.RUN_GAP) if r[1] - r[0] >= CropRules.RUN_MIN]
-    if not cr or not rr:
-        return im
-    x0, x1 = min(r[0] for r in cr), max(r[1] for r in cr)
-    y0, y1 = min(r[0] for r in rr), max(r[1] for r in rr)
-    cw, ch = x1 - x0, y1 - y0
-    mh, mv = margin_spread if cw > ch else margin_portrait
-    mx, my = cw * mh, ch * mv
-    l = max(0, int((x0 - mx) * ds)); r = min(W, int((x1 + mx) * ds))
-    t = max(0, int((y0 - my) * ds)); b = min(H, int((y1 + my) * ds))
-    return im.crop((l, t, r, b))
+    col_th = sh * CropRules.PAPER_RATIO; row_th = sw * CropRules.PAPER_RATIO
+    kc = [x for x in range(sw) if colc[x] >= col_th]
+    kr = [y for y in range(sh) if rowc[y] >= row_th]
+    if not kc or not kr:
+        return im  # 종이 못 찾으면 원본 유지(안전)
+    return im.crop((kc[0] * ds, kr[0] * ds, (kc[-1] + 1) * ds, (kr[-1] + 1) * ds))

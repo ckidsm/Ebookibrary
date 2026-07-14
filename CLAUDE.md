@@ -1053,3 +1053,30 @@ crop→qc→trim→ocr→summarize→merge→build→**code**→**book_overview*
 **'이미지 처리 바이블'(277p) 완성**: 재크롭(헤더 복원)·재발행, 코드추출 85p·285블록($0.81), 책 개요 생성($0.37). 표정리는 대상 없음(코드·다이어그램 중심). 라이브 검증 완료. OCR은 이 책 폰트에서 mojibake라 요약·개요는 비전 경로 기반(OCR 무관).
 
 **신규 자산**: `scripts/process_book.sh`·`publish_images.sh`·`gen_book_overview.py`, `build_html.py`(ViewerLayout·chapter_digests), `crop_book.py --chrome`. 커밋 다수(7c68e8a~56f2b79, YUNDEOKSOO).
+
+### 2026-07-13~14: 웹 로컬매크로 자동화 + 교보 앱 캡처 근본 안정화 + 크롭 재설계
+
+'혼자 공부하는 머신러닝+딥러닝'을 웹(로컬매크로)으로 캡처하며 여러 근본 버그를 잡고, 하드코딩을 상수 클래스로 정리, 크롭을 재설계했다.
+
+**교보 앱(iPad앱 kr.co.kyobobook.iPadB2C) 캡처 근본 수정 (`bookcapture/kyobo_app.py`)**
+- **NFD/NFC 유니코드 버그(핵심)**: Quartz `kCGWindowOwnerName`='교보eBook'이 **NFD(분해형 자모)**로 와서 리터럴 '교보'(NFC)와 substring 매칭 실패 → 창을 영영 못 찾아 캡처 실패·마지막페이지 무한반복. `unicodedata.normalize('NFC',...)` 후 비교로 해결.
+- **창 비활성 대응**: 마우스·클릭으로 교보가 비활성되면 →키/캡처 실패 → `_ensure_frontmost`(활성+최전면 폴링)를 캡처·페이지넘김 직전마다.
+- **마지막 페이지 감지**: OCR 페이지번호는 mojibake라 못 씀 → 직전 캡처와 **축소 grayscale MAD**(<임계=같은 페이지). 오탐(242p 조기종료) 방지 위해 '같은 페이지'면 **→키 3회 재전송 확인**(넘어가면 계속=일시적 미스, 계속 같으면 책 끝).
+- **오염 = 캡처 방식 문제(WID 전용으로 근본 해결)**: `-R` 영역 폴백이 교보 비-최전면 시 터미널을 찍는 유일한 오염원. '내용으로 오염 판별'(비전)은 **프로그래밍 책 코드와 구분 불가**(엄격→진짜 오염 놓침, 느슨→코드 오삭제 — 실제 ML 책 코드 84장 오삭제 사고). → **WID(-l) 전용**(occlusion-safe=창 내용만=구조적 무오염)으로 고정, -R·비전검사 폐기. WID 실패 시 재시도 후 그 페이지만 스킵.
+- 속도: capture-auto `--no-ocr`(페이지번호 OCR은 mojibake라 무의미) + interval 0.8.
+
+**크롭 재설계 (`bookcapture/page_crop.py` content_crop)**
+- 증상: '혼자 공부하는 머신러닝' p31 **우측 39% 잘림**(우측 페이지 코드블록 손실). 이미지바이블은 안 잘림.
+- 규명(추측 금지, 실측): 옛 content_crop은 **내용(어두운 텍스트) 밀도**로 경계 → 가장자리에 **드문 코드블록**(회색박스+적은 글자)은 밀도 미달로 잘림. 이미지바이블은 내용이 빽빽(전폭)해 우연히 안 걸렸을 뿐 = 근본 불안정. ('코드책이라서'가 아님 — 클로드코드도 코드책인데 됐음).
+- 해결: **'종이(흰 min≥245) 또는 내용(유채색/어두움)' 열/행을 유지, 앱 회색 여백(~235)만 제거**. 종이 위 내용은 밀도 무관하게 다 포함 → 절대 안 잘림. 베이지 표지도 '유채색=내용'으로 유지. 검증: p31 3200폭(코드 다 포함), 이미지바이블·베이지 정상.
+
+**하드코딩 → 도메인 상수 클래스 (스파게티 방지, 사용자 요청)**
+- `CaptureTuning`(kyobo_app): 키코드·최전면대기·MAD임계·SIG_SIZE·창필터 등.
+- `AnthropicAPI`(anthropic_api.py 신규): API URL·버전·모델·가격·재시도·이미지폭·타임아웃. summarize·extract_code·book_overview·contamination·chapters_detect 6파일 중복(47곳) 제거. 이름은 '실제 대상(Anthropic API)'으로.
+- `CropRules`(page_crop): 크롬·여백·SAT/DARK/PAPER 임계·썸네일.
+
+**웹 자동 파이프라인 (`worker.py` mode=auto)**
+- capture→ocr→summarize→code→merge→build→**chapters-auto(비전 장표지)**→**overview(전체+장별)**→finalize→publish. 인라인 오염검사·전수 오염검사 제거.
+- ⚠️ **미해결 버그**: `chapters-auto`가 장 0개면 exit 1 → 워커가 잡 전체 실패시킴(챕터는 선택인데). '혼자 공부하는 머신러닝'은 챕터 표지가 단색이 아니라 비전 감지 0개 → 잡 실패 → 수동 발행함. **수정 필요**: chapters-auto 0개여도 exit 0, 워커가 챕터/개요/finalize 실패를 non-fatal로. 색표지 없는 책 챕터 감지 개선(목차 기반)도 후속.
+
+**'혼자 공부하는 머신러닝+딥러닝'(291스프레드)**: WID 전용으로 오탐·오염 없이 전권 캡처, 코드추출 130p·395블록($1.4), 내용 페이지 요약 정확(예 p31 KNN). 크롭 재설계 후 재크롭·재발행. OCR은 이 책도 mojibake(코드는 읽힘, 한글 깨짐).
