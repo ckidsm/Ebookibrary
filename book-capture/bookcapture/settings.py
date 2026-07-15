@@ -45,6 +45,10 @@ class AiCfg:
     api_key: str = ""           # 환경변수에서 채워짐
     language: str = "ko"
     temperature: float = 0.3
+    # OCR/본문전사 전용 엔진 — Gemini 가 Claude 대비 ~18배 싸고 품질 동등~우세(2026-07-15)
+    ocr_provider: str = "gemini"          # gemini | claude (전사 엔진)
+    gemini_api_key: str = ""              # 환경변수 GEMINI_API_KEY/GOOGLE_API_KEY
+    gemini_model: str = "gemini-2.5-flash"
 
 
 @dataclass
@@ -97,7 +101,13 @@ def load(bridge_url: str | None = None) -> Settings:
         env_key = os.environ.get("OPENAI_API_KEY")
     if env_key:
         s.ai.api_key = env_key
-    elif not s.ai.api_key:
+
+    # Gemini(전사 엔진) 키 — 환경변수 우선
+    gkey = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if gkey:
+        s.ai.gemini_api_key = gkey
+
+    if not s.ai.api_key:
         # 환경변수도 없고 1)단계 응답은 마스킹뿐 → LAN secret 으로 평문 시도
         secret_url = (bridge_url or DEFAULT_BRIDGE_URL).rstrip("/") + "/api/secrets/ai"
         try:
@@ -121,5 +131,7 @@ def explain(s: Settings) -> str:
         f"delay={s.capture.delay_sec}s max={s.capture.max_pages} key={s.capture.next_key} | "
         f"ocr[{s.ocr.lang}, thumbs={s.ocr.use_thumbs}] | "
         f"ai[{s.ai.provider}/{s.ai.model}, key={key_mask}] | "
+        f"ocr전사[{s.ai.ocr_provider}/{s.ai.gemini_model}, "
+        f"gkey={'있음' if s.ai.gemini_api_key else '없음'}] | "
         f"out={s.output.books_dir}"
     )

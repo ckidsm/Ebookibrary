@@ -1103,3 +1103,19 @@ crop→qc→trim→ocr→summarize→merge→build→**code**→**book_overview*
 - `worker.py mode=auto` 는 아직 OCR-요약 경로 — **mode=auto 에 `--vision` 요약·전사 기본 적용**할지 결정 필요(모든 책이 mojibake 는 아님 → 자동 판별 후 분기 검토).
 - 이미지 처리 바이블도 OCR 100% mojibake → `ocr --vision` 재전사·재발행 대상(요청 시).
 - (기존) chapters-auto 0개 exit 1 워커 실패 버그 — 이번엔 chapters.json 수동 작성으로 우회.
+
+### 2026-07-15: OCR/본문전사 엔진 **Gemini 전환** (비용 ~18배 절감, Claude 안 쓰기)
+
+사용자 방침: 이북 OCR/전사는 되도록 Claude API 안 쓰고 절약. Claude가 이미 전사한 '혼자 공부하는 머신러닝'을 기준으로 **같은 페이지를 Gemini에도 전사시켜 실측 비교**.
+
+**비교(대표 5p: 산문 p3·목차 p8·코드 p31·혼합 p100·색인 p289)** — Gemini `gemini-2.5-flash`(thinking off) vs Claude `claude-sonnet-4-5`:
+- p3 산문: Gemini 우세(문장 더 정확). p8 목차: Gemini 우세(페이지번호까지, 341→582자). p31 코드: Gemini 우세(Claude는 `"""두 첫번째"""`·`"""세번..."""` 오독). p100 혼합·p289 색인: 동등.
+- **결론: Gemini 품질 동등~우세, 비용 ~18배 저렴**($7.3→~$0.4/권). → 전사 엔진 Gemini 채택.
+- ⚠️ 무료 티어(express 키 `AQ.Ab8…`)는 **503 과부하·429 쿼터**로 전권 실행 불안정 → **billing 활성 Gemini 키 필요**(그래도 Claude보다 훨씬 쌈).
+
+**구현(커밋 예정)**
+- `bookcapture/gemini_api.py` (신규) — `GeminiAPI` 상수(모델·가격·재시도) + `generate()`(generateContent, thinking off, 429/503 재시도) + `img_b64()`(JPEG). anthropic_api 와 같은 계층.
+- `bookcapture/transcribe.py` — 엔진 선택: **Gemini 키 있고 ocr_provider!=claude 면 Gemini, 아니면 Claude 폴백**. manifest resume·증분 저장 그대로. quota 소진 시 중단(resume 가능).
+- `bookcapture/settings.py` — `AiCfg` 에 `ocr_provider`(기본 gemini)·`gemini_api_key`(env GEMINI_API_KEY/GOOGLE_API_KEY)·`gemini_model`(gemini-2.5-flash) 추가. `explain()` 에 전사 엔진 표시.
+- 검증: `ocr --vision` → `engine=gemini` 라우팅·quota 소진 graceful 처리 확인. **이 책은 이미 Claude 전사·발행됨(재전사 불필요)** — Gemini는 앞으로의 책에 자동 적용.
+- **후속**: billing 키 세팅 후 신규 책부터 Gemini 전사. 요약(`summarize --vision`)도 Gemini로 옮길지는 추가 결정(요약은 추론 품질 중요 → 우선 Claude 유지).

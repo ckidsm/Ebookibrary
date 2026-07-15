@@ -2,14 +2,18 @@
 """페이지 이미지 → 깨끗한 본문 텍스트(비전) → summary/ocr_text/page_NNN.txt.
 
 교보 이북은 폰트 때문에 tesseract OCR 이 전 페이지 mojibake(한글 0%)라, 팝업의
-'📄 OCR 텍스트' 패널이 개판이 된다. tesseract 대신 Claude 비전으로 페이지를
-'있는 그대로' 전사(transcribe)해 정확한 한글 본문·코드를 복원한다. (요약 --vision 과 동일 계층)
+'📄 OCR 텍스트' 패널이 개판이 된다. tesseract 대신 **비전 전사**로 정확한 한글 본문·코드를 복원.
 
-resume: 기존 page_NNN.txt 의 한글 비율이 충분하면(이미 비전 전사됨) 건너뜀.
-        mojibake(한글<15%)·없음 이면 (재)전사. refresh=True 면 전부 재전사.
+엔진(2026-07-15 실측 비교로 결정):
+  - 기본 **Gemini 2.5-flash** — Claude 비전과 품질 동등~우세인데 ~18배 저렴($7.3→~$0.4/권).
+  - 폴백 Claude — Gemini 키 없을 때. `ai.ocr_provider`/키 유무로 자동 선택.
+
+resume: `.vision_done.json` manifest 로 완료 페이지 추적(코드 페이지는 한글비율 낮아
+        한글 판별 불가). refresh=True 면 전부 재전사.
 """
 from __future__ import annotations
 from .anthropic_api import AnthropicAPI
+from .gemini_api import GeminiAPI, generate as gemini_generate, img_b64 as gemini_img_b64
 import sys, json, base64, io, time, re, urllib.request, urllib.error
 from pathlib import Path
 
@@ -76,11 +80,22 @@ def transcribe_book(book_dir: Path, ai, refresh: bool = False,
     """책 폴더 페이지 이미지 → 비전 전사 → summary/ocr_text/page_NNN.txt(덮어씀).
     반환: {done, skipped, cost_usd}."""
     book_dir = Path(book_dir)
-    if not ai or not getattr(ai, "api_key", ""):
-        print("[transcribe] API 키 없음 — 건너뜀", file=sys.stderr)
-        return {"done": 0, "skipped": 0, "cost_usd": 0.0}
-    model = getattr(ai, "model", None) or AnthropicAPI.DEFAULT_MODEL
-    ip, op = AnthropicAPI.price(model)
+    # 엔진 선택: Gemini 키 있고 ocr_provider!=claude 면 Gemini(싸고 우세), 아니면 Claude 폴백
+    gkey = getattr(ai, "gemini_api_key", "") if ai else ""
+    use_gemini = bool(gkey) and getattr(ai, "ocr_provider", "gemini") != "claude"
+    if use_gemini:
+        engine = "gemini"
+        model = getattr(ai, "gemini_model", None) or GeminiAPI.DEFAULT_MODEL
+        ip, op = GeminiAPI.price(model)
+        api_key = gkey
+    else:
+        if not ai or not getattr(ai, "api_key", ""):
+            print("[transcribe] 전사 키 없음(Gemini/Claude 둘 다) — 건너뜀", file=sys.stderr)
+            return {"done": 0, "skipped": 0, "cost_usd": 0.0}
+        engine = "claude"
+        model = getattr(ai, "model", None) or AnthropicAPI.DEFAULT_MODEL
+        ip, op = AnthropicAPI.price(model)
+        api_key = ai.api_key
 
     ocr_dir = book_dir / "summary" / "ocr_text"
     ocr_dir.mkdir(parents=True, exist_ok=True)
@@ -116,20 +131,29 @@ def transcribe_book(book_dir: Path, ai, refresh: bool = False,
     def _save_manifest():
         manifest.write_text(json.dumps(sorted(vdone)), encoding="utf-8")
 
+    def _transcribe_one(img_path: Path):
+        """엔진별 1페이지 전사 → (text, in_tok, out_tok)."""
+        if engine == "gemini":
+            return gemini_generate(api_key, model,
+                                   f"{_SYS}\n\n{_USER}", image_b64=gemini_img_b64(img_path),
+                                   max_tokens=8000, temperature=0.0, thinking=False)
+        return _call(api_key, model, _img_b64(img_path))
+
     done = skipped = 0
     cost = 0.0
-    print(f"[transcribe] {len(nums)} 페이지 비전 전사 (model={model}, refresh={refresh}, "
-          f"기존 완료 {len(vdone & set(nums))}장)")
+    print(f"[transcribe] {len(nums)} 페이지 비전 전사 (engine={engine}, model={model}, "
+          f"refresh={refresh}, 기존 완료 {len(vdone & set(nums))}장)")
     for i, n in enumerate(nums, 1):
         cache = ocr_dir / f"page_{n:03d}.txt"
         if n in vdone and cache.exists() and not refresh:
             skipped += 1
             continue
         try:
-            txt, it, ot = _call(ai.api_key, model, _img_b64(imgs[n]))
+            txt, it, ot = _transcribe_one(imgs[n])
         except Exception as e:
-            if "credit balance is too low" in str(e):
-                print(f"[transcribe] ⛔ 크레딧 소진 — 중단(resume 가능): {e}", file=sys.stderr); break
+            es = str(e)
+            if "credit balance is too low" in es or "quota exceeded" in es:
+                print(f"[transcribe] ⛔ {engine} 한도/크레딧 소진 — 중단(resume 가능): {e}", file=sys.stderr); break
             print(f"[transcribe] ✗ p{n:03d} 건너뜀: {e}", file=sys.stderr); continue
         cache.write_text(txt, encoding="utf-8")
         vdone.add(n)
