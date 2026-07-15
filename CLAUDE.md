@@ -960,6 +960,27 @@ powershell -ExecutionPolicy Bypass -File .\install-worker-windows.ps1 -BridgeUrl
 - `./deploy.sh --backend` (buildx amd64 → load → compose up) 8080·9000 200.
 - reaper 라이브 테스트 OK, done job 은 미회수 확인. 워커 새 코드로 재시작(launchctl kickstart -k, PID 83011, ping 정상).
 
+### 2026-07-15: '밑바닥부터 만들면서 배우는 LLM' 재검토 — 워크북(별책) 분리 + 최신 표준화
+
+**발견(핵심)**: 발행본 400p 는 실제로 **두 권**이었다. 캡처가 본책이 끝난 뒤 **별책 《…LLM 워크북》**까지 이어 찍음. p1–296=본책(7장+부록 A~E, p296=부록E 그림 E-5로 끝), **p297=워크북 표지**, p297–399=워크북, p400="마지막 페이지" 모달. 사용자가 말한 "오염"의 실체 = OCR 오염이 아니라 **워크북이 통째로 섞임**. (전수 스캔: 옛 요약은 LLM 책이라 영어·코드 많아 대체로 정확, 오염은 p400 모달뿐)
+
+**결정(사용자)**: 워크북 **별책으로 분리**.
+
+**본책(1–296) 최신 표준화**
+- 워크북 페이지/ocr_text/batch 분리, `chapters.json`(7장 + 부록 A 파이토치 217–254 · B 참고문헌 255–258 · C 연습문제해답 259–271 · D 훈련부가 272–282 · E LoRA 283–296) 작성.
+- merge→build→overview(Haiku 12장)→build(개요 포함 재생성)→finalize→발행. 📋 책 개요·CH1~CH12 트리·296 페이지 카드 라이브 검증. analyzed 296p.
+- NAS 고아 이미지(297–400 page/thumb/ocr) sudo heredoc+glob 로 정리(컨테이너 root 소유라 SSH 유저 rm 불가 → `echo $P|sudo -S`).
+
+**워크북(297–399 → 1–103) 새 책 발행**
+- 페이지·ocr_text 재번호(297→001), 썸네일 재생성, batch 재번호. `chapters.json`(본책 장 미러 11섹션: 1~7장 + 부록 A·D·E + 해답/용어/참고문헌).
+- merge→overview(Haiku 11장)→build→finalize→발행(이미지 tar + 요약 + ocr). 103p, CH1~CH11.
+- books 테이블에 수동 추가(`/api/library/sync`, kyobo_id `E000012061590-WB`, 표지=자체 page_001) → 메인에 카드 노출(85권). slugify(title)=폴더 슬러그 일치.
+
+**스크립트 수정**
+- `publish_images.sh` — sudo 추출 전 `mkdir -p $DST` 추가(**새 책 발행 시 폴더 없어 tar -C 조용히 실패하던 버그** 수정). publish 순서상 이미지가 요약보다 먼저 와도 폴더 자동 생성.
+
+**미완(Phase 3)**: 두 LLM 책의 **팝업 OCR 패널은 아직 옛 mojibake OCR** — Gemini 무료 쿼터 소진(429)이라 전사 보류. 쿼터 리셋 시 `ocr --vision`(resume)으로 교체 예정. 요약·챕터·개요는 이미 완성(전사 무관).
+
 ---
 
 ### 2026-06-09: Windows capture-browser end-to-end 검증 (→ Mac 인계 메모)

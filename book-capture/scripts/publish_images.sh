@@ -43,8 +43,9 @@ tar cf - -C "$BOOK" "${LIST[@]}" | SSHPASS="$PASS" sshpass -e ssh \
   -o ConnectTimeout=20 -o StrictHostKeyChecking=no -o PubkeyAuthentication=no \
   -o PreferredAuthentications=password -o NumberOfPasswordPrompts=1 "$NAS_HOST" "cat > $TMP"
 
-# 2) sudo 추출 + 권한
+# 2) sudo 추출 + 권한 (대상 폴더 없으면 생성 — 새 책 발행 대응)
 ssh_pw "P='$PASS'
+  echo \"\$P\" | sudo -S mkdir -p '$DST' 2>/dev/null
   echo \"\$P\" | sudo -S tar xpf $TMP -C '$DST' 2>/dev/null
   echo \"\$P\" | sudo -S chown -R root:root '$DST' 2>/dev/null
   echo \"\$P\" | sudo -S chmod -R a+rX '$DST' 2>/dev/null
