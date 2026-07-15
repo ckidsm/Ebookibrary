@@ -1118,4 +1118,11 @@ crop→qc→trim→ocr→summarize→merge→build→**code**→**book_overview*
 - `bookcapture/transcribe.py` — 엔진 선택: **Gemini 키 있고 ocr_provider!=claude 면 Gemini, 아니면 Claude 폴백**. manifest resume·증분 저장 그대로. quota 소진 시 중단(resume 가능).
 - `bookcapture/settings.py` — `AiCfg` 에 `ocr_provider`(기본 gemini)·`gemini_api_key`(env GEMINI_API_KEY/GOOGLE_API_KEY)·`gemini_model`(gemini-2.5-flash) 추가. `explain()` 에 전사 엔진 표시.
 - 검증: `ocr --vision` → `engine=gemini` 라우팅·quota 소진 graceful 처리 확인. **이 책은 이미 Claude 전사·발행됨(재전사 불필요)** — Gemini는 앞으로의 책에 자동 적용.
-- **후속**: billing 키 세팅 후 신규 책부터 Gemini 전사. 요약(`summarize --vision`)도 Gemini로 옮길지는 추가 결정(요약은 추론 품질 중요 → 우선 Claude 유지).
+
+**요약 비용 절감 — Haiku + 깨끗한 텍스트 (Claude 유지)**
+- 통찰: Gemini 전사가 **깨끗한 본문 텍스트**를 주므로, 요약을 이미지(비전 Sonnet, $4.9/권)가 아니라 **그 텍스트로** 하면 된다. 텍스트요약은 싼 **Claude Haiku**로도 정확(mojibake 아니니까).
+- `settings.AiCfg.summarize_model="claude-haiku-4-5"` 추가. `cmd_summarize`/`cmd_overview` 가 이 모델 사용(`--model` override 가능). 기본 요약은 **텍스트 모드**(--vision 은 전사 텍스트 없을 때만).
+- `process_book.sh`: OCR 단계를 `ocr --vision`(Gemini 전사)로, 요약은 Haiku 텍스트 → **파이프라인 전체가 Gemini전사+Haiku요약** 체인.
+- 실측(p31·100·214): Haiku 텍스트요약 품질 Sonnet 비전과 동등~우세(p100 오히려 나음), **$4.9→~$1.4/권(3.4배↓)**. (p31 '두/세번' 잔오류는 Claude 전사본 오독 → Gemini 전사면 해소.)
+- **권당 총비용**: 기존 ~$7.1 → (전사 Gemini ~$0.4 + 요약 Haiku ~$1.4 + 코드/개요) ≈ **$2 안팎**. 코드추출(Sonnet 비전 $1.4)도 Gemini로 옮기면 추가 절감 가능(후속).
+- **후속**: billing Gemini 키 세팅 후 신규 책부터 적용. `worker.py mode=auto` 반영, 코드추출 Gemini 전환은 추가 결정.

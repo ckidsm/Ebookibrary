@@ -354,10 +354,15 @@ def cmd_summarize(args) -> int:
         except Exception:
             print(f"✗ --pages 형식: 127-155 (받은 값: {args.pages})", file=sys.stderr); return 2
 
+    # 요약 모델 — 기본 저비용(summarize_model=Haiku). 깨끗한 전사 텍스트라 텍스트요약도 정확.
+    import dataclasses
+    sum_model = getattr(args, "model", None) or s.ai.summarize_model or s.ai.model
+    sum_cfg = dataclasses.replace(s.ai, model=sum_model)
+
     out_path = book_dir / "summary" / (args.out or f"batch_{min(keys):03d}.json")
-    print(f"[summarize] 시작 · {len(keys)} 페이지 · model={s.ai.model} · "
-          f"{'비전(이미지)' if vision else 'OCR 텍스트'}")
-    res = summarize_mod.summarize_pages(files, cfg=s.ai, out_path=out_path,
+    print(f"[summarize] 시작 · {len(keys)} 페이지 · model={sum_model} · "
+          f"{'비전(이미지)' if vision else '전사 텍스트'}")
+    res = summarize_mod.summarize_pages(files, cfg=sum_cfg, out_path=out_path,
                                         page_range=page_range, images=images)
     print(f"\n결과: {res['pages_done']}건 성공, {len(res['errors'])}건 실패, "
           f"입력 {res['in_tok']} / 출력 {res['out_tok']} 토큰, ${res['cost_usd']:.3f}")
@@ -392,9 +397,13 @@ def cmd_chapters_auto(args) -> int:
 def cmd_overview(args) -> int:
     """chapters.json + pages_data.json → summary/book_overview.json (전체요약+장별 1장)."""
     from . import book_overview as BO
+    import dataclasses
     s = cfg.load(bridge_url=args.bridge)
     book_dir = _resolve_book_dir(args)
-    ov = BO.generate_overview(book_dir, s.ai, title=(args.title or None))
+    # 개요도 저비용 모델(summarize_model=Haiku) — 이미 검증된 페이지 요약을 종합하므로 충분
+    ov_model = getattr(args, "model", None) or s.ai.summarize_model or s.ai.model
+    ov_cfg = dataclasses.replace(s.ai, model=ov_model)
+    ov = BO.generate_overview(book_dir, ov_cfg, title=(args.title or None))
     return 0 if ov else 1
 
 
@@ -751,6 +760,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     pov = sub.add_parser("overview", help="chapters+pages_data → book_overview.json(전체요약+장별)")
     pov.add_argument("--slug"); pov.add_argument("--book-dir"); pov.add_argument("--title", default=None)
+    pov.add_argument("--model", help="개요 모델 override (기본 settings.summarize_model=Haiku)")
     pov.set_defaults(func=cmd_overview)
 
     pfin = sub.add_parser("finalize", help="index.html 에 챕터트리+표정리본 주입")
@@ -802,7 +812,8 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--pages", help="페이지 범위 (예: 127-155)")
     ps.add_argument("--out", help="출력 파일명 (기본: batch_<첫페이지>.json)")
     ps.add_argument("--vision", action="store_true",
-                    help="OCR 대신 페이지 이미지로 요약 (OCR mojibake 책용 — TOC·산문 환각 방지)")
+                    help="OCR 대신 페이지 이미지로 요약 (전사 텍스트 없을 때)")
+    ps.add_argument("--model", help="요약 모델 override (기본 settings.summarize_model=Haiku)")
     ps.set_defaults(func=cmd_summarize)
 
     pc = sub.add_parser("code", help="페이지 이미지 → 언어별 소스코드 (Claude 비전) → code_blocks.json")

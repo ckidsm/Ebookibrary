@@ -55,8 +55,10 @@ if run_stage crop; then
   fi
 fi
 
-# 2) OCR → 요약 → merge → build
-run_stage ocr      && { say "② OCR";       $PY -m bookcapture ocr       --book-dir "$BOOK" || true; }
+# 2) OCR(비전 전사) → 요약 → merge → build
+#    교보 이북은 tesseract 가 mojibake → --vision(Gemini 전사, Claude 폴백)으로 깨끗한 본문 확보.
+#    요약은 그 깨끗한 텍스트를 저비용 Haiku(summarize_model)로 처리 → 비용 대폭 절감.
+run_stage ocr      && { say "② 본문전사(비전)"; $PY -m bookcapture ocr --vision --book-dir "$BOOK" || true; }
 run_stage summarize&& { say "③ 요약(AI)";  $PY -m bookcapture summarize --book-dir "$BOOK" || echo "요약 일부 실패(계속)"; }
 run_stage merge    && { say "④ merge";     $PY -m bookcapture merge     --book-dir "$BOOK" || echo "merge 실패(계속)"; }
 run_stage build    && { say "⑤ build";     $PY -m bookcapture build     --book-dir "$BOOK"; }

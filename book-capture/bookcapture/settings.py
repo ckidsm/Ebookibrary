@@ -45,6 +45,9 @@ class AiCfg:
     api_key: str = ""           # 환경변수에서 채워짐
     language: str = "ko"
     temperature: float = 0.3
+    # 요약·개요 전용(저비용) 모델 — Gemini 전사가 이미 깨끗한 텍스트를 주므로 텍스트요약을
+    # 싼 Haiku 로 해도 정확. 이미지(비전)요약보다 대폭 저렴(2026-07-15).
+    summarize_model: str = "claude-haiku-4-5"
     # OCR/본문전사 전용 엔진 — Gemini 가 Claude 대비 ~18배 싸고 품질 동등~우세(2026-07-15)
     ocr_provider: str = "gemini"          # gemini | claude (전사 엔진)
     gemini_api_key: str = ""              # 환경변수 GEMINI_API_KEY/GOOGLE_API_KEY
