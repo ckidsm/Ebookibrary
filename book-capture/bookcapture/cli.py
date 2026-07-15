@@ -270,6 +270,17 @@ def cmd_ocr(args) -> int:
     book_dir = _resolve_book_dir(args)
     if not book_dir.exists():
         print(f"✗ 폴더 없음: {book_dir}", file=sys.stderr); return 2
+    if getattr(args, "vision", False):
+        # 비전 전사 — tesseract 가 mojibake 인 교보 이북용(페이지 이미지 → 깨끗한 본문)
+        from . import transcribe as tr_mod
+        page_range = None
+        if getattr(args, "pages", None):
+            try:
+                lo, hi = args.pages.split("-"); page_range = (int(lo), int(hi))
+            except Exception:
+                print(f"✗ --pages 형식: 1-50 (받은 값: {args.pages})", file=sys.stderr); return 2
+        tr_mod.transcribe_book(book_dir, ai=s.ai, refresh=args.refresh, page_range=page_range)
+        return 0
     ocr_mod.ocr_book(book_dir, cfg=s.ocr, refresh=args.refresh)
     return 0
 
@@ -302,19 +313,38 @@ def cmd_summarize(args) -> int:
     if not book_dir.exists():
         print(f"✗ 폴더 없음: {book_dir}", file=sys.stderr); return 2
 
-    ocr_dir = book_dir / "summary" / "ocr_text"
-    if not ocr_dir.exists():
-        print(f"✗ OCR 결과 없음: {ocr_dir} — 먼저 `ocr` 서브커맨드 실행", file=sys.stderr); return 2
-
-    # ocr_text/page_NNN.txt → {num: path}
     import re
+    vision = getattr(args, "vision", False)
     files: dict[int, "Path"] = {}
-    for p in sorted(ocr_dir.glob("page_*.txt")):
-        m = re.search(r"page_(\d+)\.txt$", p.name)
-        if m:
-            files[int(m.group(1))] = p
-    if not files:
-        print(f"✗ {ocr_dir} 에 page_*.txt 없음", file=sys.stderr); return 2
+    images: dict[int, "Path"] | None = None
+
+    if vision:
+        # 페이지 이미지 → {num: path} (page_*.png 우선, 없으면 thumbs)
+        images = {}
+        for p in sorted(book_dir.glob("page_*.png")):
+            m = re.search(r"page_(\d+)\.png$", p.name)
+            if m:
+                images[int(m.group(1))] = p
+        if not images:
+            for p in sorted((book_dir / "thumbs").glob("page_*.png")):
+                m = re.search(r"page_(\d+)\.png$", p.name)
+                if m:
+                    images[int(m.group(1))] = p
+        if not images:
+            print(f"✗ {book_dir} 에 page_*.png(또는 thumbs) 없음", file=sys.stderr); return 2
+        keys = images
+    else:
+        ocr_dir = book_dir / "summary" / "ocr_text"
+        if not ocr_dir.exists():
+            print(f"✗ OCR 결과 없음: {ocr_dir} — 먼저 `ocr` 서브커맨드 실행", file=sys.stderr); return 2
+        # ocr_text/page_NNN.txt → {num: path}
+        for p in sorted(ocr_dir.glob("page_*.txt")):
+            m = re.search(r"page_(\d+)\.txt$", p.name)
+            if m:
+                files[int(m.group(1))] = p
+        if not files:
+            print(f"✗ {ocr_dir} 에 page_*.txt 없음", file=sys.stderr); return 2
+        keys = files
 
     page_range = None
     if args.pages:
@@ -324,9 +354,11 @@ def cmd_summarize(args) -> int:
         except Exception:
             print(f"✗ --pages 형식: 127-155 (받은 값: {args.pages})", file=sys.stderr); return 2
 
-    out_path = book_dir / "summary" / (args.out or f"batch_{min(files):03d}.json")
-    print(f"[summarize] 시작 · {len(files)} 페이지 · model={s.ai.model}")
-    res = summarize_mod.summarize_pages(files, cfg=s.ai, out_path=out_path, page_range=page_range)
+    out_path = book_dir / "summary" / (args.out or f"batch_{min(keys):03d}.json")
+    print(f"[summarize] 시작 · {len(keys)} 페이지 · model={s.ai.model} · "
+          f"{'비전(이미지)' if vision else 'OCR 텍스트'}")
+    res = summarize_mod.summarize_pages(files, cfg=s.ai, out_path=out_path,
+                                        page_range=page_range, images=images)
     print(f"\n결과: {res['pages_done']}건 성공, {len(res['errors'])}건 실패, "
           f"입력 {res['in_tok']} / 출력 {res['out_tok']} 토큰, ${res['cost_usd']:.3f}")
     return 0 if not res["errors"] else 1
@@ -745,10 +777,13 @@ def build_parser() -> argparse.ArgumentParser:
     pu.add_argument("--title")
     pu.set_defaults(func=cmd_upload)
 
-    po = sub.add_parser("ocr", help="책 폴더 OCR")
+    po = sub.add_parser("ocr", help="책 폴더 OCR (--vision: tesseract 대신 Claude 비전 전사)")
     po.add_argument("--slug")
     po.add_argument("--book-dir")
     po.add_argument("--refresh", action="store_true")
+    po.add_argument("--vision", action="store_true",
+                    help="Claude 비전으로 본문 전사(교보 이북 mojibake 대체). ocr_text/page_NNN.txt 덮어씀")
+    po.add_argument("--pages", help="페이지 범위 (예: 1-50) — --vision 전용")
     po.set_defaults(func=cmd_ocr)
 
     pm = sub.add_parser("merge", help="batch_*.json → pages_data.json (챕터/섹션 트리)")
@@ -761,11 +796,13 @@ def build_parser() -> argparse.ArgumentParser:
     pb.add_argument("--book-dir")
     pb.set_defaults(func=cmd_build)
 
-    ps = sub.add_parser("summarize", help="OCR 결과 → batch JSON (Claude API)")
+    ps = sub.add_parser("summarize", help="OCR 결과(또는 --vision 이미지) → batch JSON (Claude API)")
     ps.add_argument("--slug")
     ps.add_argument("--book-dir")
     ps.add_argument("--pages", help="페이지 범위 (예: 127-155)")
     ps.add_argument("--out", help="출력 파일명 (기본: batch_<첫페이지>.json)")
+    ps.add_argument("--vision", action="store_true",
+                    help="OCR 대신 페이지 이미지로 요약 (OCR mojibake 책용 — TOC·산문 환각 방지)")
     ps.set_defaults(func=cmd_summarize)
 
     pc = sub.add_parser("code", help="페이지 이미지 → 언어별 소스코드 (Claude 비전) → code_blocks.json")

@@ -1080,3 +1080,26 @@ crop→qc→trim→ocr→summarize→merge→build→**code**→**book_overview*
 - ⚠️ **미해결 버그**: `chapters-auto`가 장 0개면 exit 1 → 워커가 잡 전체 실패시킴(챕터는 선택인데). '혼자 공부하는 머신러닝'은 챕터 표지가 단색이 아니라 비전 감지 0개 → 잡 실패 → 수동 발행함. **수정 필요**: chapters-auto 0개여도 exit 0, 워커가 챕터/개요/finalize 실패를 non-fatal로. 색표지 없는 책 챕터 감지 개선(목차 기반)도 후속.
 
 **'혼자 공부하는 머신러닝+딥러닝'(291스프레드)**: WID 전용으로 오탐·오염 없이 전권 캡처, 코드추출 130p·395블록($1.4), 내용 페이지 요약 정확(예 p31 KNN). 크롭 재설계 후 재크롭·재발행. OCR은 이 책도 mojibake(코드는 읽힘, 한글 깨짐).
+
+### 2026-07-15: 요약·OCR 텍스트 **비전 경로화** (mojibake 책 근본 해결) + '혼자 공부하는 머신러닝' 재발행
+
+'혼자 공부하는 머신러닝+딥러닝' 발행본이 (1) 주제 요약이 일부 페이지에서 환각(리액트·OSI·베타테스트 등), (2) 챕터트리·책개요 없음 = 이미지 처리 바이블과 다름 — 신고. 전수 진단·근본 수정.
+
+**근본 원인 (전수 검증)**: `summarize`·`ocr` 두 단계가 **tesseract OCR 텍스트를 입력**으로 쓰는데, 교보 이북은 폰트 때문에 **전 페이지 OCR 이 mojibake(한글 0%)**. 코드 있는 페이지는 OCR 에 코드(ASCII)가 살아 요약이 우연히 정확했지만, TOC·산문·간지 페이지는 앵커조차 없어 AI 가 환각. (이미지 처리 바이블도 OCR 은 100% mojibake였으나 ISBN·URL 등 앵커가 있어 티가 덜 났을 뿐 — 구조적 문제.)
+
+**수정 — 비전 경로 신설(재사용, 향후 모든 mojibake 책 적용)**
+- `bookcapture/summarize.py` — `summarize_page_vision()` + `summarize_pages(images=...)`: OCR 텍스트 대신 **페이지 이미지**를 Claude 비전에 보내 요약(코드추출·챕터감지와 동일 계층). 5장마다 증분 저장 + **resume**(기존 batch 재사용) 추가.
+- `bookcapture/transcribe.py` (신규) — `ocr --vision`: tesseract 대신 **Claude 비전으로 본문 전사** → `ocr_text/page_NNN.txt` 덮어씀. 팝업 '📄 OCR 텍스트' 패널이 mojibake 대신 깨끗한 한글 본문·코드 표시. resume 는 `.vision_done.json` manifest(코드 페이지는 한글비율 낮아 한글 판별 불가 → 별도 추적).
+- `bookcapture/cli.py` — `summarize --vision`, `ocr --vision [--pages]` 플래그.
+
+**이 책 재작업 (end-to-end)**
+- 291p **비전 재요약**($4.9) — 환각 8+장(p8 리액트→Ch01 로드맵, p246 OSI→순환신경망 등) 전부 교정. 도중 크레딧 소진 → 충전 후 resume 로 14p 마저 완료.
+- `chapters.json` 수동 작성 — 재요약 결과에서 9장 경계 정밀 확인('확인 문제'로 장 끝 + 다음 장 간지 패턴). Ch1(14–33)~Ch9(244–277), 앞 1–13=front matter.
+- merge→build→**overview**(전체+9장 상세, $0.4)→finalize(챕터트리)→발행. 📋 책 개요·CH1~CH9 트리·291 페이지 카드 라이브 검증.
+- 291p **비전 전사**($7.3) — 팝업 OCR 패널 교체. 전사 후 한글정상 258장, 코드페이지 23장(자연히 낮음), p5 1장 콘텐츠필터 오탐→재시도 성공. `publish_ocr.sh` 로 발행.
+- 발행 3종: `publish_book.sh`(index/overview/code) + `publish_ocr.sh`(ocr_text 291). NAS_PASS 는 `인증서/나스인증/`에서 런타임 주입(하드코딩 금지).
+
+**미해결/후속**
+- `worker.py mode=auto` 는 아직 OCR-요약 경로 — **mode=auto 에 `--vision` 요약·전사 기본 적용**할지 결정 필요(모든 책이 mojibake 는 아님 → 자동 판별 후 분기 검토).
+- 이미지 처리 바이블도 OCR 100% mojibake → `ocr --vision` 재전사·재발행 대상(요청 시).
+- (기존) chapters-auto 0개 exit 1 워커 실패 버그 — 이번엔 chapters.json 수동 작성으로 우회.
