@@ -110,15 +110,18 @@ def load(bridge_url: str | None = None) -> Settings:
     if gkey:
         s.ai.gemini_api_key = gkey
 
-    if not s.ai.api_key:
-        # 환경변수도 없고 1)단계 응답은 마스킹뿐 → LAN secret 으로 평문 시도
+    # 평문 키(claude·gemini) 는 /api/settings 응답에선 마스킹됨 → LAN secret 으로 평문 조회.
+    # (워커·로컬 도구가 백엔드 ⚙ 설정에 저장된 키를 env 없이도 받도록)
+    if not s.ai.api_key or not s.ai.gemini_api_key:
         secret_url = (bridge_url or DEFAULT_BRIDGE_URL).rstrip("/") + "/api/secrets/ai"
         try:
             req = urllib.request.Request(secret_url, headers={"Accept": "application/json"})
             with urllib.request.urlopen(req, timeout=5.0) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-                if data.get("api_key"):
+                if not s.ai.api_key and data.get("api_key"):
                     s.ai.api_key = data["api_key"]
+                if not s.ai.gemini_api_key and data.get("gemini_api_key"):
+                    s.ai.gemini_api_key = data["gemini_api_key"]
         except Exception as e:
             print(f"[settings] secret 로드 실패 ({secret_url}): {e}")
 

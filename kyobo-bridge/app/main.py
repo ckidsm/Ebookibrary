@@ -258,6 +258,11 @@ DEFAULT_SETTINGS = {
         "api_key": "",                # 사용자가 직접 입력 (UI 마스킹)
         "language": "ko",
         "temperature": 0.3,
+        # 비용 절감(2026-07-15): 본문전사=Gemini(싸고 정확), 요약·개요=저비용 Haiku(깨끗한 전사 텍스트 기반)
+        "ocr_provider": "gemini",           # 전사 엔진: gemini | claude
+        "gemini_api_key": "",               # Gemini API 키(별도 결제) — UI 마스킹
+        "gemini_model": "gemini-2.5-flash",
+        "summarize_model": "claude-haiku-4-5",
     },
     "output": {
         # NAS 측 절대경로 (compose 마운트는 /mnt/data 식으로 추가 가능)
@@ -278,13 +283,15 @@ def get_settings_endpoint() -> dict:
             merged[k] = {**merged[k], **v}
         else:
             merged[k] = v
-    # api_key 는 응답에서 마스킹 (저장은 그대로)
-    if isinstance(merged.get("ai"), dict) and merged["ai"].get("api_key"):
-        key = merged["ai"]["api_key"]
-        merged["ai"]["api_key_masked"] = (
-            key[:7] + "..." + key[-4:] if len(key) > 12 else "***"
-        )
-        merged["ai"]["api_key"] = ""  # 평문은 응답에 안 내보냄
+    # api_key 는 응답에서 마스킹 (저장은 그대로) — claude·gemini 둘 다
+    if isinstance(merged.get("ai"), dict):
+        for fld in ("api_key", "gemini_api_key"):
+            key = merged["ai"].get(fld)
+            if key:
+                merged["ai"][fld + "_masked"] = (
+                    key[:7] + "..." + key[-4:] if len(key) > 12 else "***"
+                )
+                merged["ai"][fld] = ""  # 평문은 응답에 안 내보냄
     return {"settings": merged}
 
 
@@ -299,11 +306,12 @@ class SettingsUpdate(BaseModel):
 @app.put("/api/settings")
 def put_settings(payload: SettingsUpdate) -> dict:
     items = {k: v for k, v in payload.model_dump().items() if v is not None}
-    # ai.api_key 가 빈 문자열로 오면 기존 값 유지 (마스킹 응답 후 사용자가 안 건드린 경우)
-    if "ai" in items and items["ai"].get("api_key") == "":
+    # api_key/gemini_api_key 가 빈 문자열로 오면 기존 값 유지 (마스킹 응답 후 사용자가 안 건드린 경우)
+    if "ai" in items:
         prev = get_all_settings().get("ai") or {}
-        if prev.get("api_key"):
-            items["ai"]["api_key"] = prev["api_key"]
+        for fld in ("api_key", "gemini_api_key"):
+            if items["ai"].get(fld) == "" and prev.get(fld):
+                items["ai"][fld] = prev[fld]
     n = set_all_settings(items)
     return {"ok": True, "updated_keys": n}
 
@@ -770,6 +778,11 @@ def get_ai_secret(request: Request) -> dict:
         "api_key": ai.get("api_key", ""),
         "language": ai.get("language", "ko"),
         "temperature": ai.get("temperature", 0.3),
+        # 전사(Gemini)·저비용요약 설정 — 워커 settings.load 가 평문 키 가져감
+        "ocr_provider": ai.get("ocr_provider", "gemini"),
+        "gemini_api_key": ai.get("gemini_api_key", ""),
+        "gemini_model": ai.get("gemini_model", "gemini-2.5-flash"),
+        "summarize_model": ai.get("summarize_model", "claude-haiku-4-5"),
     }
 
 

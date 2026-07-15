@@ -177,7 +177,7 @@ def run_one(bridge: str, job: dict) -> None:
             report(bridge, jid, status="failed", error=msg)
             return
         steps = [
-            ["ocr", "--book-dir", str(book_dir)],
+            ["ocr", "--vision", "--book-dir", str(book_dir)],  # 비전 전사(Gemini→Claude 폴백) — tesseract mojibake 대체
             ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
             ["code", "--book-dir", str(book_dir)],
             ["merge", "--book-dir", str(book_dir)],
@@ -198,7 +198,7 @@ def run_one(bridge: str, job: dict) -> None:
         # 현재 워커는 Mac local 이라 직접 처리는 OneDrive 동기화 폴더에서만 가능.
         # → upload-process 는 일단 book-capture/books/<slug>/ 에 미리 파일 있다고 가정.
         steps = [
-            ["ocr", "--book-dir", str(book_dir)],
+            ["ocr", "--vision", "--book-dir", str(book_dir)],  # 비전 전사(Gemini→Claude 폴백) — tesseract mojibake 대체
             ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
             ["code", "--book-dir", str(book_dir)],
             ["merge", "--book-dir", str(book_dir)],
@@ -255,7 +255,7 @@ def run_one(bridge: str, job: dict) -> None:
              "--slug", slug,
              "--out-dir", str(book_dir),
              "--max-pages", "300", "--delay", "1.5"],
-            ["ocr", "--book-dir", str(book_dir)],
+            ["ocr", "--vision", "--book-dir", str(book_dir)],  # 비전 전사(Gemini→Claude 폴백) — tesseract mojibake 대체
             ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
             ["code", "--book-dir", str(book_dir)],
             ["merge", "--book-dir", str(book_dir)],
@@ -273,7 +273,7 @@ def run_one(bridge: str, job: dict) -> None:
             print(f"[worker] ⚠ salecmdtid 없음 — 사용자가 책 직접 펼친 상태 가정")
         steps = [
             cap,
-            ["ocr", "--book-dir", str(book_dir)],
+            ["ocr", "--vision", "--book-dir", str(book_dir)],  # 비전 전사(Gemini→Claude 폴백) — tesseract mojibake 대체
             ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
             ["code", "--book-dir", str(book_dir)],
             ["merge", "--book-dir", str(book_dir)],

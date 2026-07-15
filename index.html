@@ -2716,14 +2716,30 @@
                         <select id="ai-provider">
                             ${['claude','openai','none'].map(k => `<option ${a.provider===k?'selected':''} value="${k}">${k}</option>`).join('')}
                         </select>
-                        <label>모델</label>
+                        <label>모델(요약·코드)</label>
                         <input type="text" id="ai-model" value="${escapeAttr(a.model || 'claude-sonnet-4-5')}">
-                        <label>API 키</label>
+                        <label>API 키(Claude)</label>
                         <input type="password" id="ai-key" placeholder="${escapeAttr(apiKeyPlaceholder)}">
                         <label>출력 언어</label>
                         <input type="text" id="ai-lang" value="${escapeAttr(a.language || 'ko')}">
                         <label>Temperature</label>
                         <input type="number" id="ai-temp" step="0.1" min="0" max="2" value="${a.temperature ?? 0.3}">
+                    </div>
+                </div>
+
+                <div class="sgroup">
+                    <h3>③-2 저비용 전사·요약 (Gemini + Haiku)</h3>
+                    <div class="sgrid">
+                        <label>본문전사 엔진</label>
+                        <select id="ai-ocrprov">
+                            ${['gemini','claude'].map(k => `<option ${(a.ocr_provider||'gemini')===k?'selected':''} value="${k}">${k}${k==='gemini'?' (권장·저렴)':' (폴백·비쌈)'}</option>`).join('')}
+                        </select>
+                        <label>Gemini 모델</label>
+                        <input type="text" id="ai-gmodel" value="${escapeAttr(a.gemini_model || 'gemini-2.5-flash')}">
+                        <label>Gemini API 키</label>
+                        <input type="password" id="ai-gkey" placeholder="${escapeAttr(a.gemini_api_key_masked ? '현재 저장됨: '+a.gemini_api_key_masked+' (변경하려면 새 키)' : 'AIza... (별도 결제, billing 활성 권장)')}">
+                        <label>요약·개요 모델</label>
+                        <input type="text" id="ai-summodel" value="${escapeAttr(a.summarize_model || 'claude-haiku-4-5')}">
                     </div>
                 </div>
 
@@ -2764,6 +2780,10 @@
                     api_key: document.getElementById('ai-key').value,  // 빈 문자열이면 백엔드가 기존 유지
                     language: document.getElementById('ai-lang').value.trim() || 'ko',
                     temperature: parseFloat(document.getElementById('ai-temp').value) || 0.3,
+                    ocr_provider: document.getElementById('ai-ocrprov').value,
+                    gemini_model: document.getElementById('ai-gmodel').value.trim() || 'gemini-2.5-flash',
+                    gemini_api_key: document.getElementById('ai-gkey').value,  // 빈 문자열이면 기존 유지
+                    summarize_model: document.getElementById('ai-summodel').value.trim() || 'claude-haiku-4-5',
                 },
                 output: {
                     books_dir: document.getElementById('out-dir').value.trim(),
