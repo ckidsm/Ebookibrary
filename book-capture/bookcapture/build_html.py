@@ -131,8 +131,9 @@ class ViewerLayout:
           (3) 앱 raw 는 `scripts/crop_book.py --chrome 20,20,20,20` 로 재크롭(재캡처 0).
     근거·상세: docs/EBOOK_CAPTURE_STANDARD.md §3(크롭)·§6.1(뷰어)."""
     OVERLAY_BG    = "#0a0e14"  # 오버레이 배경(솔리드 다크). 반투명 금지(비침 버그).
-    STAGE_MARGIN_V = 64        # 스테이지 상하 여백(px) — 툴바/닫기 아래, 이미지 숨쉴 공간.
-    STAGE_MARGIN_H = 96        # 스테이지 좌우 여백(px) — 이 안에 화살표(이미지 밖).
+    STAGE_MARGIN_V = 58        # 스테이지 상단 여백(px) — 툴바/닫기 바로 아래(더 줄이면 이미지가 툴바 밑으로 파고듦).
+    STAGE_MARGIN_B = 16        # 스테이지 하단 여백(px) — 아래엔 툴바 없음 → 작게. 세로여백 최소화로 이미지 최대·좌우 검은여백 축소.
+    STAGE_MARGIN_H = 96        # 스테이지 좌우 여백(px) — 이 안에 화살표(이미지 밖). ⚠ 줄이면 height-fit 이미지의 좌우 검은여백이 오히려 늘어남.
     NAV_W          = 54        # 이전/다음 화살표 버튼 폭(px).
     NAV_H          = 92        # 화살표 버튼 높이(px).
     NAV_OFFSET     = 18        # 화살표 가장자리로부터 여백(px).
@@ -155,14 +156,14 @@ class ViewerLayout:
         return (
             "/* ↓↓ ViewerLayout(규칙화 클래스)에서 생성 — 레이아웃 수치의 단일 관리처 ↓↓ */\n"
             ".modal-overlay {{ background: {bg}; }}\n"
-            ".modal-stage {{ inset: {mv}px {mh}px; }}\n"
+            ".modal-stage {{ inset: {mv}px {mh}px {mb}px {mh}px; }}\n"
             ".modal-nav {{ width: {nw}px; height: {nh}px; }}\n"
             ".modal-nav.mnav-prev {{ left: {off}px; }}\n"
             ".modal-nav.mnav-next {{ right: {off}px; }}\n"
             ".modal-overlay.text-open .modal-stage {{ right: {r}px; }}\n"
             ".modal-overlay.text-open .mnav-next {{ right: {r}px; }}\n"
             ".modal-text {{ width: {tp}px; }}\n"
-        ).format(bg=cls.OVERLAY_BG, mv=cls.STAGE_MARGIN_V, mh=cls.STAGE_MARGIN_H,
+        ).format(bg=cls.OVERLAY_BG, mv=cls.STAGE_MARGIN_V, mb=cls.STAGE_MARGIN_B, mh=cls.STAGE_MARGIN_H,
                  nw=cls.NAV_W, nh=cls.NAV_H, off=cls.NAV_OFFSET, r=r, tp=cls.TEXT_PANEL_W)
 
 
