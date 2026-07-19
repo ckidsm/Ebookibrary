@@ -26,15 +26,15 @@ KYOBO_SKIP_NET=1 .venv/bin/pytest tests/   # 오프라인(발행 검증 스킵)
 `test_build_html` 의 라운드트립은 실제 `pages_data.json`+`book_overview.json` 을 **tmp 로만** 재빌드해
 페이지 카드 수·개요 주입을 검증한다(발행본 index.html 무손상).
 
-## 검증이 잡은 발행 불일치 (2026-07-19)
+## 검증이 잡은 발행 불일치 (2026-07-19, 모두 해소)
 
-`test_published` 가 잡은 재발행 대상 2건:
+`test_published` 가 잡은 재발행 대상 2건 — 둘 다 해결 후 strict 통과 승격(현재 4권 전부 green):
 
-- ✅ **밑바닥 LLM** — 코드모달 UI 는 있으나 `code_blocks.json` 미발행(404, 코드패널 로드 실패)였음.
-  → **2026-07-19 `bookcapture code`(118p·307블록·$1.21) + `publish_book.sh` 재발행으로 해소.**
-  strict 검증(`test_published_code_blocks_consistency`)으로 승격됨.
-- ⏳ **클로드코드** — 레거시 발행본. 📋책개요는 있으나 **챕터별 상세요약·코드모달 없음**.
-  로컬 산출물이 없어(재캡처/복원 필요) 미해소 → `xfail` 로 문서화(`_LEGACY_NO_DIGESTS`).
+- ✅ **밑바닥 LLM** — 코드모달은 있으나 `code_blocks.json` 미발행(404, 코드패널 로드 실패)였음.
+  → `bookcapture code`(118p·307블록·$1.21) + `publish_book.sh` 재발행.
+- ✅ **클로드코드** — 레거시 발행본(📋책개요는 있으나 **챕터별 상세요약·코드모달 없음**)이었음.
+  → NAS 원본 복원(재캡처 X) 후 `code`(85블록·$0.31) + `overview`(10장 digests·$0.16) + `build` +
+  `finalize`(챕터트리·표24) + 재발행으로 현대 포맷 복원.
 
-미해소 건이 재발행되면 `test_published.py` 상단 `_LEGACY_NO_DIGESTS` 집합에서 슬러그를 빼
-strict 검증으로 승격한다.
+향후 발행 불일치가 재발하면 `test_published.py` 상단 `_LEGACY_NO_DIGESTS`·`_MISSING_CODE_JSON`
+집합에 슬러그를 넣어 `xfail` 로 문서화한다(현재 둘 다 비어있음).
