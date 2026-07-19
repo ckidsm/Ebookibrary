@@ -17,3 +17,6 @@ books/
 .DS_Store
 .vscode/
 .idea/
+
+# 데스크탑 앱 빌드 산출물
+desktop/KyoboCapture.app/

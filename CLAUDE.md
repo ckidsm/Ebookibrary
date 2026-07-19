@@ -1284,4 +1284,8 @@ crop→qc→trim→ocr→summarize→merge→build→**code**→**book_overview*
 - **`scripts/nas_conn.sh`(신규)**: 공용 접속 헬퍼 — **LAN(192.168.10.205:22) probe → 안 되면 외부(redcodeme.synology.me:**2200**) 자동 폴백**. SSH 키(id_ed25519_kyobo_nas) 무비번 기본, NAS_PASS 있으면 비번 폴백. **sudo 없음**. (VPN/외부망 대비 — 사용자 요구.)
 - **publish_book/images/ocr.sh 재작성**: nas_conn.sh source, `nas_ssh`/`nas_put` 사용, sudo 제거, RedCode 소유로 직접 쓰기(mv/chmod). 검증: 키접속·쓰기가능·구문 OK.
 
-**남음(선택)**: Phase 3 — py2app 서명·공증 `KyoboCapture.app`(run.command 대신 아이콘 더블클릭).
+**Phase 3 — `KyoboCapture.app` (아이콘 더블클릭)**
+- **py2app 안 씀(중요)**: py2app 번들의 `sys.executable`은 앱 실행파일이라 `run_pipeline`의 `sys.executable -m bookcapture` subprocess가 깨짐. → **래퍼 .app**(실행파일=venv python 런처) 채택 — subprocess 정상 + 아이콘 더블클릭·Terminal 없음.
+- `desktop/build_app.sh`(신규): `KyoboCapture.app` 생성 — Info.plist(bundle id·화면기록/자동화 usage 문자열·HiDPI), 런처(`MacOS/launch`: PATH 보강[/opt/homebrew 등 tesseract]→`cd book-capture`→`.venv/bin/python3 -m desktop.main`), codesign(Apple Development 서명; 비대화형이면 ad-hoc 폴백). `.app`은 .gitignore(빌드산출물).
+- 검증: `open KyoboCapture.app` → 창 열림, venv python(pywebview) 사용 확인.
+- **배포·공증**: Developer ID Application 인증서 발급 시 가능(현재 미발급 — 본인 Mac은 Apple Development/ad-hoc 서명으로 충분).
