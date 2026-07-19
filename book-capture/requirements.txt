@@ -17,3 +17,6 @@ pyobjc-framework-Quartz==12.2 ; sys_platform == "darwin"
 # PIL ImageGrab(GDI BitBlt)은 교보가 '화면캡처 불가' 파란화면으로 오염시킴.
 # dxcam(DXGI Desktop Duplication)은 GPU 합성 출력을 캡처 → Snipping Tool(WGC)처럼 우회.
 dxcam==0.0.5 ; sys_platform == "win32"
+
+# 데스크탑 앱(desktop/) — 웹뷰 embed
+pywebview==6.2.1

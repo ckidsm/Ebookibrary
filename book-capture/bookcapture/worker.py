@@ -35,6 +35,7 @@ import urllib.request
 from pathlib import Path
 
 from .settings import DEFAULT_BRIDGE_URL, load as load_settings
+from .pipeline_run import build_steps, run_pipeline
 
 
 # stdout 한 줄에서 "현재/전체" 추출하기 위한 패턴 (각 단계 출력 형식)
@@ -166,223 +167,59 @@ def run_one(bridge: str, job: dict) -> None:
     books_dir = Path(s.output.books_dir).expanduser().resolve()
     book_dir = books_dir / slug
 
-    # CLI 서브커맨드 결정
-    steps: list[list[str]] = []
-    if mode == "summarize-only":
-        # 캡처 PNG 가 미리 있어야 함
-        if not list(book_dir.glob("*.png")):
-            msg = (f"책 폴더에 캡처 PNG 없음: {book_dir}\n"
-                   f"먼저 capture-only 작업 실행 또는 수동 capture")
-            print(f"[worker] {msg}")
-            report(bridge, jid, status="failed", error=msg)
-            return
-        steps = [
-            ["ocr", "--vision", "--book-dir", str(book_dir)],  # 비전 전사(Gemini→Claude 폴백) — tesseract mojibake 대체
-            ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
-            ["code", "--book-dir", str(book_dir)],
-            ["merge", "--book-dir", str(book_dir)],
-            ["build", "--book-dir", str(book_dir)],
-        ]
-    elif mode == "upload-process":
-        # Phase #67: 사용자가 업로드한 PNG 들을 처리 — capture 스킵
-        # 업로드된 파일은 백엔드가 LIBRARY_BOOKS_DIR/<slug>/ 에 저장.
-        # Mac 워커는 OneDrive 안 book-capture/books/<slug>/ 로 처리 — 백엔드 books_dir 와 워커 book_dir 가 다름.
-        # 해결: 백엔드 books_dir 의 파일을 워커가 SCP/sync 또는 직접 접근.
-        # 가장 단순: 워커가 백엔드 books_dir 에서 직접 처리.
-        # 다만 worker 가 NAS books_dir 에 직접 접근 못 함 (다른 머신).
-        # 대안: 백엔드 → worker 로 파일 전송 endpoint, 또는 OneDrive 동기화 활용.
-        # 가장 빠른 길: 사용자 업로드를 NAS 정적 폴더에 저장하고,
-        # worker 가 직접 OCR/요약/HTML 처리 (이미 만들어진 도구 그대로 사용).
-        # → 다만 책 폴더가 NAS 안에 있어야 — Mac 워커가 NAS SMB 또는 비슷한 방법으로 접근.
-        # 일단 단순화: 백엔드에서 처리 (워커가 백엔드 안에서 실행되거나, 백엔드가 ocr/summarize/merge/build 직접).
-        # 현재 워커는 Mac local 이라 직접 처리는 OneDrive 동기화 폴더에서만 가능.
-        # → upload-process 는 일단 book-capture/books/<slug>/ 에 미리 파일 있다고 가정.
-        steps = [
-            ["ocr", "--vision", "--book-dir", str(book_dir)],  # 비전 전사(Gemini→Claude 폴백) — tesseract mojibake 대체
-            ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
-            ["code", "--book-dir", str(book_dir)],
-            ["merge", "--book-dir", str(book_dir)],
-            ["build", "--book-dir", str(book_dir)],
-        ]
-    elif mode == "capture-only":
-        # 하이브리드(#67): 캡처만 워커가 하고, PNG 를 백엔드로 업로드 →
-        # 백엔드가 upload-process 로 OCR/요약/빌드. 원격(Windows) 에 최적.
-        # count = 최대 페이지 안전 상한(책 끝에서 같은 화면 감지 시 자동 중단되므로 넉넉히).
-        # 300 은 두꺼운 책(500p+)을 다 못 찍어서 1500 으로 상향.
-        cap = ["capture-auto", "--slug", slug, "--count", "1500", "--interval", "2"]
-        sale_id = job.get("salecmdtid") or _lookup_salecmdtid(bridge, slug)
-        if sale_id:
-            cap += ["--book-id", sale_id]
-        # 시작 페이지(job.pages 가 숫자면) — N>1 이면 그 번호부터 이어서 캡처
-        _sp = str(job.get("pages") or "").strip()
-        if _sp.isdigit() and int(_sp) > 1:
-            cap += ["--start-page", _sp]
-        steps = [
-            cap,
-            ["upload", "--slug", slug, "--title", (job.get("title") or slug)],
-        ]
-    elif mode == "capture-browser":
-        # 🌐 브라우저 웹뷰어 캡처 — 사용자가 wviewer(바로보기)를 브라우저 전체화면으로 띄워두면
-        # 데스크탑 앱 없이 포그라운드(브라우저)를 화면캡처 + → 키로 페이지 넘김.
-        # 교보 데스크탑 앱 DRM(화면캡처 파란화면)을 우회. (wviewer 웹페이지는 OS 캡처 못 막음)
-        print(f"[worker] 🌐 mode=capture-browser — 브라우저 웹뷰어 화면캡처(--no-app)")
-        cap = ["capture-auto", "--slug", slug, "--count", "1500", "--interval", "2", "--no-app"]
-        _sp = str(job.get("pages") or "").strip()
-        if _sp.isdigit() and int(_sp) > 1:
-            cap += ["--start-page", _sp]
-        steps = [
-            cap,
-            ["upload", "--slug", slug, "--title", (job.get("title") or slug)],
-        ]
-    elif mode == "auto-web":
-        # Phase #47: e-library 통과 → wviewer 캡처 (화면 점유 X)
-        print(f"[worker] 🌐 mode=auto-web 분기 진입")
-        salecmdtid = job.get("salecmdtid")
+    # ── 사전조건 + salecmdtid 해석 (모드별) ──
+    if mode == "summarize-only" and not list(book_dir.glob("*.png")):
+        msg = f"책 폴더에 캡처 PNG 없음: {book_dir}\n먼저 capture-only 작업 실행 또는 수동 capture"
+        print(f"[worker] {msg}"); report(bridge, jid, status="failed", error=msg); return
+    salecmdtid = None
+    if mode in ("auto", "capture-only", "auto-web"):
+        salecmdtid = job.get("salecmdtid") or _lookup_salecmdtid(bridge, slug)
+        if mode == "auto-web" and not salecmdtid:
+            msg = f"auto-web 모드인데 salecmdtid 없음 (slug={slug}). books 테이블 등록 확인."
+            print(f"[worker] {msg}"); report(bridge, jid, status="failed", error=msg); return
         if salecmdtid:
-            print(f"[worker] ✓ job 안에 salecmdtid 있음: {salecmdtid}")
-        else:
-            print(f"[worker] 📖 job 에 salecmdtid 없음 → books 테이블 조회 (slug={slug})")
-            salecmdtid = _lookup_salecmdtid(bridge, slug)
-            print(f"[worker] 조회 결과: salecmdtid={salecmdtid!r}")
-        if not salecmdtid:
-            msg = f"auto-web 모드인데 salecmdtid 없음 (slug={slug}). books 테이블에 등록됐는지 확인."
-            print(f"[worker] {msg}")
-            report(bridge, jid, status="failed", error=msg)
-            return
-        steps = [
-            ["wviewer", "capture-lib",
-             "--salecmdtid", salecmdtid,
-             "--slug", slug,
-             "--out-dir", str(book_dir),
-             "--max-pages", "300", "--delay", "1.5"],
-            ["ocr", "--vision", "--book-dir", str(book_dir)],  # 비전 전사(Gemini→Claude 폴백) — tesseract mojibake 대체
-            ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
-            ["code", "--book-dir", str(book_dir)],
-            ["merge", "--book-dir", str(book_dir)],
-            ["build", "--book-dir", str(book_dir)],
-        ]
-    else:  # auto = 로컬 매크로 최종 파이프라인 (capture→…→build→챕터→개요→최종화)
-        print(f"[worker] 🖥 mode={mode!r} (로컬 매크로 분기) — capture-auto 실행 예정")
-        cap = ["capture-auto", "--slug", slug, "--count", "1500", "--interval", "0.8", "--no-ocr"]
-        # salecmdtid 가 있으면 deep link 책 자동 열기 (kyoboebook://book/<id>)
-        sale_id = job.get("salecmdtid") or _lookup_salecmdtid(bridge, slug)
-        if sale_id:
-            print(f"[worker] ✓ salecmdtid={sale_id} → deep link 책 자동 열기 시도")
-            cap += ["--book-id", sale_id]
-        else:
-            print(f"[worker] ⚠ salecmdtid 없음 — 사용자가 책 직접 펼친 상태 가정")
-        steps = [
-            cap,
-            ["ocr", "--vision", "--book-dir", str(book_dir)],  # 비전 전사(Gemini→Claude 폴백) — tesseract mojibake 대체
-            ["summarize", "--book-dir", str(book_dir)] + (["--pages", pages] if pages else []),
-            ["code", "--book-dir", str(book_dir)],
-            ["merge", "--book-dir", str(book_dir)],
-            ["build", "--book-dir", str(book_dir)],
-            ["chapters-auto", "--book-dir", str(book_dir)],          # 비전 장 표지 감지
-            ["overview", "--book-dir", str(book_dir), "--title", (job.get("title") or slug)],
-            ["finalize", "--book-dir", str(book_dir)],               # 챕터트리+표 주입
-            ["publish", "--book-dir", str(book_dir)],                # NAS 발행(NAS_PASS 있으면)
-        ]
+            print(f"[worker] ✓ salecmdtid={salecmdtid} (deep link 책 열기 시도)")
+
+    # ── step 배열 생성 (pipeline_run 공용) ──
+    try:
+        steps = build_steps(mode, slug, book_dir, title=(job.get("title") or slug),
+                            salecmdtid=salecmdtid, pages=pages)
+    except ValueError as e:
+        report(bridge, jid, status="failed", error=str(e)); print(f"[worker] {e}"); return
 
     print(f"[worker] 📋 실행할 steps ({len(steps)}개):")
-    for idx, s in enumerate(steps, 1):
-        print(f"[worker]   {idx}. {' '.join(map(str, s))}")
-    stdout_buf: list[str] = []
+    for _idx, _st in enumerate(steps, 1):
+        print(f"[worker]   {_idx}. {' '.join(map(str, _st))}")
+
+    # ── 실행 (pipeline_run.run_pipeline) — 진행보고 throttle 0.6s + 취소 ──
     n = len(steps)
-    last_report_ts = 0.0
-    last_cancel_check_ts = 0.0
-    REPORT_MIN_INTERVAL = 0.6
-    CANCEL_CHECK_INTERVAL = 1.5   # 1.5s 마다 status 체크 (취소 감지)
+    _last = [0.0]
+    def _on_progress(i, _n, name, cur, tot, line):
+        now = time.monotonic()
+        if line == "시작..." or line.endswith("완료") or (now - _last[0]) >= 0.6:
+            _last[0] = now
+            report(bridge, jid, progress=progress_payload(i, _n, name, cur, tot, line))
+    result = run_pipeline(
+        steps,
+        on_progress=_on_progress,
+        should_cancel=lambda: is_cancelling(bridge, jid),
+        on_line=lambda s: print(s, end=""),
+    )
 
-    for i, args in enumerate(steps, 1):
-        step_name = args[0]
-        # 단계 사이에 cancel 체크
-        if is_cancelling(bridge, jid):
-            print(f"[worker] ⏹ cancel 감지 — 종료")
-            report(bridge, jid, status="cancelled",
-                   progress=progress_payload(i, n, step_name, 0, 0, "사용자가 중단"))
-            return
-
-        report(bridge, jid,
-               progress=progress_payload(i, n, step_name, 0, 0, "시작..."))
-        print(f"\n[worker] [{i}/{n}] {step_name} ...")
-        try:
-            proc = subprocess.Popen(
-                [sys.executable, "-m", "bookcapture", *args],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",       # 자식이 UTF-8 로 출력(cp949 콘솔 무관)
-                errors="replace",
-                bufsize=1,
-            )
-            assert proc.stdout
-            sub_current = sub_total = 0
-            for line in proc.stdout:
-                print(line, end="")
-                stdout_buf.append(line)
-                if len(stdout_buf) > 200:
-                    stdout_buf = stdout_buf[-200:]
-
-                parsed = parse_subprogress(line)
-                if parsed:
-                    sub_current, sub_total = parsed
-
-                now = time.monotonic()
-                if (now - last_report_ts) >= REPORT_MIN_INTERVAL:
-                    last_report_ts = now
-                    report(bridge, jid,
-                           progress=progress_payload(
-                               i, n, step_name, sub_current, sub_total,
-                               line.strip()[:140] or step_name,
-                           ))
-                # 주기적으로 cancel 체크 → subprocess SIGTERM
-                if (now - last_cancel_check_ts) >= CANCEL_CHECK_INTERVAL:
-                    last_cancel_check_ts = now
-                    if is_cancelling(bridge, jid):
-                        print(f"[worker] ⏹ cancel 감지 — subprocess SIGTERM")
-                        try: proc.terminate()
-                        except Exception: pass
-                        try: proc.wait(timeout=3)
-                        except subprocess.TimeoutExpired:
-                            try: proc.kill()
-                            except Exception: pass
-                        report(bridge, jid, status="cancelled",
-                               progress=progress_payload(i, n, step_name,
-                                                         sub_current, sub_total,
-                                                         "중단됨"),
-                               stdout_tail="".join(stdout_buf[-30:]))
-                        return
-            rc = proc.wait()
-            # 단계 종료 신호 (100%)
-            report(bridge, jid,
-                   progress=progress_payload(i, n, step_name,
-                                             sub_total or 1, sub_total or 1,
-                                             f"{step_name} 완료"))
-            if rc != 0:
-                # 선택 단계(챕터·개요·최종화·발행)는 실패해도 잡 중단 X — 기본 책(캡처·요약·코드·build)은
-                # 이미 완성이라, 이것들이 실패해도 책은 살린다(2026-07-14: chapters-auto 0개가 잡 전체를
-                # 실패시키던 버그 → 선택 단계는 non-fatal).
-                if step_name in ("chapters-auto", "overview", "finalize", "publish"):
-                    print(f"[worker] ⚠ 선택 단계 '{step_name}' exit {rc} — 건너뛰고 계속(기본 책 유지)")
-                    continue
-                msg = f"step '{step_name}' exit {rc}"
-                report(bridge, jid, status="failed", error=msg,
-                       stdout_tail="".join(stdout_buf[-30:]))
-                print(f"[worker] ✗ {msg}")
-                return
-        except Exception as e:
-            tb = traceback.format_exc()
-            report(bridge, jid, status="failed", error=f"{type(e).__name__}: {e}",
-                   stdout_tail="".join(stdout_buf[-20:]) + "\n" + tb[-500:])
-            print(f"[worker] ✗ exception in {step_name}: {e}")
-            return
-
-    # 최종 완료
-    report(bridge, jid, status="done",
-           progress=progress_payload(n, n, "done", 1, 1, "전체 완료"),
-           stdout_tail="".join(stdout_buf[-30:]))
-    print(f"[worker] ✓ job #{jid} 완료")
+    st = result.get("status")
+    tail = result.get("stdout_tail", "")
+    if st == "done":
+        report(bridge, jid, status="done",
+               progress=progress_payload(n, n, "done", 1, 1, "전체 완료"), stdout_tail=tail)
+        print(f"[worker] ✓ job #{jid} 완료")
+    elif st == "cancelled":
+        report(bridge, jid, status="cancelled",
+               progress=progress_payload(1, n, result.get("failed_step", ""), 0, 0, "중단됨"),
+               stdout_tail=tail)
+        print(f"[worker] ⏹ job #{jid} 취소")
+    else:
+        report(bridge, jid, status="failed", error=result.get("error", "unknown"), stdout_tail=tail)
+        print(f"[worker] ✗ {result.get('error')}")
 
 
 _PING_META: dict | None = None
