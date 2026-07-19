@@ -208,6 +208,9 @@ def generate_chapters_via_toc(book_dir, cfg):
         lst, ti, to = _read_toc(key, model, book_dir / f"page_{p:03d}.png")
         ci += ti; co += to
         raw_ch.extend(lst)
+    if ci or co:
+        from . import cost as _cost
+        _cost.record(book_dir, "chapters-toc", model, ci, co, AnthropicAPI.cost_usd(model, ci, co))
     # 중복 제거: 번호 있는 장은 **번호 기준**(같은 장이 스프레드 경계로 두 목차페이지에 걸쳐 두 번 잡힘 —
     #   제목이 미세하게 달라도 같은 장). 번호 없는 부록(num=0)은 제목 기준.
     seen_num, seen_title, toc_ch = set(), set(), []
@@ -427,6 +430,9 @@ def generate_chapters(book_dir, cfg, min_frac=0.30, include_sections=False):
         if lvl == "chapter" or (include_sections and lvl == "section"):
             covers.append({"page": c["page"], "level": lvl,
                            "num": info.get("num", 0), "title": info.get("title", "").strip()})
+    if ci or co:   # 결과(성공/스킵) 무관하게 소비된 비전 비용 기록
+        from . import cost as _cost
+        _cost.record(book_dir, "chapters", model, ci, co, AnthropicAPI.cost_usd(model, ci, co))
     # 페이지순 정렬 + 경계 계산(chapter 만 경계)
     covers.sort(key=lambda x: x["page"])
     chs = [c for c in covers if c["level"] == "chapter"]

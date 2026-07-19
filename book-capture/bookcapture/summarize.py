@@ -429,6 +429,9 @@ def summarize_pages(
     _save()
     note = f", 오염 제외 {len(skipped)}장" if skipped else ""
     print(f"[summarize] 저장: {out_path} ({pages_done} 페이지{note}, 비용 ${cost_total:.3f})")
+    if pages_done:
+        from . import cost as _cost
+        _cost.record(out_path.parent.parent, "summarize", cfg.model, in_total, out_total, cost_total)
     if skipped:
         print(f"[summarize] ⏭ 오염 제외 페이지: "
               + ", ".join(f"p.{n}({w})" for n, w in skipped), file=sys.stderr)

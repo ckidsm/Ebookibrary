@@ -404,6 +404,14 @@ def cmd_chapters_auto(args) -> int:
     return 0
 
 
+def cmd_cost(args) -> int:
+    """단계별 API 비용 집계 출력 (summary/cost_log.tsv)."""
+    from . import cost as _cost
+    book_dir = _resolve_book_dir(args)
+    _cost.report(book_dir)
+    return 0
+
+
 def cmd_overview(args) -> int:
     """chapters.json + pages_data.json → summary/book_overview.json (전체요약+장별 1장)."""
     from . import book_overview as BO
@@ -764,6 +772,10 @@ def build_parser() -> argparse.ArgumentParser:
     ptt.add_argument("--min-run", type=int, default=2, help="꼬리 반복 최소 연속 수(기본 2)")
     ptt.add_argument("--dry-run", action="store_true", help="삭제 안 하고 목록만")
     ptt.set_defaults(func=cmd_trim_tail)
+
+    pcost = sub.add_parser("cost", help="단계별 API 비용 집계 출력 (summary/cost_log.tsv)")
+    pcost.add_argument("--slug"); pcost.add_argument("--book-dir")
+    pcost.set_defaults(func=cmd_cost)
 
     pca2 = sub.add_parser("chapters-auto", help="장 감지 → chapters.json (표지 비전 + 목차 폴백)")
     pca2.add_argument("--slug"); pca2.add_argument("--book-dir")

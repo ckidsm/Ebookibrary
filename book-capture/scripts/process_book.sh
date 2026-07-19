@@ -41,6 +41,8 @@ BOOK="books/$SLUG"; SUM="$BOOK/summary"
 STAGES=(crop ocr summarize merge build code overview finalize publish)
 idx() { local i=0; for s in "${STAGES[@]}"; do [ "$s" = "$1" ] && { echo $i; return; }; i=$((i+1)); done; echo 99; }
 FROM_I=$(idx "$FROM"); run_stage() { [ "$(idx "$1")" -ge "$FROM_I" ]; }
+# 비용 로그 초기화 — 처음부터(crop/ocr) 실행할 때만(부분 --from 은 누적 유지)
+[ "$FROM" = crop ] || [ "$FROM" = ocr ] && $PY -c "from bookcapture import cost; cost.reset('$BOOK')" 2>/dev/null || true
 say() { echo; echo "━━━ $* ━━━"; }
 
 # 1) 크롭 (source_raws → page/thumbs)
@@ -98,6 +100,7 @@ elif [ "$PUBLISH" = 1 ]; then
   echo "(publish 단계는 --from 로 스킵됨)"
 fi
 
+echo; $PY -m bookcapture cost --book-dir "$BOOK" 2>/dev/null || true
 echo; echo "✅ 완료: $SLUG"
 if [ "$PUBLISH" = 1 ]; then
   echo "   라이브: https://redcodeme.synology.me/kyobo/books/$SLUG/summary/index.html"

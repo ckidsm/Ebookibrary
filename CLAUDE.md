@@ -1247,3 +1247,19 @@ crop→qc→trim→ocr→summarize→merge→build→**code**→**book_overview*
 **검증 결과(전 파이프라인, 발행 없이 로컬)**: 캡처163 → Gemini전사(**mojibake 0**) → Haiku요약 → merge/build → 코드추출 → chapters(cover 불완전→TOC 13장) → overview(13장) → finalize(사이드바 13장 트리·📋개요·164 페이지카드). 이후 발행.
 
 **변경 소스 3개**(모두 이 검증으로 실증): `bookcapture/kyobo_app.py`(캡처 4종) · `bookcapture/cli.py`(interval 0) · `bookcapture/chapters_detect.py`(완전성 게이트).
+
+---
+
+### 2026-07-19: 메인 "분석된 책만" 필터 + 단계별 API 비용 로깅
+
+**① 메인 그리드 "분석된 책만" 필터** (`index.html`)
+- 기존 정렬 콤보(분석도서순/동기화순/가나다순)에 **`분석된 책만`** 옵션 추가. 선택 시 `applySort` 가 `_analyzedMap.has(slugify(title))` 로 **필터**(미분석 숨김) + 가나다 정렬. (사용자가 "분석순 필터 미작동" 신고 → 실은 정렬은 됐고 필터 옵션이 없었던 것. 라이브 검증: 85권 → 9권 필터, 전부 ✓분석됨.)
+- ⚠️ 외부 Web Station 이 HTML 캐시 → 반영엔 강력 새로고침 필요.
+
+**② 단계별 API 비용 로깅** (`bookcapture/cost.py` 신규)
+- 각 AI 단계가 `cost.record(book_dir, stage, model, in, out, usd)` 로 `summary/cost_log.tsv` 에 append + `[COST]` 표준 출력. `cost.report()` 가 단계별·합계·**장당 비용** 집계.
+- 계측 지점: `transcribe`(Gemini/Claude 전사) · `summarize`(Haiku) · `code`(Sonnet 비전) · `chapters`+`chapters-toc`(비전) · `overview`(Haiku). `AnthropicAPI.cost_usd()` 로 토큰→USD.
+- `cli.py` `cost` 서브커맨드 + `process_book.sh` 가 시작 시 reset(crop/ocr) · 끝에 리포트 출력.
+- 실측 예(인공지능 개념 사전, 163장): 전사 Gemini ~$0.34 + 요약 Haiku ~$0.35~0.57 + 챕터 ~$0.17 + 개요 ~$0.10 ≈ **$1.2/권, 장당 ~$0.007**. (Gemini 전사가 Claude 비전 $7.3/권 대비 ~18배 절감 실증.)
+
+**변경**: `index.html`(필터) · `bookcapture/cost.py`(신규) · `anthropic_api.py`(cost_usd) · `transcribe.py`·`summarize.py`·`extract_code.py`·`chapters_detect.py`·`book_overview.py`(record 호출) · `cli.py`(cost 서브커맨드) · `scripts/process_book.sh`(reset+리포트).

@@ -140,4 +140,8 @@ def generate_overview(book_dir, cfg, title=None):
         print("[overview] 생성 실패"); return None
     out_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[overview] {out_path.name} (장 {len(digests)} · in={ci} out={co})")
+    if ci or co:
+        _ovmodel = getattr(cfg, "model", None) or AnthropicAPI.DEFAULT_MODEL
+        from . import cost as _cost
+        _cost.record(book_dir, "overview", _ovmodel, ci, co, AnthropicAPI.cost_usd(_ovmodel, ci, co))
     return meta

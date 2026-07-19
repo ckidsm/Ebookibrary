@@ -956,6 +956,7 @@
         <div class="section-label" style="display:flex;align-items:center;gap:0.6rem;">내 e-Library 도서함 <small id="kyobo-count" style="opacity:0.6;font-weight:normal;text-transform:none;letter-spacing:0;"></small>
             <select id="kyobo-sort" onchange="applySort()" title="정렬" style="margin-left:auto;background:#1a2332;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:3px 9px;font-size:0.8rem;text-transform:none;letter-spacing:0;font-weight:normal;cursor:pointer;">
                 <option value="analyzed" selected>분석도서순</option>
+                <option value="analyzed-only">분석된 책만</option>
                 <option value="sync">동기화순</option>
                 <option value="title">가나다순</option>
             </select>
@@ -1068,7 +1069,11 @@
                 if (!cur || (b.author && b.author !== '저자 미상' && (!cur.author || cur.author === '저자 미상'))) _bySlug.set(k, b);
             }
             let list = Array.from(_bySlug.values());
-            if (_sortMode === 'title') {
+            if (_sortMode === 'analyzed-only') {
+                // 필터: 분석된 책만 (나머지 숨김) + 가나다 정렬
+                list = list.filter(b => _analyzedMap.has(slugify(b.title)))
+                           .sort((a, b) => (a.title || '').localeCompare(b.title || '', 'ko'));
+            } else if (_sortMode === 'title') {
                 list.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'ko'));
             } else if (_sortMode === 'analyzed') {
                 list.sort((a, b) => {

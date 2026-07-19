@@ -52,6 +52,12 @@ class AnthropicAPI:
     HEADERS_CT = "application/json"
 
     @classmethod
+    def cost_usd(cls, model, in_tok, out_tok):
+        """토큰 → USD (PRICES 단가). 미등록 모델은 DEFAULT_PRICE."""
+        pin, pout = cls.PRICES.get(model, cls.DEFAULT_PRICE)
+        return in_tok / 1e6 * pin + out_tok / 1e6 * pout
+
+    @classmethod
     def price(cls, model):
         """모델 단가 (input,output) $/1M. 미등록이면 DEFAULT_PRICE."""
         return cls.PRICES.get(model, cls.DEFAULT_PRICE)

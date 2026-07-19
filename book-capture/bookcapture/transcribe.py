@@ -141,6 +141,7 @@ def transcribe_book(book_dir: Path, ai, refresh: bool = False,
 
     done = skipped = 0
     cost = 0.0
+    tot_in = tot_out = 0
     print(f"[transcribe] {len(nums)} 페이지 비전 전사 (engine={engine}, model={model}, "
           f"refresh={refresh}, 기존 완료 {len(vdone & set(nums))}장)")
     for i, n in enumerate(nums, 1):
@@ -159,6 +160,7 @@ def transcribe_book(book_dir: Path, ai, refresh: bool = False,
         vdone.add(n)
         done += 1
         cost += it / 1e6 * ip + ot / 1e6 * op
+        tot_in += it; tot_out += ot
         if done % 5 == 0:
             _save_manifest()
         if progress:
@@ -166,4 +168,7 @@ def transcribe_book(book_dir: Path, ai, refresh: bool = False,
                   f"(in={it} out={ot} cum=${cost:.3f})")
     _save_manifest()
     print(f"[transcribe] 완료 — 전사 {done}장, 재사용 {skipped}장, ${cost:.3f}")
+    if done:
+        from . import cost as _cost
+        _cost.record(book_dir, "transcribe", f"{engine}:{model}", tot_in, tot_out, cost)
     return {"done": done, "skipped": skipped, "cost_usd": cost}

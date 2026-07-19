@@ -99,6 +99,7 @@ def extract_code_blocks(book_dir: Path, ai, pages=None, progress=True) -> dict:
     todo = [n for n in pages if str(n) not in result]
     print(f"[code] 코드 페이지 {len(pages)}장, 남은 {len(todo)}장 (model={model})")
     cost = 0.0
+    it_total = ot_total = 0
     for i, n in enumerate(todo, 1):
         img = book_dir / "thumbs" / f"page_{n:03d}.png"
         if not img.exists(): img = book_dir / f"page_{n:03d}.png"
@@ -115,6 +116,7 @@ def extract_code_blocks(book_dir: Path, ai, pages=None, progress=True) -> dict:
         blocks = [b for b in data.get("blocks", []) if b.get("code", "").strip()]
         if blocks: result[str(n)] = blocks
         cost += it / 1e6 * ip + ot_ / 1e6 * op
+        it_total += it; ot_total += ot_
         if progress:
             print(f"[code] {i}/{len(todo)} p{n:03d}: {len(blocks)} block · cum=${cost:.3f}")
         if i % 10 == 0:
@@ -123,4 +125,7 @@ def extract_code_blocks(book_dir: Path, ai, pages=None, progress=True) -> dict:
     out.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
     total = sum(len(v) for v in result.values())
     print(f"[code] 저장: {out} ({len(result)} 페이지·{total} 블록, 비용 ${cost:.3f})")
+    if it_total or ot_total:
+        from . import cost as _cost
+        _cost.record(book_dir, "code", model, it_total, ot_total, cost)
     return {"pages": len(result), "blocks": total, "cost_usd": cost, "done": True}
