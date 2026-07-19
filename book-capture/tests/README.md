@@ -28,12 +28,13 @@ KYOBO_SKIP_NET=1 .venv/bin/pytest tests/   # 오프라인(발행 검증 스킵)
 
 ## 검증이 잡은 발행 불일치 (2026-07-19)
 
-`test_published` 가 `xfail` 로 문서화한 재발행 대상 2건 — 재발행되면 자동 `xpass`:
+`test_published` 가 잡은 재발행 대상 2건:
 
-- **클로드코드** — 레거시 발행본. 📋책개요는 있으나 **챕터별 상세요약·코드모달 없음**.
-  → `finalize`(chapter_digests) + 코드추출 재실행 후 재발행.
-- **밑바닥 LLM** — 코드모달 UI 는 있으나 **`code_blocks.json` 미발행(404)** → 코드패널 로드 실패.
-  → `publish_book.sh`(code_blocks.json 포함) 재발행.
+- ✅ **밑바닥 LLM** — 코드모달 UI 는 있으나 `code_blocks.json` 미발행(404, 코드패널 로드 실패)였음.
+  → **2026-07-19 `bookcapture code`(118p·307블록·$1.21) + `publish_book.sh` 재발행으로 해소.**
+  strict 검증(`test_published_code_blocks_consistency`)으로 승격됨.
+- ⏳ **클로드코드** — 레거시 발행본. 📋책개요는 있으나 **챕터별 상세요약·코드모달 없음**.
+  로컬 산출물이 없어(재캡처/복원 필요) 미해소 → `xfail` 로 문서화(`_LEGACY_NO_DIGESTS`).
 
-수정 후 `test_published.py` 상단 `_LEGACY_NO_DIGESTS`·`_MISSING_CODE_JSON` 집합에서 해당 슬러그를
-빼면 strict 검증으로 승격된다.
+미해소 건이 재발행되면 `test_published.py` 상단 `_LEGACY_NO_DIGESTS` 집합에서 슬러그를 빼
+strict 검증으로 승격한다.

@@ -3,11 +3,11 @@
 네트워크 필요. KYOBO_SKIP_NET=1 로 스킵. 발행 자원만 GET(읽기전용).
 pages_data.json·chapters.json 은 index.html 에 인라인 → 미발행(404 정상), 검증 안 함.
 
-⚠️ 이 스위트가 잡은 실제 발행 불일치(2026-07-19, xfail 로 문서화 → 재발행 시 xpass):
+이 스위트가 잡은 실제 발행 불일치(2026-07-19):
+  · 밑바닥 LLM  = 코드모달 UI 는 있으나 code_blocks.json 미발행(404) → 코드패널 로드 실패.
+                 → **2026-07-19 코드추출(118p·307블록)+재발행으로 해소.** strict 검증으로 승격됨.
   · 클로드코드  = 레거시 발행본. 📋책개요는 있으나 **챕터별 상세요약(chapter_digests)·코드모달 없음**.
-                 → finalize+overview 재실행 후 재발행 대상.
-  · 밑바닥 LLM  = 코드모달 UI 는 있으나 **code_blocks.json 미발행(404)** → 코드패널 로드 실패.
-                 → publish_book/code_blocks.json 재발행 대상.
+                 로컬 산출물이 없어 재캡처/복원 필요 → 미해소. xfail 로 문서화.
 """
 import json
 
@@ -17,9 +17,9 @@ from conftest import BOOKS, SKIP_NET, published_url, param_books
 
 pytestmark = pytest.mark.skipif(SKIP_NET, reason="KYOBO_SKIP_NET=1 (네트워크 스킵)")
 
-# 발행 완전성 이슈가 있는 책(위 표) — 재발행되면 이 마킹을 지워 strict 검증으로 승격.
+# 아직 미해소인 발행 완전성 이슈 — 재발행되면 집합에서 빼 strict 검증으로 승격.
 _LEGACY_NO_DIGESTS = {"클로드_코드로_시작하는_실전_에이전틱_코딩"}
-_MISSING_CODE_JSON = {"밑바닥부터_만들면서_배우는_LLM"}
+_MISSING_CODE_JSON: set[str] = set()   # 밑바닥LLM 해소(2026-07-19) → 비어있음
 
 
 def _xfail_if(slug: str, known: set, reason: str):
