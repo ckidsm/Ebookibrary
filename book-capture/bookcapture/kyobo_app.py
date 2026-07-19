@@ -46,10 +46,15 @@ class CaptureTuning:
     TITLE_BAR_H = 28           # macOS 타이틀바 높이(px) — -R 캡처 시 자동 크롭
     MIN_BOOK_AREA_H = 200      # 타이틀바 크롭 후 남아야 할 최소 책영역 높이(px). 이보다 작으면 크롭 안 함(sanity)
 
-    # ── 마지막 페이지 감지 (perceptual MAD) ──
+    # ── 마지막 페이지 감지 (perceptual MAD + OCR 'e마지막 페이지' 확인) ──
     SIG_SIZE = 100             # 축소 grayscale 서명 한 변(px). 미세 렌더 차이 무시 + 페이지 변화 감지
     MAD_SAME_THRESHOLD = 4.0   # 이 미만이면 '같은 페이지'. 검증: 같은=0, 다른≥9 → 여유 threshold
-    END_CONFIRM_TRIES = 3      # '같은 페이지' 감지 시 →키 재전송해 확인하는 횟수(일시적 미스 vs 진짜 끝 구분)
+    END_CONFIRM_TRIES = 10     # '같은 페이지' 감지 시 →키 재전송해 확인하는 횟수(일시적 미스 vs 진짜 끝). 10회 소진=자동중지
+    # 데스크탑 앱은 렌더가 즉시 → 페이지 넘김 후 대기를 짧게(무딜레이). 캡처 간 interval 도 0 권장.
+    PAGE_TURN_RENDER_WAIT = 0.15   # →키 후 렌더 대기(초). 로컬앱이라 짧게(mid-transition 캡처만 방지)
+    # 마지막 페이지 OCR 확인: 하단 영역에서 '마지막 페이지' 문구 인식 시 즉시 종료.
+    END_TEXT_OCR_TOP = 0.82    # 하단 몇 % 부터 OCR 할지(하단 18%) — 우하단·좌하단·가운데 페이지표시/모달 포함
+    END_TEXT_PATTERNS = ("마지막페이지", "마지막장", "책의끝", "마지막쪽")  # 정규화(공백제거) 후 부분일치
 
     # ── 오염 인라인 재캡처 ──
     CONTAM_RECAPTURE_TRIES = 2  # 오염(-R 캡처) 시 같은 페이지 재캡처 시도 횟수
@@ -651,6 +656,10 @@ class KyoboAppScreenshot:
         페이지 넘김·캡처 직전에 호출. 반환: 최전면 확보 여부."""
         if self.system != "Darwin":
             return True
+        # 이미 최전면이면 즉시 반환 — activate_app 의 sleep(0.5) 스킵(무딜레이). 캡처 시작 시
+        # 한 번 활성화되면 우리가 앱을 구동하는 동안 계속 최전면이라 매 페이지 재활성 불필요.
+        if self._is_kyobo_frontmost():
+            return True
         self.activate_app()
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
@@ -796,6 +805,25 @@ class KyoboAppScreenshot:
                                  * x['kCGWindowBounds']['Height'])
         b = main['kCGWindowBounds']
         return int(b['X']), int(b['Y']), int(b['Width']), int(b['Height'])
+
+    def _is_last_page_text(self, image_path):
+        """캡처 하단 영역을 OCR 해 '마지막 페이지' 문구가 있으면 True (책 끝 확정용).
+        교보 앱은 끝에서 우하단·좌하단·가운데에 안내 문구/페이지표시를 띄운다. 이 UI 문구는
+        본문 임베디드 폰트(mojibake)와 달리 시스템 폰트라 tesseract 로 읽힌다(best-effort)."""
+        if not HAS_OCR:
+            return False
+        try:
+            img = Image.open(image_path).convert("RGB")
+            w, h = img.size
+            region = img.crop((0, int(h * CaptureTuning.END_TEXT_OCR_TOP), w, h))  # 하단 18%
+            text = pytesseract.image_to_string(region, lang="kor+eng", config="--psm 6")
+            norm = "".join(text.split())  # 공백 제거 → '마지막 페이지'/'마지막  페이지' 모두 매칭
+            hit = any(pat in norm for pat in CaptureTuning.END_TEXT_PATTERNS)
+            if hit:
+                print(f"   🔚 OCR 하단에서 마지막페이지 문구 감지: …{norm[-40:]}")
+            return hit
+        except Exception:
+            return False
 
     def _finalize_page(self, page_path):
         """확정된 page_NNN.png(raw)를 표준 정규화: (1) source_raws/raw_NNN.png 원본 보존,
@@ -989,7 +1017,7 @@ class KyoboAppScreenshot:
                         temp_filepath.unlink(missing_ok=True)
                         results.append(None)
                         if i < count - 1 and auto_page_turn:
-                            self._turn_next_page(); time.sleep(interval)
+                            self._turn_next_page(); time.sleep(CaptureTuning.PAGE_TURN_RENDER_WAIT)
                         continue
 
                 # 🔚 마지막 페이지 감지 (OCR 무관, perceptual): 직전 캡처와 **거의 동일**하면
@@ -1009,13 +1037,17 @@ class KyoboAppScreenshot:
                     _mad = _mad_vs_prev(cur_sig)
                     if _mad < CaptureTuning.MAD_SAME_THRESHOLD:
                         # 같은 페이지 = →키가 **일시적으로 안 먹혔을** 수도, **진짜 책 끝**일 수도.
-                        # 오탐(242p 조기종료) 방지: →키 재전송+재캡처로 확인. 바뀌면 계속, 계속 같으면 끝.
+                        # 오탐(242p 조기종료) 방지: →키 재전송+재캡처로 확인(요구② 10회). 바뀌면 계속.
+                        # 재캡처마다 '마지막 페이지' OCR 도 확인 → 있으면 즉시 끝. 10회 소진=자동중지(요구③).
+                        N = CaptureTuning.END_CONFIRM_TRIES
                         confirmed_end = True
-                        for _rt in range(CaptureTuning.END_CONFIRM_TRIES):
-                            print(f"   … 같은 페이지(MAD={_mad:.1f}) — 활성화+→키 재전송 후 확인 {_rt + 1}/3")
-                            self._turn_next_page(); time.sleep(max(interval, 1.5))
+                        for _rt in range(N):
+                            print(f"   … 같은 페이지(MAD={_mad:.1f}) — 활성화+→키 재전송 후 확인 {_rt + 1}/{N}")
+                            self._turn_next_page(); time.sleep(CaptureTuning.PAGE_TURN_RENDER_WAIT)
                             if not self.capture_app_window(str(temp_filepath)):
                                 continue
+                            if self._is_last_page_text(temp_filepath):
+                                break  # 마지막페이지 문구 확인 → confirmed_end 유지, 종료
                             try:
                                 re_sig = _I.open(temp_filepath).convert("L").resize((CaptureTuning.SIG_SIZE, CaptureTuning.SIG_SIZE))
                             except Exception:
@@ -1027,7 +1059,7 @@ class KyoboAppScreenshot:
                                 confirmed_end = False
                                 break
                         if confirmed_end:
-                            print(f"   🔚 →키 3회 재전송에도 동일 → 책 끝 확정, 종료 "
+                            print(f"   🔚 →키 {N}회 재전송에도 동일(또는 마지막페이지 문구) → 책 끝 확정, 종료 "
                                   f"(수집 {len([r for r in results if r])}장)")
                             temp_filepath.unlink(missing_ok=True)
                             break
@@ -1080,13 +1112,12 @@ class KyoboAppScreenshot:
                     temp_filepath.unlink()
                 results.append(None)
 
-            # 다음 캡처 전 페이지 넘김 및 대기
+            # 다음 캡처 전 페이지 넘김 및 대기(데스크탑앱=무딜레이, 렌더 대기만)
             if i < count - 1:
                 if auto_page_turn:
-                    print(f"📄 다음 페이지로 이동...")
                     self._turn_next_page()  # 활성 확인 후 →키(창 비활성 시 페이지 안 넘어감 방지)
-                print(f"⏳ {interval}초 대기 중...")
-                time.sleep(interval)
+                # interval 이 0 이어도 렌더 대기(PAGE_TURN_RENDER_WAIT)는 확보 → mid-transition 캡처 방지
+                time.sleep(max(interval, CaptureTuning.PAGE_TURN_RENDER_WAIT))
         finally:
             self.set_focus_mode(False)  # 🌙 캡처 종료(정상/오류 무관) → 집중모드 해제
 

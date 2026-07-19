@@ -737,7 +737,8 @@ def build_parser() -> argparse.ArgumentParser:
     pca = sub.add_parser("capture-auto", help="비대화형 자동 캡처 (worker용)")
     pca.add_argument("--slug", required=True)
     pca.add_argument("--count", type=int, default=300)
-    pca.add_argument("--interval", type=float, default=2.0)
+    pca.add_argument("--interval", type=float, default=0.0,
+                     help="캡처 간 대기(초). 데스크탑앱=0 권장(렌더대기 0.15s는 내부 보장)")
     pca.add_argument("--start-page", type=int, default=1)
     pca.add_argument("--no-ocr", action="store_true")
     pca.add_argument("--continue-from-last", action="store_true")

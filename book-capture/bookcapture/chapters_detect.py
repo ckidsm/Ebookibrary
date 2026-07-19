@@ -431,11 +431,21 @@ def generate_chapters(book_dir, cfg, min_frac=0.30, include_sections=False):
     covers.sort(key=lambda x: x["page"])
     chs = [c for c in covers if c["level"] == "chapter"]
     chs = _drop_false_chapters(chs)   # 번호 역행/중복 = 섹션 오검출 제거(안정화 2026-07-18)
+    # 완전성 검사(2026-07-19, '인공지능 개념 사전' 검증에서 발견): 비전이 읽은 장 번호에 큰 구멍이
+    #   있으면(컬러 장표지 없는 장을 놓침) 순차 재번호(i+1)가 그 불완전성을 숨겨 **위조 연속번호**를
+    #   만든다(실제 1·3·8·9·10·11·13 → 가짜 1~7). → 번호가 촘촘(구멍 ≤2, 1~2에서 시작)할 때만
+    #   재번호로 소소한 오류 교정(부록 '9장'→'8장'), 구멍 크면 스킵(수동 chapters.json 또는 목차 필요).
+    vnums = [c["num"] for c in chs if c.get("num")]
+    dense = bool(vnums) and min(vnums) <= 2 and ((max(vnums) - min(vnums) + 1) - len(vnums) <= 2)
+    if chs and not dense:
+        print(f"[chapters] ⚠ cover 감지 불완전 — 실제 장번호 {sorted(vnums)} 구멍 큼(컬러 장표지 없는 장 누락). "
+              f"위조 연속번호 대신 스킵 → 수동 chapters.json 또는 목차 경로 필요.")
+        return []
     chapters = []
     for i, c in enumerate(chs):
         start = c["page"]
         end = (chs[i + 1]["page"] - 1) if i + 1 < len(chs) else last_page
-        # 재번호: 위치 순 1..N (비전이 준 번호가 흔들려도 트리 번호는 일관 — 부록 '9장'→'8장' 등 교정)
+        # dense 일 때만 여기 도달 → 위치 순 1..N 재번호 안전(부록 '9장'→'8장' 등 교정)
         chapters.append({"num": i + 1, "title": c["title"],
                          "start": start, "end": end, "summary": "", "topics": []})
     (sd / "chapters.json").write_text(

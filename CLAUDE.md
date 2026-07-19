@@ -1223,3 +1223,27 @@ crop→qc→trim→ocr→summarize→merge→build→**code**→**book_overview*
 **검증 함정 기록**: 5권 배치 재검증 스크립트가 **rate-limit 로 chapters-auto 크래시 → chapters.json 미수정 → 정답 그대로 남아 '거짓 일치'**(LLM 12/12 같은 불가능한 결과). chapters-auto 자체 로그(후보/장) 0건으로 판별. **재현 테스트는 산출물이 실제로 갱신됐는지(자체 로그/타임스탬프) 확인해야 함**. 개별 실측(위 ②)은 유효.
 
 **변경 소스 4개**: `kyobo-bridge/app/main.py`(put_settings deep-merge) · `bookcapture/anthropic_api.py`(DETECT_TEMPERATURE) · `bookcapture/chapters_detect.py`(TOC 블록·dedup·재번호·게이트·temp0) · `bookcapture/cli.py`(chapters-auto TOC 폴백 + --no-toc).
+
+---
+
+### 2026-07-19: 새 책 캡처 end-to-end 검증 — Mac앱 캡처 로직 강화 + 챕터 완전성 게이트(버그 차단)
+
+'코딩책과 함께 보는 인공지능 개념 사전'(337쪽)을 **새로 캡처**해 지금까지 작업 전체를 실전 검증. Mac 교보앱(iPadB2C) 캡처 경로 요구 4종을 반영하고, 검증 중 챕터 감지 버그를 발견·수정.
+
+**환경(작업 노트북)**: 멀티모니터 3개 — 주(외장 2560×1440)·**내장 1800×1169 @2.0x**(교보앱 위치, 백킹 3600px=양면표준 충족)·외장세로. 교보앱은 **창모드 최대화**(전체화면 아님), WID=단일 내용창.
+
+**Mac앱 캡처 로직 4종 (`kyobo_app.py`)**
+1. **마우스無 자동 활성화**: `_ensure_frontmost`가 osascript(System Events)로 최전면 확보(이미 있음). + **이미 최전면이면 activate·sleep(0.5) 스킵**(무딜레이 최적화).
+2. **끝페이지 →키 10회 재시도**: `END_CONFIRM_TRIES 3→10`. MAD 같은페이지 감지 시 →키 재전송하며 확인, 넘어가면 계속.
+3. **마지막페이지 OCR 확인**: `_is_last_page_text()` — 하단 18%(우하단·좌하단·가운데) tesseract OCR로 '마지막페이지'/'책의끝' 문구 감지 시 즉시 종료. **10회 소진해도 못 찾으면 자동중지**(안전).
+4. **데스크탑앱 무딜레이**: `interval` 기본 `2.0→0`(cli), 페이지간·재시도 대기를 `PAGE_TURN_RENDER_WAIT=0.15s`(mid-transition만 방지). 끝 의심 시에만 OCR(매 페이지 OCR 안 함=빠름).
+- 크롭: `_finalize_page`가 캡처 즉시 `crop_page(chrome=CHROME_APP=20,20,20,20)`→`content_crop`(종이 감지)로 **타이틀바(신호등)·회색 자동 제거** → 창모드에서도 동일 동작(내용 감지 방식). raw는 `source_raws/` 보존.
+- **실측**: 163장(양면=책 2쪽) ~4분, 끝에서 →키 10회 동일 MAD=2.1 → 자동종료. 무딜레이·자동활성화·크롭 전부 정상, page_163 back matter까지 정확.
+
+**챕터 완전성 게이트 (`chapters_detect.py`) — 검증이 잡은 버그**
+- 이 책은 PART+장 혼합, **컬러 장표지가 일부만**(1·3·8·9·10·11·13만 감지, 2·4·5·6·7·12 누락). **순차 재번호(num=i+1)가 이 불완전성을 숨겨 가짜 1~7장으로 위조**(발행 전 발견).
+- 수정: cover 결과의 **비전 장번호에 큰 구멍(gap>2)이거나 1~2에서 시작 안 하면 '불완전'으로 스킵**(위조 연속번호 금지). 촘촘하면(gap≤2) 재번호 유지(부록 '9장'→'8장' 교정). → cover 자동 스킵 → **TOC 폴백이 완전한 13장(1~13, page_138 '13장' 표지와 일치)** 확보. 두 경로 연쇄 정상.
+
+**검증 결과(전 파이프라인, 발행 없이 로컬)**: 캡처163 → Gemini전사(**mojibake 0**) → Haiku요약 → merge/build → 코드추출 → chapters(cover 불완전→TOC 13장) → overview(13장) → finalize(사이드바 13장 트리·📋개요·164 페이지카드). 이후 발행.
+
+**변경 소스 3개**(모두 이 검증으로 실증): `bookcapture/kyobo_app.py`(캡처 4종) · `bookcapture/cli.py`(interval 0) · `bookcapture/chapters_detect.py`(완전성 게이트).
