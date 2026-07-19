@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  KyoboCapture.app 공증(하드런타임)용 엔타이틀먼트.
+  런처가 외부 venv python 을 exec 하고, python 이 homebrew/venv dylib(ad-hoc 서명)을 로드하므로
+  library validation 을 풀어준다. Apple Events(교보앱 제어)·화면기록은 TCC(런타임 사용자 허용)로 처리.
+-->
+<plist version="1.0"><dict>
+  <key>com.apple.security.cs.disable-library-validation</key><true/>
+  <key>com.apple.security.cs.allow-dyld-environment-variables</key><true/>
+  <key>com.apple.security.cs.allow-jit</key><true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/>
+  <key>com.apple.security.automation.apple-events</key><true/>
+</dict></plist>

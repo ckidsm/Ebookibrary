@@ -11,8 +11,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."            # book-capture/
 BOOKCAP="$(pwd)"
 APP="desktop/KyoboCapture.app"
-# 서명 인증서(기본: Apple Development deok soo yun). SIGN_IDENTITY 로 오버라이드, "-" 면 ad-hoc.
-IDENTITY="${SIGN_IDENTITY:-46FF8B80175EFC0070F050FB944764BF3F168757}"
+# 서명 인증서(기본: Developer ID Application deok soo yun RRTB256N59 — 배포·공증용).
+#   Mac14_person 세트(2026-07-19 발급). SIGN_IDENTITY 로 오버라이드, "-" 면 ad-hoc.
+#   개인키 없는 다른 맥에서 빌드 시엔 Mac14_person/DeveloperID_Application_Mac14.p12 임포트 후 사용.
+IDENTITY="${SIGN_IDENTITY:-C97C6B43743CA9B8F297940898B281143627EB58}"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
