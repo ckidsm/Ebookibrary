@@ -20,6 +20,10 @@ class AnthropicAPI:
     DEFAULT_MODEL = "claude-sonnet-4-5"   # 요약·책개요 등 품질 필요 작업
     VISION_MODEL = "claude-haiku-4-5"     # 오염검사·챕터표지 감지 등 싼 시각 판정
 
+    # ── temperature ──
+    # 구조 판정(챕터표지·목차·오염검사 등 tool_use)은 **재현성**을 위해 0. (기본 1.0이면 실행마다 결과가 흔들림)
+    DETECT_TEMPERATURE = 0.0
+
     # ── 가격 ($/1M 토큰) = (input, output) ──
     PRICES = {
         "claude-sonnet-4-5":         (3.0, 15.0),

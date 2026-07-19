@@ -1197,3 +1197,29 @@ crop→qc→trim→ocr→summarize→merge→build→**code**→**book_overview*
 - 확정: `.modal-stage img`는 **fit-to-screen 원복**(`max-width/height:100%`, origin center). 세로여백 **상단 58 / 하단 16 비대칭**(툴바는 상단만 → 하단 축소로 이미지 최대·좌우 검은여백 축소). `ViewerLayout`에 `STAGE_MARGIN_B` 추가, `modal_css` inset 4값. **좌우(H=96)는 안 줄임**(height-fit에선 줄이면 검은여백 오히려 늘어남). ⚠ 이 트레이드오프를 ViewerLayout 주석에 못박음 — 다음에 같은 왕복 금지.
 
 **발행 메모**: NAS_PASS는 `인증서/나스인증/NAS_RedCode_접속정보.md`에서 런타임 주입. sudo tar 추출 시 `~`가 root 홈으로 확장되는 함정 → **`/tmp` 절대경로** 사용.
+
+---
+
+### 2026-07-19: 신규 책 자동화 완성 — Gemini 키 영구화 + 챕터 감지 안정화·목차(TOC) 폴백 + SSH 키
+
+"새 책 분석 시 깨끗한 OCR·챕터·개요가 자동으로 나오는가"를 검증하다 두 공백을 메우고, 챕터 감지를 결정적으로 재설계했다.
+
+**① Gemini billing 키 백엔드 영구화 (자동 저비용 전사)**
+- 문제: `worker.py`/`process_book.sh` 는 이미 전 분기 `ocr --vision`(Gemini→Claude 폴백)인데, **Gemini 키가 백엔드에 없어** 새 책이 Claude 폴백(~18배 비쌈)으로 감. (env 키는 세션 한정)
+- 조치: billing 활성 Gemini 키를 `/api/settings` 에 저장 → `/api/secrets/ai` 가 반환 → 워커/CLI 가 자동 사용. `ocr_provider=gemini`, `gemini_model=gemini-2.5-flash` 확인.
+- **⚠️ 사고·수정**: PUT `ai:{gemini_api_key}` 만 보냈더니 `set_setting('ai', ...)` 이 **ai dict 를 통째 교체 → Claude `api_key` 삭제**. DB·WAL·env 어디에도 복구 불가 → 사용자에게 재입력받아 복원. **`put_settings` 를 deep-merge 로 수정**(형제 키 보존, 부분 업데이트 안전) 후 **백엔드 정식 재빌드**(`deploy.sh --backend`). 교훈: 부분 설정 PUT 전 기존값 병합 필수.
+- 배포된 백엔드가 소스보다 옛 이미지였음(gemini 지원 미반영) → 재빌드로 해소.
+
+**② 챕터 감지 안정화 + 목차(TOC) 폴백 재설계 (`chapters_detect.py`)**
+- 배경: 발행본 챕터는 대부분 **수동 보정본**. 재현 테스트로 **커버 기반 감지가 비결정적**(temperature 미설정=기본 1.0)임이 드러남 — 실행마다 가짜 장·경계 흔들림.
+- **안정화 3종**: (a) `AnthropicAPI.DETECT_TEMPERATURE=0.0` 신설 → 표지·목차 판정 **결정적**(재현성). (b) `_drop_false_chapters` — 장번호 역행/중복(섹션 오검출·스프레드 경계 중복) 제거. (c) 위치순 **순차 재번호**(부록 '9장'→'8장' 교정).
+- **TOC 폴백**(색표지 없는 책): `find_toc_pages` 를 **연속 블록** 방식으로 재설계 — 목차가 여러 페이지에 걸치고 페이지당 1~2장만 담을 때(스프레드당 Chapter 1개) '페이지당 장 ≥3' 요구가 첫/끝 장을 놓침 → '제목……페이지번호' 라인 밀집 페이지의 **연속 범위 전체**를 목차로. 산문/추천사는 페이지번호 라인 없어 여전히 제외. 비전으로 장 목록 추출(temp=0) → **깨끗한 전사 텍스트**에서 각 장 제목/번호로 위치 검색 → 경계. 제목 가드는 길이(>40)만(짧은 '~합니다' 제목 오제외 버그 수정). **contiguity 게이트**: 장번호 불연속/일부 위치 실패 시 스킵(수동본 보호).
+- 검증(개별 실행, 실측): **이미지바이블**(컬러표지·cover 경로) run1==run2 결정적, 가짜장 제거·부록 교정. **혼자공부 ML**(무표지·TOC 폴백) run1==run2 결정적, **9/9 장, 1~8장 경계 정확**(9장만 end 가 back matter 포함 291 vs 정답 277). **LLM**(무TOC·무표지·무헤딩=최악) → 0장 안전 반환(수동 필요, 가비지 없음).
+- ⚠️ **미해결**: (a) 마지막 장 end 가 책 끝으로 잡혀 back matter 포함(뒤 부분 감지 필요). (b) cover 경로 남은 경계 오차(비전이 특정 표지를 일관되게 다르게 판정 — 이젠 결정적이라 재현은 됨).
+
+**③ SSH 키 인증(비대화형 배포 근본 해결)**
+- NAS 는 비번 인증이라 `deploy.sh`(평범한 `ssh`)가 비대화형에서 막힘 → **passphrase 없는 배포 전용 키**(`~/.ssh/id_ed25519_kyobo_nas`) 발급, NAS `authorized_keys` 등록, `~/.ssh/config` 설정. 이후 ssh/scp/deploy/docker 가 비번 없이. 키 백업·문서화: `인증서/나스인증/`.
+
+**검증 함정 기록**: 5권 배치 재검증 스크립트가 **rate-limit 로 chapters-auto 크래시 → chapters.json 미수정 → 정답 그대로 남아 '거짓 일치'**(LLM 12/12 같은 불가능한 결과). chapters-auto 자체 로그(후보/장) 0건으로 판별. **재현 테스트는 산출물이 실제로 갱신됐는지(자체 로그/타임스탬프) 확인해야 함**. 개별 실측(위 ②)은 유효.
+
+**변경 소스 4개**: `kyobo-bridge/app/main.py`(put_settings deep-merge) · `bookcapture/anthropic_api.py`(DETECT_TEMPERATURE) · `bookcapture/chapters_detect.py`(TOC 블록·dedup·재번호·게이트·temp0) · `bookcapture/cli.py`(chapters-auto TOC 폴백 + --no-toc).

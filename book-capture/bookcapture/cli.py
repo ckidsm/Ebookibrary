@@ -383,12 +383,22 @@ def cmd_code(args) -> int:
 
 
 def cmd_chapters_auto(args) -> int:
-    """비전으로 장 표지 감지 → summary/chapters.json (OCR 깨진 책도 동작)."""
+    """장 감지 → summary/chapters.json (OCR 깨진 책도 동작).
+    ① 색표지/저밀도 표지 비전 감지 → ② 부족하면 목차(TOC) 기반 감지로 폴백(색표지 없는 책 대응)."""
     from . import chapters_detect as CD
     s = cfg.load(bridge_url=args.bridge)
     book_dir = _resolve_book_dir(args)
     chs = CD.generate_chapters(book_dir, s.ai)
-    # 챕터 0개는 **에러 아님**(챕터 트리는 선택 — 색표지 없는 책 등). exit 0 로 파이프라인 계속.
+    # 색표지 경로가 빈약하면(<2장) 목차 기반으로 재시도 — 더 많이 찾으면 그걸 채택
+    if len(chs) < 2 and not getattr(args, "no_toc", False):
+        print(f"[chapters] 표지 감지 {len(chs)}장 → 목차(TOC) 기반 재시도")
+        toc_chs = CD.generate_chapters_via_toc(book_dir, s.ai)
+        if len(toc_chs) > len(chs):
+            chs = toc_chs
+        elif not toc_chs and not chs:
+            # 둘 다 실패 → chapters.json 은 빈 배열로 유지(generate_chapters_via_toc가 이미 안 씀)
+            pass
+    # 챕터 0개는 **에러 아님**(챕터 트리는 선택). exit 0 로 파이프라인 계속.
     if not chs:
         print("[chapters] 감지된 장 0개 — 챕터 트리 없이 계속(정상)")
     return 0
@@ -754,8 +764,9 @@ def build_parser() -> argparse.ArgumentParser:
     ptt.add_argument("--dry-run", action="store_true", help="삭제 안 하고 목록만")
     ptt.set_defaults(func=cmd_trim_tail)
 
-    pca2 = sub.add_parser("chapters-auto", help="비전으로 장 표지 감지 → chapters.json(OCR 무관)")
+    pca2 = sub.add_parser("chapters-auto", help="장 감지 → chapters.json (표지 비전 + 목차 폴백)")
     pca2.add_argument("--slug"); pca2.add_argument("--book-dir")
+    pca2.add_argument("--no-toc", action="store_true", help="목차(TOC) 기반 폴백 끄기(표지 감지만)")
     pca2.set_defaults(func=cmd_chapters_auto)
 
     pov = sub.add_parser("overview", help="chapters+pages_data → book_overview.json(전체요약+장별)")

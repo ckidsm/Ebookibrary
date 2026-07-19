@@ -306,13 +306,21 @@ class SettingsUpdate(BaseModel):
 @app.put("/api/settings")
 def put_settings(payload: SettingsUpdate) -> dict:
     items = {k: v for k, v in payload.model_dump().items() if v is not None}
-    # api_key/gemini_api_key 가 빈 문자열로 오면 기존 값 유지 (마스킹 응답 후 사용자가 안 건드린 경우)
-    if "ai" in items:
-        prev = get_all_settings().get("ai") or {}
-        for fld in ("api_key", "gemini_api_key"):
-            if items["ai"].get(fld) == "" and prev.get(fld):
-                items["ai"][fld] = prev[fld]
-    n = set_all_settings(items)
+    saved = get_all_settings()
+    # ⚠️ 부분 업데이트 시 형제 키 유실 방지 (2026-07-18): set_setting 은 top-level 키 값을
+    #    통째로 교체하므로, 들어온 dict 를 저장된 dict 에 얕게 병합해 지정 안 한 하위 키를 보존한다.
+    #    (예전엔 ai:{gemini_api_key} 만 PUT 하면 api_key 가 날아갔음)
+    merged = {}
+    for k, v in items.items():
+        base = {**saved[k], **v} if isinstance(v, dict) and isinstance(saved.get(k), dict) else v
+        # api_key/gemini_api_key 가 빈 문자열이면 기존 값 유지 (마스킹 상태에서 안 건드린 경우)
+        if k == "ai" and isinstance(base, dict):
+            prev = saved.get("ai") or {}
+            for fld in ("api_key", "gemini_api_key"):
+                if base.get(fld) == "" and prev.get(fld):
+                    base[fld] = prev[fld]
+        merged[k] = base
+    n = set_all_settings(merged)
     return {"ok": True, "updated_keys": n}
 
 
