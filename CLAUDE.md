@@ -1263,3 +1263,25 @@ crop→qc→trim→ocr→summarize→merge→build→**code**→**book_overview*
 - 실측 예(인공지능 개념 사전, 163장): 전사 Gemini ~$0.34 + 요약 Haiku ~$0.35~0.57 + 챕터 ~$0.17 + 개요 ~$0.10 ≈ **$1.2/권, 장당 ~$0.007**. (Gemini 전사가 Claude 비전 $7.3/권 대비 ~18배 절감 실증.)
 
 **변경**: `index.html`(필터) · `bookcapture/cost.py`(신규) · `anthropic_api.py`(cost_usd) · `transcribe.py`·`summarize.py`·`extract_code.py`·`chapters_detect.py`·`book_overview.py`(record 호출) · `cli.py`(cost 서브커맨드) · `scripts/process_book.sh`(reset+리포트).
+
+---
+
+### 2026-07-19: 로컬 캡처 데스크탑 앱(pywebview) + 발행 SSH키 무비번화
+
+스크립트·Claude 없이 **더블클릭 앱**에서 책 골라 로컬 캡처→분석→발행. 계획 승인 후 구현(커밋 4cb0d46 등).
+
+**앱 구조 (`book-capture/desktop/` + `bookcapture/pipeline_run.py`)**
+- **pipeline_run.py**(신규): `build_steps(mode→CLI 배열)` + `run_pipeline(subprocess 순차·진행률 파싱·취소)` — worker.py:171-385 에 인라인이던 로직 추출. **worker.run_one 이 이걸 호출**(동작 불변, 회귀 없음). 앱·워커 공용.
+- **desktop/main.py**: pywebview 창에 기존 교보 웹(redcodeme.../kyobo/) embed. `JsApi.start_local/cancel/book_confirm`. on_loaded 시 `hook.js` 주입. (pywebview 6.2.1, requirements 추가.)
+- **desktop/hook.js**: `window.showAnalyzeCmd` 오버라이드 — mode=auto(로컬 매크로) 면 백엔드 /api/jobs 대신 `window.pywebview.api.start_local({slug,title,salecmdtid,pages})`. 진행 오버레이 패널(단계·%·중단) + `__kyoboApp.*` 콜백(파이썬이 evaluate_js).
+- **desktop/orchestrator.py**: `analyze(book,…)` — ①캡처 프리플라이트: `open_book_by_id(salecmdtid)` deep link → 안 열리면 `on_prompt(title)` 로 "교보앱에서 책 열고 [확인·캡처시작]" 다이얼로그 대기. ②build_steps('auto')+run_pipeline(캡처→…→발행).
+- **desktop/run.command**: 더블클릭 런처(`.venv/bin/python -m desktop.main`).
+- 검증: 앱 실행·웹 로드·hook 주입(`__kyoboApp` object, showAnalyzeCmd override, 오버레이 DOM) 실측 확인.
+
+**발행 SSH키 무비번화 (사용자 지적으로 대폭 단순화)**
+- **함정 정정**: 웹 books 폴더는 **원래 RedCode 소유·쓰기가능**이었다(옛 책들 RedCode). sudo 는 그동안 불필요했고, root 소유 잔재(8355개)는 sudo 발행이 남긴 것.
+- **1회 정규화**: `sudo chown -R RedCode:users /volume1/docker/web-apps/kyobo-library/books` → root 잔재 0. 이후 **sudo 영구 불필요**.
+- **`scripts/nas_conn.sh`(신규)**: 공용 접속 헬퍼 — **LAN(192.168.10.205:22) probe → 안 되면 외부(redcodeme.synology.me:**2200**) 자동 폴백**. SSH 키(id_ed25519_kyobo_nas) 무비번 기본, NAS_PASS 있으면 비번 폴백. **sudo 없음**. (VPN/외부망 대비 — 사용자 요구.)
+- **publish_book/images/ocr.sh 재작성**: nas_conn.sh source, `nas_ssh`/`nas_put` 사용, sudo 제거, RedCode 소유로 직접 쓰기(mv/chmod). 검증: 키접속·쓰기가능·구문 OK.
+
+**남음(선택)**: Phase 3 — py2app 서명·공증 `KyoboCapture.app`(run.command 대신 아이콘 더블클릭).
